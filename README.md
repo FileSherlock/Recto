@@ -143,6 +143,4 @@ the faces its goldens name).
 ## Documentation
 
 Full documentation is in [`guide/`](guide/) — start with the
-[architecture overview](guide/architecture/architecture-overview.md). The original
-server-based version lives on the `main` branch; [`MIGRATING.md`](MIGRATING.md) maps its
-plugin model onto this one.
+[architecture overview](guide/architecture/architecture-overview.md).
