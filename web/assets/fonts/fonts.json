@@ -1,0 +1,93 @@
+{
+  "_": "The font catalogue — the ONE list of faces Recto knows. The build writes it, with which files are present, to generated/fonts.json; text_tool builds the toolbar's font menu and the @font-face rules from that, and resolves (family, bold, italic) to a file for HarfBuzz widths. Files live beside this file (web/assets/fonts/); `python3 tools/dev/fonts_setup.py` builds them: the URW faces are converted from tol0's certified CFFs, the Windows faces copied from C:/Windows/Fonts. Family names are exactly what tol0's set-fonts table uses, so an OCR line names its face in the same words.",
+  "families": [
+    {
+      "family": "Nimbus Roman",
+      "class": "mupdf",
+      "note": "URW base-35 Times — the face MuPDF itself draws unembedded Times with",
+      "pdfNames": ["Times-Roman", "Times-Bold", "Times-Italic", "Times-BoldItalic", "Times", "NimbusRoman"],
+      "files": { "regular": "NimbusRoman-Regular.otf", "bold": "NimbusRoman-Bold.otf", "italic": "NimbusRoman-Italic.otf" }
+    },
+    {
+      "family": "Nimbus Sans",
+      "class": "mupdf",
+      "note": "URW base-35 Helvetica — MuPDF's substitute for unembedded Helvetica/Arial",
+      "pdfNames": ["Helvetica", "Helvetica-Bold", "Helvetica-Oblique", "Helvetica-BoldOblique", "NimbusSans"],
+      "files": { "regular": "NimbusSans-Regular.otf", "bold": "NimbusSans-Bold.otf" }
+    },
+    {
+      "family": "Nimbus Mono PS",
+      "class": "mupdf",
+      "note": "URW base-35 Courier — MuPDF's builtin Courier (the Outside In email family reads with it)",
+      "pdfNames": ["Courier", "Courier-Bold", "Courier-Oblique", "Courier-BoldOblique", "NimbusMono"],
+      "files": { "regular": "NimbusMonoPS-Regular.otf" }
+    },
+    {
+      "family": "DejaVu Serif",
+      "class": "free",
+      "note": "DejaVu Serif — a per-user font install seen in the corpus (EFTA01150379 family)",
+      "pdfNames": ["DejaVuSerif"],
+      "files": { "regular": "DejaVuSerif.ttf" }
+    },
+    {
+      "family": "Times New Roman",
+      "class": "windows",
+      "pdfNames": ["TimesNewRoman", "TimesNewRomanPSMT", "TimesNewRomanPS"],
+      "files": { "regular": "times.ttf", "bold": "timesbd.ttf", "italic": "timesi.ttf", "bolditalic": "timesbi.ttf" }
+    },
+    {
+      "family": "Arial",
+      "class": "windows",
+      "pdfNames": ["Arial", "ArialMT", "Arial-BoldMT", "Arial-ItalicMT"],
+      "files": { "regular": "arial.ttf", "bold": "arialbd.ttf", "italic": "ariali.ttf", "bolditalic": "arialbi.ttf" }
+    },
+    {
+      "family": "Courier New",
+      "class": "windows",
+      "pdfNames": ["CourierNew", "CourierNewPSMT", "CourierNewPS"],
+      "files": { "regular": "cour.ttf", "bold": "courbd.ttf", "italic": "couri.ttf", "bolditalic": "courbi.ttf" }
+    },
+    {
+      "family": "Calibri",
+      "class": "windows",
+      "pdfNames": ["Calibri"],
+      "files": { "regular": "calibri.ttf", "bold": "calibrib.ttf", "italic": "calibrii.ttf", "bolditalic": "calibriz.ttf" }
+    },
+    {
+      "family": "Cambria",
+      "class": "windows",
+      "pdfNames": ["Cambria"],
+      "files": { "regular": "cambria.ttf", "bold": "cambriab.ttf", "italic": "cambriai.ttf", "bolditalic": "cambriaz.ttf" }
+    },
+    {
+      "family": "Georgia",
+      "class": "windows",
+      "pdfNames": ["Georgia"],
+      "files": { "regular": "georgia.ttf", "bold": "georgiab.ttf", "italic": "georgiai.ttf", "bolditalic": "georgiaz.ttf" }
+    },
+    {
+      "family": "Tahoma",
+      "class": "windows",
+      "pdfNames": ["Tahoma"],
+      "files": { "regular": "tahoma.ttf", "bold": "tahomabd.ttf" }
+    },
+    {
+      "family": "Segoe UI",
+      "class": "windows",
+      "pdfNames": ["SegoeUI"],
+      "files": { "regular": "segoeui.ttf", "bold": "segoeuib.ttf", "italic": "segoeuii.ttf", "bolditalic": "segoeuiz.ttf" }
+    },
+    {
+      "family": "Verdana",
+      "class": "windows",
+      "pdfNames": ["Verdana"],
+      "files": { "regular": "verdana.ttf", "bold": "verdanab.ttf", "italic": "verdanai.ttf", "bolditalic": "verdanaz.ttf" }
+    },
+    {
+      "family": "Century Schoolbook",
+      "class": "windows",
+      "pdfNames": ["CenturySchoolbook", "NewCenturySchlbk"],
+      "files": { "regular": "censcbk.ttf", "bold": "schlbkb.ttf", "italic": "schlbki.ttf", "bolditalic": "schlbkbi.ttf" }
+    }
+  ]
+}

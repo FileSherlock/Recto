@@ -1,0 +1,15 @@
+{
+  "name": "webgl_mask",
+  "order": 20,
+  "styles": [
+    "webgl-mask.css"
+  ],
+  "toolbar_button": "toolbar_button.html",
+  "options_bar": "options_bar.html",
+  "ribbon_bar": null,
+  "sidebar": null,
+  "scripts_before_viewer": [
+    "webgl-mask.js"
+  ],
+  "scripts_after_app": []
+}

@@ -1,0 +1,13 @@
+{
+  "name": "redaction_refiner",
+  "order": 50,
+  "styles": [],
+  "toolbar_button": null,
+  "options_bar": null,
+  "ribbon_bar": null,
+  "sidebar": null,
+  "scripts_before_viewer": [],
+  "scripts_after_app": [
+    "redaction-refiner.js"
+  ]
+}

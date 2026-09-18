@@ -1,0 +1,12 @@
+/* Base64 decoder — subtoolbar controls */
+#b64-blocks {
+  min-width: 180px;
+  max-width: 280px;
+}
+
+#b64-status {
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

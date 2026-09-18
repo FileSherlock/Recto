@@ -1,0 +1,134 @@
+      <!-- Candidates right-panel. The host <aside> and its toggle button, CSS
+           and wiring all belong to this plugin now — delete this folder and no
+           trace of a "tools sidebar" remains in the core. Open by default
+           (the toolbar button carries `active`); api.js wires the toggle. -->
+      <aside id="tools-sidebar">
+
+        <!-- 1. Candidates -->
+        <div class="tool-card">
+          <h2><span class="step">1</span> Candidates</h2>
+
+          <div class="cand-add-row">
+            <input type="text" id="name-input" class="tool-input" placeholder="Type name...">
+            <button class="tool-btn cand-add-btn" onclick="addName()">Add</button>
+          </div>
+
+          <!-- `display` is toggled inline by api.js (none/block); the class only
+               supplies the styling, so the two don't fight. -->
+          <div id="paste-area" class="paste-area" style="display:none;">
+            <textarea id="paste-input" class="tool-input paste-textarea"
+              placeholder="Paste a list of names (one per line)..."></textarea>
+            <div class="paste-actions">
+              <button class="tool-btn paste-import-btn" onclick="processPaste()">Import Names</button>
+              <button class="tool-btn secondary paste-cancel-btn"
+                onclick="document.getElementById('paste-area').style.display='none'">Cancel</button>
+            </div>
+          </div>
+
+          <div class="cand-links">
+            <a href="#" class="cand-link"
+              onclick="document.getElementById('paste-area').style.display = document.getElementById('paste-area').style.display === 'none' ? 'block' : 'none'; return false;">
+              <span class="material-symbols-outlined">content_paste</span> Paste Mode</a>
+            <a href="#" class="cand-link cand-link--danger" onclick="clearAll(); return false;">
+              <span class="material-symbols-outlined">delete_sweep</span> Clear Custom</a>
+          </div>
+
+          <!-- Name format options — collapsed by default -->
+          <details class="cand-section">
+            <summary class="cand-section-summary">
+              <span class="cand-section-title">Name format
+                <span id="name-format-scope" class="cand-scope" title="These settings apply per redaction box">· new boxes</span>
+              </span>
+              <span id="name-settings-count" class="cand-count"></span>
+            </summary>
+
+            <div class="cand-section-body">
+              <div class="cand-group-label">Generate</div>
+              <div class="cand-checks">
+                <label class="cand-check"><input type="checkbox" id="ns-full" checked onchange="onNameSettingChange()"> Full name</label>
+                <label class="cand-check"><input type="checkbox" id="ns-first-only" onchange="onNameSettingChange()"> First only</label>
+                <label class="cand-check"><input type="checkbox" id="ns-last-only" onchange="onNameSettingChange()"> Last only</label>
+              </div>
+
+              <div class="cand-group-label">Include</div>
+              <div class="cand-checks">
+                <label class="cand-check"><input type="checkbox" id="ns-prefix" onchange="onNameSettingChange()"> Prefix/Title</label>
+                <label class="cand-check"><input type="checkbox" id="ns-suffix" onchange="onNameSettingChange()"> Suffix</label>
+                <label class="cand-check"><input type="checkbox" id="ns-nickname" onchange="onNameSettingChange()"> Nickname</label>
+              </div>
+
+              <div class="cand-group-label">Expand aliases</div>
+              <div class="cand-checks">
+                <label class="cand-check"><input type="checkbox" id="ns-expand-first" onchange="onNameSettingChange()"> First names</label>
+                <label class="cand-check"><input type="checkbox" id="ns-expand-last" onchange="onNameSettingChange()"> Last names</label>
+              </div>
+            </div>
+          </details>
+
+          <!-- Letter filter — collapsed by default (secondary control) -->
+          <details class="cand-section">
+            <summary class="cand-section-summary">
+              <span class="cand-section-title">Filter by letters</span>
+            </summary>
+
+            <div class="cand-section-body">
+              <div class="cand-filter">
+                <label class="cand-letter">Starts with
+                  <input type="text" id="ns-starts-with" maxlength="24" autocomplete="off" spellcheck="false"
+                    placeholder="e.g. Sa" oninput="onNameSettingChange()">
+                </label>
+                <label class="cand-letter">Ends with
+                  <input type="text" id="ns-ends-with" maxlength="24" autocomplete="off" spellcheck="false"
+                    placeholder="e.g. llen" oninput="onNameSettingChange()">
+                </label>
+                <span class="cand-filter-hint">One or more letters · blank = no filter</span>
+              </div>
+            </div>
+          </details>
+
+          <div class="table-cont">
+            <table>
+              <thead>
+                <tr>
+                  <th onclick="setSort('name')">Name</th>
+                  <th class="col-right" onclick="setSort('width')">Width (px) <span id="sort-icon"></span></th>
+                  <th class="col-del"></th>
+                </tr>
+              </thead>
+              <tbody id="names-body"></tbody>
+            </table>
+          </div>
+          <div class="cand-pager">
+            <button class="tool-btn secondary cand-pager-btn"
+              onclick="changePage(-1)" id="btn-prev-page" disabled>&lt; Prev</button>
+            <div class="cand-pager-info" id="page-info"></div>
+            <button class="tool-btn secondary cand-pager-btn"
+              onclick="changePage(1)" id="btn-next-page" disabled>Next &gt;</button>
+          </div>
+        </div>
+
+        <!-- 2. All Matches Summary -->
+        <div class="tool-card" id="all-matches-card" style="display: none; border: 1px solid #16a34a; background: rgba(22, 163, 74, 0.05);">
+          <h2 style="color: #16a34a; margin-bottom: 4px;"><span class="step"
+              style="background:#16a34a; color:#202124;">2</span> All Matches</h2>
+          <div id="match-progress-container" style="height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px; margin-bottom: 8px; overflow: hidden;">
+            <div id="match-progress-bar" style="height: 100%; width: 0%; background: #16a34a; transition: width 0.5s ease;"></div>
+          </div>
+
+          <div id="all-matches-summary" style="font-size: 12px; color: #9aa0a6; margin-bottom: 4px;"></div>
+          <div class="cand-filter-hint" style="margin-bottom: 8px;">Several names can share one width. Click a name to show it on the bar, or press [ / ] with the bar selected. A bar rebuilt from OCR pens matches to ¼ px; others use the Tolerance field. Two bars can be one name (a space apart, or split over a line break): a dashed chip is one person's first name on one bar and last name on the other.</div>
+          <div class="table-cont" style="max-height: 250px; overflow-y: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Page</th>
+                  <th class="col-right">Width (px)</th>
+                  <th>Matches</th>
+                </tr>
+              </thead>
+              <tbody id="all-matches-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </aside>

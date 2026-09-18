@@ -1,0 +1,10 @@
+/* WebGL mask overlay canvas. The core's generic `.page-container > canvas`
+   rule excludes `.webgl-overlay`, so this rule fully controls its rendering. */
+.webgl-overlay {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  mix-blend-mode: screen;
+}

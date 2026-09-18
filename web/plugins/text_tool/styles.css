@@ -1,0 +1,236 @@
+/* text_tool/styles.css — Unified SVG Text Layer */
+
+/* ── SVG text layer overlay ─────────────────────────────────── */
+
+.text-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none; /* let events fall through to page image by default */
+  z-index: 5;
+}
+
+/* ── Box groups ──────────────────────────────────────────────── */
+
+.utb-group {
+  pointer-events: all; /* enable interaction on the group */
+}
+
+/* Bounding-box rect — hidden by default, shown when selected */
+.utb-bbox {
+  fill: none;
+  stroke-width: 1;
+  stroke-dasharray: none;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.utb-group.selected .utb-bbox,
+.utb-group:hover .utb-bbox {
+  opacity: 1;
+}
+
+/* ── Text rendering by type ──────────────────────────────────── */
+
+.utb-text {
+  cursor: default;
+  user-select: none;
+  dominant-baseline: auto;
+  white-space: pre;
+}
+
+.utb-group[data-type="embedded"] .utb-text {
+  fill: rgba(0, 100, 255, 0.82);
+}
+
+body.hide-embedded-text .utb-group[data-type="embedded"] { display: none; }
+
+.utb-group[data-type="redaction"] .utb-text {
+  fill: rgba(129, 201, 149, 0.90);
+}
+
+.utb-group[data-type="harfbuzz"] .utb-text {
+  fill: rgba(255, 140, 0, 0.80);
+}
+
+.utb-group[data-type="ocr"] .utb-text {
+  fill: rgba(0, 200, 255, 0.70);
+}
+
+.hide-ocr .utb-group[data-type="ocr"] { display: none; }
+
+/* Selection highlight — subtle glow on bbox */
+.utb-group.selected .utb-bbox {
+  stroke-width: 1.5;
+  filter: drop-shadow(0 0 3px rgba(138, 180, 248, 0.7));
+}
+
+/* ── Micro-typography character hit areas ────────────────────── */
+
+.utb-char-hit {
+  fill: transparent;
+  stroke: none;
+  cursor: col-resize;
+  pointer-events: all;
+}
+
+.utb-group.micro-typo .utb-char-hit {
+  opacity: 1;
+}
+
+/* Hovered char hit: faint highlight */
+.utb-char-hit:hover {
+  fill: rgba(138, 180, 248, 0.25);
+}
+
+/* ── Micro-typography popover ────────────────────────────────── */
+
+.utb-nudge-popover {
+  position: absolute;
+  background: #202124;
+  border: 1px solid #3c4043;
+  border-radius: 6px;
+  padding: 8px 12px;
+  z-index: 100;
+  min-width: 160px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  font-size: 12px;
+  color: #e8eaed;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.utb-nudge-popover label {
+  color: #9aa0a6;
+  font-size: 11px;
+}
+
+.utb-nudge-popover .nudge-char-preview {
+  font-size: 20px;
+  font-family: "Times New Roman", serif;
+  text-align: center;
+  color: #8ab4f8;
+  letter-spacing: 0.05em;
+}
+
+.utb-nudge-popover input[type="range"] {
+  width: 100%;
+  accent-color: #8ab4f8;
+}
+
+.utb-nudge-popover .nudge-value {
+  text-align: right;
+  color: #8ab4f8;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Edge resize handles ─────────────────────────────────────── */
+
+.utb-edge {
+  pointer-events: all;
+}
+
+.utb-edge-l { cursor: w-resize; }
+.utb-edge-r { cursor: e-resize; }
+
+/* ── Inline text editing ─────────────────────────────────────── */
+
+.utb-inline-edit {
+  overflow: visible;
+  pointer-events: all;
+}
+
+.utb-edit-input {
+  background: rgba(32, 33, 36, 0.85);
+  border: 1px solid rgba(138, 180, 248, 0.5);
+  border-radius: 2px;
+  outline: none;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  caret-color: #8ab4f8;
+  line-height: 1;
+}
+
+.utb-edit-input:focus {
+  border-color: rgba(138, 180, 248, 0.8);
+  box-shadow: 0 0 6px rgba(138, 180, 248, 0.3);
+}
+
+/* Edit mode glow on the bounding box */
+.utb-group.editing .utb-bbox {
+  opacity: 1;
+  stroke: rgba(138, 180, 248, 0.8);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 2;
+  filter: drop-shadow(0 0 4px rgba(138, 180, 248, 0.5));
+}
+
+/* Nudge button disabled state */
+#fabric-nudge-mode:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Horizontal ruler ────────────────────────────────────────── */
+
+/* Reserve room above the page so the ruler (top: -22px) is visible. */
+.page-container {
+  margin-top: 24px;
+}
+
+.ruler-layer {
+  position: absolute;
+  top: -22px;
+  left: 0;
+  width: 100%;
+  height: 20px;
+  overflow: visible;
+  pointer-events: none; /* ticks fall through; only the marker is interactive */
+  z-index: 6;
+  background: #f5f5f5;
+  border: 1px solid #cfcfcf;
+  box-sizing: border-box;
+}
+
+.ruler-ticks line {
+  stroke: #777;
+  stroke-width: 1;
+}
+
+.ruler-label {
+  fill: #444;
+  font-family: sans-serif;
+  font-size: 8px;
+  user-select: none;
+}
+
+.ruler-marker {
+  pointer-events: all;
+  cursor: ew-resize;
+}
+
+.ruler-marker path {
+  fill: #4a8fe0;
+  stroke: #2b6cb0;
+  stroke-width: 0.6;
+}
+
+.ruler-marker:hover path {
+  fill: #6aa6ec;
+}
+
+/* Ribbon placement. The core provides the shared bar primitives; each plugin
+   declares where its own bars sit in the ribbon's reading order. */
+#fabric-insert-bar  { order: 1; }
+#fabric-options-bar { order: 2; }
+
+/* ── Pixel-renderer seam (svg-renderer.js _applyPixelRender) ────── */
+/* A plugin may draw a box as raster pixels; the <text> stays in the DOM
+   (inline-edit owns its inline display style) but is not painted. */
+.utb-group.utb-pixel-mode .utb-text { visibility: hidden; }
+.utb-pixel { image-rendering: pixelated; image-rendering: crisp-edges; }

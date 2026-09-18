@@ -1,0 +1,24 @@
+{
+  "name": "text_tool",
+  "order": 70,
+  "styles": [
+    "styles.css"
+  ],
+  "toolbar_button": "toolbar_button.html",
+  "options_bar": "options_bar.html",
+  "ribbon_bar": null,
+  "sidebar": null,
+  "scripts_before_viewer": [],
+  "scripts_after_app": [
+    "shaping.js",
+    "fonts.js",
+    "unified-text-box.js",
+    "svg-renderer.js",
+    "drag-resize.js",
+    "ruler.js",
+    "toolbar.js",
+    "micro-typo.js",
+    "inline-edit.js",
+    "text-tool.js"
+  ]
+}

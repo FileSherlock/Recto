@@ -1,0 +1,332 @@
+{
+ "1": {
+  "spans": [
+   {
+    "page": 1,
+    "text": "Golden vector document",
+    "x": 96.0,
+    "y": 94.94,
+    "w": 251.98,
+    "h": 33.24,
+    "sizePt": 18.0,
+    "font": "Times-Bold"
+   },
+   {
+    "page": 1,
+    "text": "The quick brown fox jumps over the lazy dog while the office staff ",
+    "x": 96.0,
+    "y": 149.55,
+    "w": 433.25,
+    "h": 21.34,
+    "sizePt": 12.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 1,
+    "text": "file affidavits. ",
+    "x": 96.0,
+    "y": 183.15,
+    "w": 93.76,
+    "h": 21.34,
+    "sizePt": 12.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 1,
+    "text": "Two spaces follow a sentence; a tab�does not.",
+    "x": 193.76,
+    "y": 183.15,
+    "w": 291.94,
+    "h": 21.34,
+    "sizePt": 12.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 1,
+    "text": "Times italic: difficult waffle, fjord, AVATAR To Wa",
+    "x": 96.0,
+    "y": 218.38,
+    "w": 328.48,
+    "h": 19.54,
+    "sizePt": 12.0,
+    "font": "Times-Italic"
+   },
+   {
+    "page": 1,
+    "text": "Helvetica 9.5 pt: Lesley Groff <office@example.org> 2019-07-08",
+    "x": 96.0,
+    "y": 253.58,
+    "w": 362.06,
+    "h": 17.4,
+    "sizePt": 9.5,
+    "font": "Helvetica"
+   },
+   {
+    "page": 1,
+    "text": "Helvetica bold 14 pt",
+    "x": 96.0,
+    "y": 275.49,
+    "w": 175.32,
+    "h": 25.7,
+    "sizePt": 14.0,
+    "font": "Helvetica-Bold"
+   },
+   {
+    "page": 1,
+    "text": "Courier 10 pt: ",
+    "x": 96.0,
+    "y": 320.91,
+    "w": 120.0,
+    "h": 16.65,
+    "sizePt": 10.0,
+    "font": "Courier"
+   },
+   {
+    "page": 1,
+    "text": "0123456789 ",
+    "x": 224.0,
+    "y": 320.91,
+    "w": 88.0,
+    "h": 16.65,
+    "sizePt": 10.0,
+    "font": "Courier"
+   },
+   {
+    "page": 1,
+    "text": "| ",
+    "x": 320.0,
+    "y": 320.91,
+    "w": 16.0,
+    "h": 16.65,
+    "sizePt": 10.0,
+    "font": "Courier"
+   },
+   {
+    "page": 1,
+    "text": "fixed ",
+    "x": 344.0,
+    "y": 320.91,
+    "w": 48.0,
+    "h": 16.65,
+    "sizePt": 10.0,
+    "font": "Courier"
+   },
+   {
+    "page": 1,
+    "text": "pitch",
+    "x": 408.0,
+    "y": 320.91,
+    "w": 40.0,
+    "h": 16.65,
+    "sizePt": 10.0,
+    "font": "Courier"
+   },
+   {
+    "page": 1,
+    "text": "Courier bold 8 pt, the smallest line on the page",
+    "x": 96.0,
+    "y": 351.93,
+    "w": 307.2,
+    "h": 14.93,
+    "sizePt": 8.0,
+    "font": "Courier-Bold"
+   },
+   {
+    "page": 1,
+    "text": "Times 24 pt",
+    "x": 96.0,
+    "y": 354.04,
+    "w": 152.9,
+    "h": 42.69,
+    "sizePt": 24.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 1,
+    "text": "A line below the black bar, long enough to count as body text.",
+    "x": 96.0,
+    "y": 596.49,
+    "w": 398.18,
+    "h": 21.34,
+    "sizePt": 12.0,
+    "font": "Times-Roman"
+   }
+  ],
+  "num_pages": 2
+ },
+ "2": {
+  "spans": [
+   {
+    "page": 2,
+    "text": "Page two",
+    "x": 96.0,
+    "y": 110.51,
+    "w": 93.65,
+    "h": 29.38,
+    "sizePt": 16.0,
+    "font": "Helvetica-Bold"
+   },
+   {
+    "page": 2,
+    "text": " 1. Row 1 of plain eleven point Times body text, indent 0.",
+    "x": 96.0,
+    "y": 171.22,
+    "w": 339.36,
+    "h": 19.57,
+    "sizePt": 11.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 2,
+    "text": " 2. Row 2 of plain eleven point Times body text, indent 1.",
+    "x": 106.67,
+    "y": 193.89,
+    "w": 339.36,
+    "h": 19.57,
+    "sizePt": 11.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 2,
+    "text": " 3. Row 3 of plain eleven point Times body text, indent 2.",
+    "x": 117.33,
+    "y": 216.56,
+    "w": 339.36,
+    "h": 19.57,
+    "sizePt": 11.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 2,
+    "text": " 4. Row 4 of plain eleven point Times body text, indent 0.",
+    "x": 96.0,
+    "y": 239.22,
+    "w": 339.36,
+    "h": 19.57,
+    "sizePt": 11.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 2,
+    "text": " 5. Row 5 of plain eleven point Times body text, indent 1.",
+    "x": 106.67,
+    "y": 261.89,
+    "w": 339.36,
+    "h": 19.57,
+    "sizePt": 11.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 2,
+    "text": " 6. Row 6 of plain eleven point Times body text, indent 2.",
+    "x": 117.33,
+    "y": 284.56,
+    "w": 339.36,
+    "h": 19.57,
+    "sizePt": 11.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 2,
+    "text": " 7. Row 7 of plain eleven point Times body text, indent 0.",
+    "x": 96.0,
+    "y": 307.22,
+    "w": 339.36,
+    "h": 19.57,
+    "sizePt": 11.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 2,
+    "text": " 8. Row 8 of plain eleven point Times body text, indent 1.",
+    "x": 106.67,
+    "y": 329.89,
+    "w": 339.36,
+    "h": 19.57,
+    "sizePt": 11.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 2,
+    "text": " 9. Row 9 of plain eleven point Times body text, indent 2.",
+    "x": 117.33,
+    "y": 352.56,
+    "w": 339.36,
+    "h": 19.57,
+    "sizePt": 11.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 2,
+    "text": "10. Row 10 of plain eleven point Times body text, indent 0.",
+    "x": 96.0,
+    "y": 375.22,
+    "w": 350.36,
+    "h": 19.57,
+    "sizePt": 11.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 2,
+    "text": "11. Row 11 of plain eleven point Times body text, indent 1.",
+    "x": 106.67,
+    "y": 397.89,
+    "w": 350.36,
+    "h": 19.57,
+    "sizePt": 11.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 2,
+    "text": "12. Row 12 of plain eleven point Times body text, indent 2.",
+    "x": 117.33,
+    "y": 420.56,
+    "w": 350.36,
+    "h": 19.57,
+    "sizePt": 11.0,
+    "font": "Times-Roman"
+   },
+   {
+    "page": 2,
+    "text": "Courier footer ",
+    "x": 96.0,
+    "y": 922.15,
+    "w": 108.0,
+    "h": 14.99,
+    "sizePt": 9.0,
+    "font": "Courier"
+   },
+   {
+    "page": 2,
+    "text": "with ",
+    "x": 218.4,
+    "y": 922.15,
+    "w": 36.0,
+    "h": 14.99,
+    "sizePt": 9.0,
+    "font": "Courier"
+   },
+   {
+    "page": 2,
+    "text": "wide ",
+    "x": 268.8,
+    "y": 922.15,
+    "w": 36.0,
+    "h": 14.99,
+    "sizePt": 9.0,
+    "font": "Courier"
+   },
+   {
+    "page": 2,
+    "text": "gaps",
+    "x": 319.2,
+    "y": 922.15,
+    "w": 28.8,
+    "h": 14.99,
+    "sizePt": 9.0,
+    "font": "Courier"
+   }
+  ],
+  "num_pages": 2
+ }
+}

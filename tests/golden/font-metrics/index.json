@@ -1,0 +1,210 @@
+[
+ {
+  "file": "times-new-roman.regular.16.json.gz",
+  "request": {
+   "family": "Times New Roman",
+   "bold": 0,
+   "italic": 0,
+   "size_px": 16
+  },
+  "face": "times.ttf",
+  "advances": 150,
+  "kern_pairs": 100,
+  "missing": 0
+ },
+ {
+  "file": "times-new-roman.regular.13.3333.json.gz",
+  "request": {
+   "family": "Times New Roman",
+   "bold": 0,
+   "italic": 0,
+   "size_px": 13.3333
+  },
+  "face": "times.ttf",
+  "advances": 150,
+  "kern_pairs": 100,
+  "missing": 0
+ },
+ {
+  "file": "times-new-roman.bold.16.json.gz",
+  "request": {
+   "family": "Times New Roman",
+   "bold": 1,
+   "italic": 0,
+   "size_px": 16
+  },
+  "face": "timesbd.ttf",
+  "advances": 150,
+  "kern_pairs": 102,
+  "missing": 0
+ },
+ {
+  "file": "times-new-roman.bold.13.3333.json.gz",
+  "request": {
+   "family": "Times New Roman",
+   "bold": 1,
+   "italic": 0,
+   "size_px": 13.3333
+  },
+  "face": "timesbd.ttf",
+  "advances": 150,
+  "kern_pairs": 102,
+  "missing": 0
+ },
+ {
+  "file": "arial.regular.16.json.gz",
+  "request": {
+   "family": "Arial",
+   "bold": 0,
+   "italic": 0,
+   "size_px": 16
+  },
+  "face": "arial.ttf",
+  "advances": 150,
+  "kern_pairs": 95,
+  "missing": 0
+ },
+ {
+  "file": "arial.regular.13.3333.json.gz",
+  "request": {
+   "family": "Arial",
+   "bold": 0,
+   "italic": 0,
+   "size_px": 13.3333
+  },
+  "face": "arial.ttf",
+  "advances": 150,
+  "kern_pairs": 95,
+  "missing": 0
+ },
+ {
+  "file": "arial.bold.16.json.gz",
+  "request": {
+   "family": "Arial",
+   "bold": 1,
+   "italic": 0,
+   "size_px": 16
+  },
+  "face": "arialbd.ttf",
+  "advances": 150,
+  "kern_pairs": 94,
+  "missing": 0
+ },
+ {
+  "file": "arial.bold.13.3333.json.gz",
+  "request": {
+   "family": "Arial",
+   "bold": 1,
+   "italic": 0,
+   "size_px": 13.3333
+  },
+  "face": "arialbd.ttf",
+  "advances": 150,
+  "kern_pairs": 94,
+  "missing": 0
+ },
+ {
+  "file": "courier-new.regular.16.json.gz",
+  "request": {
+   "family": "Courier New",
+   "bold": 0,
+   "italic": 0,
+   "size_px": 16
+  },
+  "face": "cour.ttf",
+  "advances": 150,
+  "kern_pairs": 0,
+  "missing": 0
+ },
+ {
+  "file": "courier-new.regular.13.3333.json.gz",
+  "request": {
+   "family": "Courier New",
+   "bold": 0,
+   "italic": 0,
+   "size_px": 13.3333
+  },
+  "face": "cour.ttf",
+  "advances": 150,
+  "kern_pairs": 0,
+  "missing": 0
+ },
+ {
+  "file": "courier-new.bold.16.json.gz",
+  "request": {
+   "family": "Courier New",
+   "bold": 1,
+   "italic": 0,
+   "size_px": 16
+  },
+  "face": "courbd.ttf",
+  "advances": 150,
+  "kern_pairs": 0,
+  "missing": 0
+ },
+ {
+  "file": "courier-new.bold.13.3333.json.gz",
+  "request": {
+   "family": "Courier New",
+   "bold": 1,
+   "italic": 0,
+   "size_px": 13.3333
+  },
+  "face": "courbd.ttf",
+  "advances": 150,
+  "kern_pairs": 0,
+  "missing": 0
+ },
+ {
+  "file": "nimbus-roman.regular.16.json.gz",
+  "request": {
+   "family": "Nimbus Roman",
+   "bold": 0,
+   "italic": 0,
+   "size_px": 16
+  },
+  "face": "NimbusRoman-Regular.otf",
+  "advances": 150,
+  "kern_pairs": 0,
+  "missing": 0
+ },
+ {
+  "file": "nimbus-roman.regular.13.3333.json.gz",
+  "request": {
+   "family": "Nimbus Roman",
+   "bold": 0,
+   "italic": 0,
+   "size_px": 13.3333
+  },
+  "face": "NimbusRoman-Regular.otf",
+  "advances": 150,
+  "kern_pairs": 0,
+  "missing": 0
+ },
+ {
+  "file": "nimbus-roman.bold.16.json.gz",
+  "request": {
+   "family": "Nimbus Roman",
+   "bold": 1,
+   "italic": 0,
+   "size_px": 16
+  },
+  "face": "NimbusRoman-Bold.otf",
+  "advances": 150,
+  "kern_pairs": 0,
+  "missing": 0
+ },
+ {
+  "file": "nimbus-roman.bold.13.3333.json.gz",
+  "request": {
+   "family": "Nimbus Roman",
+   "bold": 1,
+   "italic": 0,
+   "size_px": 13.3333
+  },
+  "face": "NimbusRoman-Bold.otf",
+  "advances": 150,
+  "kern_pairs": 0,
+  "missing": 0
+ }
+]

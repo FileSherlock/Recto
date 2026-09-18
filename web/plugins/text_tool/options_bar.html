@@ -1,0 +1,116 @@
+<!-- Unified Text Box Formatting Toolbar (text_tool) -->
+
+<!-- Persistent "Insert" group — always available so you can drop a new text/box
+     without first selecting one. `.ribbon-bar` only (openSubtoolbar never hides it). -->
+<div id="fabric-insert-bar" class="ribbon-bar">
+  <div class="options-group">
+    <div class="options-group-controls">
+      <button id="tt-add-text-btn" class="icon-button" title="Add New Text (click on page)">
+        <span class="material-symbols-outlined">text_fields</span>
+      </button>
+      <button id="tool-add-box" class="icon-button" title="Add Redaction Box (click on page)">
+        <span class="material-symbols-outlined">add_box</span>
+      </button>
+    </div>
+    <div class="options-group-header">Insert</div>
+  </div>
+</div>
+
+<!-- Contextual formatting groups — revealed only while a text/redaction box is
+     selected (see syncToolbarToBox / deselect in drag-resize.js). -->
+<div id="fabric-options-bar" class="ribbon-bar options-bar hidden">
+
+  <div class="options-divider"></div>
+
+  <div class="options-group">
+    <div class="options-group-controls">
+      <!-- filled from the font catalogue by fonts.js (generated/fonts.json); the one
+           option here is the fallback until the catalogue arrives -->
+      <select id="fabric-font-family" class="toolbar-select" title="Font family — MuPDF's own faces first, then the Windows faces the OCR models">
+        <option value="Times New Roman" selected>Times New Roman</option>
+      </select>
+      <input type="number" id="fabric-font-size" value="12" min="1" max="400" step="0.05"
+             title="Font size (pt)" class="toolbar-input-small" style="width: 64px;">
+      <span class="options-label">pt</span>
+    </div>
+    <div class="options-group-header">Font</div>
+  </div>
+
+  <div class="options-divider"></div>
+
+  <div class="options-group">
+    <div class="options-group-controls">
+      <button id="fabric-bold"          class="icon-button options-toggle" title="Bold"><b style="font-family:serif;">B</b></button>
+      <button id="fabric-italic"        class="icon-button options-toggle" title="Italic"><em style="font-family:serif;">I</em></button>
+      <button id="fabric-underline"     class="icon-button options-toggle" title="Underline"><u style="font-family:serif;">U</u></button>
+      <button id="fabric-strikethrough" class="icon-button options-toggle" title="Strikethrough"><s style="font-family:serif;">S</s></button>
+      <input type="color" id="fabric-color" value="#000000" title="Text color" style="margin-left: 4px;">
+      <label class="checkbox-lbl" style="margin-left: 6px;" title="Apply the font's native kerning to this text">
+        <input type="checkbox" id="kerning"> Kerning</label>
+      <span class="options-divider options-divider--inline"></span>
+      <button id="fabric-nudge-mode" class="icon-button options-toggle" title="Nudge characters (micro-typography)">
+        <span class="material-symbols-outlined" style="font-size: 18px;">width</span>
+      </button>
+    </div>
+    <div class="options-group-header">Style</div>
+  </div>
+
+  <div class="options-divider"></div>
+
+  <div class="options-group">
+    <div class="options-group-controls">
+      <input type="number" id="fabric-letter-spacing" value="0" min="-0.5" max="2" step="0.01"
+             title="Letter spacing (em)" class="toolbar-input-small" style="width: 64px;">
+      <span class="options-label">em</span>
+      <span class="options-divider options-divider--inline"></span>
+      <button id="fabric-default-sw" class="icon-button options-toggle active"
+              title="When active, use the font's native space width. Click to switch to manual control.">
+        <span style="font-size: 11px; font-weight: 600;">Default</span>
+      </button>
+      <span class="options-divider options-divider--inline"></span>
+      <span class="options-label">Space W.</span>
+      <input type="range" id="fabric-space-width" min="1" max="20" step="0.1" value="4"
+             title="Space width (px)" style="width: 60px;">
+      <span id="fabric-space-width-display" class="options-label">4px</span>
+      <span class="options-divider options-divider--inline"></span>
+      <button id="toggle-space-labels" class="icon-button options-toggle"
+              title="Show numeric width of each space character">
+        <span style="font-size: 11px; font-weight: 700; font-family: monospace; letter-spacing: -0.5px;">sp#</span>
+      </button>
+    </div>
+    <div class="options-group-header">Spacing</div>
+  </div>
+
+  <div class="options-divider"></div>
+
+  <!-- Applies to every selection, so it keeps a fixed slot ahead of the
+       redaction-only Match group. Wired in text_tool/…/text-tool.js. -->
+  <div class="options-group">
+    <div class="options-group-controls">
+      <button id="utb-delete-box" class="icon-button" title="Delete the selected box (Del)">
+        <span class="material-symbols-outlined">delete</span>
+      </button>
+    </div>
+    <div class="options-group-header">Box</div>
+  </div>
+
+  <!-- Match group — tuning that drives width matching against a detected bar.
+       Revealed only while a redaction box is selected (see syncToolbarToBox in
+       toolbar.js). The #tolerance / #force-uppercase IDs are read by whichever
+       matching plugin is installed; they are inert when none is. (Kerning is a
+       general text property and lives in the Style group above.) -->
+  <div class="options-divider hidden" id="fabric-match-divider"></div>
+
+  <div class="options-group hidden" id="fabric-match-group">
+    <div class="options-group-controls">
+      <span class="options-label">Tolerance</span>
+      <input type="number" id="tolerance" value="0.7" step="0.1" class="toolbar-input-small"
+             style="width: 44px; text-align: center;">
+      <span class="options-label">px</span>
+      <span class="options-divider options-divider--inline"></span>
+      <label class="checkbox-lbl"><input type="checkbox" id="force-uppercase"> Uppercase</label>
+    </div>
+    <div class="options-group-header">Match</div>
+  </div>
+
+</div>

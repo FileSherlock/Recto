@@ -1,0 +1,15 @@
+{
+  "name": "base64_tool",
+  "order": 30,
+  "styles": [
+    "styles.css"
+  ],
+  "toolbar_button": "toolbar_button.html",
+  "options_bar": "options_bar.html",
+  "ribbon_bar": null,
+  "sidebar": null,
+  "scripts_before_viewer": [],
+  "scripts_after_app": [
+    "base64-tool.js"
+  ]
+}

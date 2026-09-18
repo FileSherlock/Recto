@@ -1,0 +1,42 @@
+# Build output — written by tools/build.mjs (the dev server rebuilds them per index request)
+web/index.html
+web/generated/
+
+# Python, for the two development scripts under tools/dev/ and old checkouts
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Left behind by the server-based version (it lives on `main`): local state, never committed
+db.sqlite3
+*.sqlite3
+.secret_key
+media/
+demo/
+/static/
+*.log
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Debug and local test documents
+debug_out/
+_temp_test_files/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Lab — local measurement tools over the OCR engine (see lab/README.md); never committed
+lab/

@@ -1,0 +1,57 @@
+{
+ "1": {
+  "image": {
+   "mime": "image/png",
+   "width": 1000,
+   "height": 1294,
+   "mode": "RGB",
+   "sha256_rgba": "49b480253311d4cf851014d5c80f6311dedcece406f9b6b18c5ecbf54546f4f0",
+   "sha256_gray": "a9e52491605917bae8b8a91c57f9feaf37b3620a07c84bb4070b92708ec76f5b"
+  },
+  "thumb": {
+   "mime": "image/png",
+   "width": 180,
+   "height": 233,
+   "mode": "RGB",
+   "sha256_rgba": "c2412f7c1fa83191800273a25b63c3dcc778bc8e2a54d51acbc0c71e5e3da92f",
+   "sha256_gray": "664e2a5b696b46fa35dd99989db190a19d640afc34e8b1c98ade4e4251715a43"
+  },
+  "mask": {
+   "status": 200,
+   "width": 1000,
+   "height": 1320,
+   "sha256_gray": "5831a1b6048c1a343384f71ae32b7176fbcd0541a50ef93f44cee0563ced479f",
+   "nonzero": 19296,
+   "file": "mask-1.png"
+  },
+  "raster": {
+   "source": "embedded",
+   "page_rect": [
+    0.0,
+    0.0,
+    612.0,
+    807.8400268554688
+   ],
+   "rotation": 0,
+   "embedded": {
+    "width": 1000,
+    "height": 1320,
+    "bpc": 8,
+    "colorspace": "ICCBased",
+    "filter": "FlateDecode"
+   },
+   "rect": [
+    0.0,
+    0.0,
+    612.0,
+    807.8400268554688
+   ],
+   "text_rect": [
+    0.0,
+    0.0,
+    612.0,
+    807.8400268554688
+   ]
+  }
+ }
+}

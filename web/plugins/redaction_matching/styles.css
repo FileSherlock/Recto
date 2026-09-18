@@ -1,0 +1,615 @@
+/* =========================================================
+   Candidates sidebar (replaces the old inline styles)
+   ========================================================= */
+
+/* ----------------- Tools Sidebar (Right) -----------------
+   The right-panel host and its primitives used to live in the core stylesheet,
+   which meant the core styled a plugin's DOM. They belong here, with the panel
+   they dress. Delete this folder and no "tools sidebar" styling remains. */
+#tools-sidebar {
+  width: 320px;
+  background-color: #323639;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  overflow-y: auto;
+  transition: width 0.2s, padding 0.2s;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  color: #e8eaed;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+#tools-sidebar.hidden {
+  width: 0;
+  padding: 0;
+  border-left: none;
+  overflow: hidden;
+}
+
+.tool-card {
+  background-color: #202124;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.tool-card h2 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #e8eaed;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-card h2 span.step {
+  background: #8ab4f8;
+  /* Google blue for dark mode */
+  color: #202124;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+/* Sub-controls inside Tool Card */
+.control-group {
+  margin-bottom: 10px;
+}
+
+.control-group label {
+  display: block;
+  font-size: 12px;
+  color: #9aa0a6;
+  margin-bottom: 4px;
+}
+
+.tool-input {
+  width: 100%;
+  background-color: #323639;
+  border: 1px solid #5f6368;
+  color: #e8eaed;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.tool-input:focus {
+  outline: none;
+  border-color: #8ab4f8;
+}
+
+.tool-btn {
+  background-color: #8ab4f8;
+  color: #202124;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+  transition: background-color 0.15s;
+}
+
+.tool-btn:hover {
+  background-color: #aecbfa;
+}
+
+.tool-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tool-btn.secondary {
+  background-color: transparent;
+  color: #8ab4f8;
+  border: 1px solid #5f6368;
+}
+
+.tool-btn.secondary:hover {
+  background-color: rgba(138, 180, 248, 0.08);
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* Mobile: the right panel becomes a slide-in overlay (mirrors the core's
+   left-thumbnails treatment). Same breakpoint as pdf_core/styles.css. */
+@media (max-width: 768px) {
+  #tools-sidebar {
+    position: fixed;
+    top: 56px; /* Below toolbar */
+    bottom: 0;
+    right: 0;
+    width: 280px;
+    z-index: 1000;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+    border: none;
+    transform: translateX(0);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  #tools-sidebar.hidden {
+    transform: translateX(100%);
+    display: flex !important;
+    pointer-events: none;
+  }
+}
+
+/* Add-name row */
+.cand-add-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.cand-add-row .tool-btn { width: auto; }
+
+/* Paste mode */
+.paste-area {
+  margin-bottom: 12px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+.paste-textarea {
+  height: 120px;
+  resize: vertical;
+  background: transparent;
+  border: none;
+  font-family: monospace;
+}
+.paste-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.paste-actions .paste-import-btn { flex: 1; }
+.paste-actions .paste-cancel-btn { width: auto; }
+
+/* Paste Mode / Clear Custom quick links */
+.cand-links {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 0 2px;
+}
+.cand-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #8ab4f8;
+  text-decoration: none;
+}
+.cand-link:hover { text-decoration: underline; }
+.cand-link--danger { color: #f28b82; }
+.cand-link .material-symbols-outlined { font-size: 14px; }
+
+/* Collapsible sections (Name format, Filter by letters) */
+.cand-section {
+  margin-bottom: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
+}
+.cand-section-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  cursor: pointer;
+  list-style: none;            /* hide default disclosure triangle (Firefox) */
+  user-select: none;
+}
+.cand-section-summary::-webkit-details-marker { display: none; }  /* Chrome/Safari */
+.cand-section-summary::after {
+  content: 'expand_more';
+  font-family: 'Material Symbols Outlined';
+  font-size: 18px;
+  color: #9aa0a6;
+  transition: transform 0.15s ease;
+  margin-left: auto;
+}
+.cand-section[open] > .cand-section-summary::after { transform: rotate(180deg); }
+.cand-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #e8eaed;
+}
+.cand-scope {
+  color: #5f6368;
+  font-weight: 400;
+}
+.cand-count {
+  font-size: 10px;
+  color: #8ab4f8;
+}
+.cand-section-body {
+  padding: 0 8px 8px;
+}
+
+/* Name-format groups */
+.cand-group-label {
+  font-size: 10px;
+  color: #9aa0a6;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.cand-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-bottom: 9px;
+}
+.cand-check {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #e8eaed;
+  cursor: pointer;
+}
+.cand-check input { accent-color: #8ab4f8; }
+
+/* Letter filter */
+.cand-filter {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.cand-letter {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: #e8eaed;
+}
+.cand-letter input {
+  width: 72px;
+  padding: 3px 4px;
+  text-align: left;
+  font-size: 12px;
+  color: #e8eaed;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+.cand-letter input:focus { outline: none; border-color: #8ab4f8; }
+.cand-filter-hint {
+  font-size: 10px;
+  color: #5f6368;
+  line-height: 1.4;
+  padding-bottom: 3px;
+}
+
+/* Candidates table pager */
+.cand-pager {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+}
+.cand-pager .cand-pager-btn {
+  width: auto;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.cand-pager-info {
+  text-align: center;
+  font-size: 11px;
+  color: #9aa0a6;
+}
+
+.table-cont {
+  margin-top: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #202124;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: box-shadow 0.3s ease;
+}
+
+.table-cont:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+th {
+  background: #323639;
+  text-align: left;
+  padding: 6px 8px;
+  color: #9aa0a6;
+  font-weight: 500;
+  border-bottom: 1px solid #5f6368;
+  cursor: pointer;
+}
+
+td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #3c4043;
+  color: #e8eaed;
+}
+
+
+
+
+tr:hover td {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.selected-row td {
+  background: rgba(138, 180, 248, 0.15) !important;
+  color: #8ab4f8 !important;
+  font-weight: 500;
+}
+
+.best-match td {
+  background: rgba(129, 201, 149, 0.12) !important;
+  color: #81c995 !important;
+}
+
+
+th:hover {
+  background: #3c4043;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+.col-right {
+  text-align: right;
+}
+
+.col-del {
+  width: 30px;
+  text-align: center;
+}
+
+.btn-del {
+  background: transparent;
+  color: #f28b82;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-del:hover {
+  color: #ffb4ab;
+}
+
+.status-msg {
+  font-size: 12px;
+  color: #9aa0a6;
+  margin-top: 8px;
+}
+
+.status-msg.error {
+  color: #f28b82;
+}
+
+/* Inspection panel */
+.ins-row {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #3c4043;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.ins-lbl {
+  color: #9aa0a6;
+}
+
+.ins-val {
+  color: #e8eaed;
+  font-family: monospace;
+}
+
+.match-box {
+  margin-top: 10px;
+  padding: 8px;
+  background: rgba(129, 201, 149, 0.1);
+  border: 1px solid rgba(129, 201, 149, 0.4);
+  border-radius: 4px;
+}
+
+.match-item {
+  color: #81c995;
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 1px dashed rgba(129, 201, 149, 0.3);
+  padding: 4px 0;
+  display: flex;
+  justify-content: space-between;
+}
+
+.match-px {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.no-match {
+  color: #9aa0a6;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Redaction Overlays */
+
+.redaction-overlay {
+  position: absolute;
+  background-color: rgba(253, 224, 71, 0.3);
+  border: 1px solid rgba(234, 179, 8, 0.8);
+  border-radius: 2px;
+  cursor: pointer;
+  z-index: 60; /* above etv-overlay (4) and etv-overlay.active-tool (50) */
+  left:   calc(var(--px-x,      0) * var(--scale-factor, 1));
+  top:    calc(var(--px-y,      0) * var(--scale-factor, 1));
+  width:  calc(var(--px-width,  0) * var(--scale-factor, 1));
+  height: calc(var(--px-height, 0) * var(--scale-factor, 1));
+}
+
+.redaction-overlay:hover {
+  background-color: rgba(253, 224, 71, 0.55);
+}
+
+.redaction-overlay.selected {
+  background-color: rgba(138, 180, 248, 0.15);
+  border-color: rgba(138, 180, 248, 0.7);
+  box-shadow: 0 0 0 1px rgba(138, 180, 248, 0.4);
+  z-index: 20;
+}
+
+/* Hide the match glow when the overlay is selected — avoids two simultaneous rings */
+.redaction-overlay.selected::after {
+  display: none;
+}
+
+.resizer {
+  position: absolute;
+  background: transparent;
+  z-index: 30;
+}
+
+.resizer-l { left: -4px; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+.resizer-r { right: -4px; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+.resizer-t { top: -4px; left: 0; right: 0; height: 8px; cursor: ns-resize; }
+.resizer-b { bottom: -4px; left: 0; right: 0; height: 8px; cursor: ns-resize; }
+
+.resizer:hover {
+  background: rgba(138, 180, 248, 0.5);
+}
+
+/* High Confidence Match Glow */
+.redaction-overlay.has-match::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 2px;
+  border: 1px solid #81c995;
+  box-shadow: 0 0 10px rgba(129, 201, 149, 0.3);
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.redaction-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  min-width: 100%;
+  height: 100%;
+  width: max-content;
+  color: #81c995;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: visible;
+  z-index: 10;
+  user-select: none; /* prevent text selection during drag */
+  cursor: move;
+}
+
+
+.redaction-label:focus {
+  outline: none;
+  cursor: text;
+  overflow: visible;
+  z-index: 100;
+}
+
+/* When label also carries .etv-span, override position/cursor/select conflicts.
+   Two-class specificity (0,2,0) beats either single-class rule regardless of load order. */
+.etv-span.redaction-label {
+  left: 0;
+  top: 0;
+  height: 100%;
+  cursor: move;
+  user-select: none;
+  /* Neutralise etv-span's position custom-property cascade */
+  --etv-x: 0;
+  --etv-y: 0;
+}
+
+.etv-span.redaction-label:focus {
+  cursor: text;
+}
+
+/* All Matches: several names can fit one bar — chips pick, ‹ › cycle */
+.match-chip {
+  display: inline-block;
+  cursor: pointer;
+  padding: 1px 5px;
+  margin: 0 3px 2px 0;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  color: #81c995;
+}
+.match-chip:hover { border-color: #81c995; }
+.match-chip.active {
+  background: rgba(22, 163, 74, 0.25);
+  border-color: #16a34a;
+  color: #fff;
+}
+.match-cycle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-right: 6px;
+  color: #9aa0a6;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.match-cycle-btn {
+  background: none;
+  border: 1px solid #3c4043;
+  color: #e8eaed;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0 5px;
+  line-height: 16px;
+  font-size: 13px;
+}
+.match-cycle-btn:hover { border-color: #8ab4f8; }
+.shown-match td:first-child { font-weight: 600; }
+td[data-name] { cursor: pointer; }
+
+/* Page-pixel verdicts on chips (optional hypothesis tester), tolerance note */
+.match-verdict { display: inline-block; width: 11px; margin-right: 2px; font-family: system-ui, sans-serif; }
+.match-chip.verdict-consistent { color: #81c995; }
+.match-chip.verdict-no-evidence { color: #9aa0a6; }
+.match-chip.verdict-contradicted { color: #5f6368; text-decoration: line-through; }
+.match-chip.verdict-contradicted:hover { text-decoration: none; }
+.match-tol { display: block; margin-top: 3px; font-size: 10px; color: #5f6368; }
+.match-loose { font-size: 10px; color: #f28b82; margin-bottom: 3px; }
+
+/* Two bars, one name: a pair reading shows this bar's half (dashed), and the
+   row says which bar holds the other half */
+.match-chip.pair { border-style: dashed; border-color: rgba(129, 201, 149, 0.5); }
+.match-chip.pair.active { border-style: solid; }
+.match-link { font-size: 10px; color: #8ab4f8; margin-bottom: 3px; }
+/* A near miss the page pixels vouch for (outside the pen lattice) */
+.match-chip.near { border-style: dotted; border-color: rgba(129, 201, 149, 0.5); }

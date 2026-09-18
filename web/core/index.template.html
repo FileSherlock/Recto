@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recto — PDF Editor</title>
+  <link rel="icon" href="core/favicon.ico">
+
+  <!-- Material Symbols Outlined for Chrome-like icons -->
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Fabric.js v5 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+
+  <link rel="stylesheet" href="core/styles.css">
+  <!-- @plugins:styles -->
+</head>
+
+<body>
+  <!-- Disclaimer Modal -->
+<!--  <div id="disclaimer-overlay">
+    <div id="disclaimer">
+      <h3>Work in Progress</h3>
+      <p>Recto is <strong>unfinished</strong> and actively being developed. Features may be incomplete, broken, or produce incorrect results.</p>
+      <p>Recto is provided as-is, with no claim of accuracy, completeness, or fitness for any particular purpose, and no liability for any consequences arising from its use.</p>
+      <p>Analysis plugins produce <strong>estimates, not facts</strong>. Results may be incomplete or wrong, and should be independently verified before you rely on them. Do not use Recto to circumvent lawful redactions or to violate anyone's privacy. You are solely responsible for how you use this software.</p>
+      <button id="disclaimer-accept">I Understand &amp; Accept</button>
+    </div>
+  </div>-->
+
+  <!-- Drag and drop overlay -->
+  <div id="drag-overlay" class="hidden">
+    <div class="drag-text">Drop a PDF or image to open</div>
+  </div>
+
+  <div id="app-container">
+    <!-- Top Toolbar -->
+    <header id="toolbar">
+      <div id="toolbar-left">
+        <button id="toggle-sidebar" class="icon-button" title="Toggle thumbnails">
+          <span class="material-symbols-outlined">view_sidebar</span>
+        </button>
+        <a href="https://github.com/FileSherlock/Recto" target="_blank" rel="noopener noreferrer" class="icon-button" aria-label="GitHub Repository" style="color: inherit; text-decoration: none;">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display: inline-block; vertical-align: middle;">
+            <path d="M10.226 17.284c-2.965-.36-5.054-2.493-5.054-5.256 0-1.123.404-2.336 1.078-3.144-.292-.741-.247-2.314.09-2.965.898-.112 2.111.36 2.83 1.01.853-.269 1.752-.404 2.853-.404 1.1 0 1.999.135 2.807.382.696-.629 1.932-1.1 2.83-.988.315.606.36 2.179.067 2.942.72.854 1.101 2 1.101 3.167 0 2.763-2.089 4.852-5.098 5.234.763.494 1.28 1.572 1.28 2.807v2.336c0 .674.561 1.056 1.235.786 4.066-1.55 7.255-5.615 7.255-10.646C23.5 6.188 18.334 1 11.978 1 5.62 1 .5 6.188.5 12.545c0 4.986 3.167 9.12 7.435 10.669.606.225 1.19-.18 1.19-.786V20.63a2.9 2.9 0 0 1-1.078.224c-1.483 0-2.359-.808-2.987-2.313-.247-.607-.517-.966-1.034-1.033-.27-.023-.359-.135-.359-.27 0-.27.45-.471.898-.471.652 0 1.213.404 1.797 1.235.45.651.921.943 1.483.943.561 0 .92-.202 1.437-.719.382-.381.674-.718.944-.943"></path>
+          </svg>
+        </a>
+        <div id="document-title">No PDF Loaded</div>
+      </div>
+
+      <div id="toolbar-center">
+        <button id="prev-page" class="icon-button" title="Previous Page">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <input type="number" id="page-input" class="toolbar-input" value="0" min="0" max="0">
+        <span id="page-count">/ 0</span>
+        <button id="next-page" class="icon-button" title="Next Page">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>
+
+      <div id="toolbar-right">
+        <div class="zoom-controls">
+          <button id="zoom-out" class="icon-button" title="Zoom out">
+            <span class="material-symbols-outlined">remove</span>
+          </button>
+          <div class="zoom-input-container">
+            <input type="text" id="zoom-input" value="100%">
+          </div>
+          <button id="zoom-in" class="icon-button" title="Zoom in">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+        </div>
+
+        <div class="divider"></div>
+
+        <input type="file" id="pdf-file" accept="application/pdf,.pdf,image/png,image/jpeg,image/tiff,image/bmp,image/webp,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp" style="display: none;">
+        <button id="upload-pdf-btn" class="icon-button" title="Upload PDF" onclick="document.getElementById('pdf-file').click()">
+          <span class="material-symbols-outlined">upload_file</span>
+        </button>
+
+        <!-- @plugins:toolbar_buttons -->
+
+      </div>
+    </header>
+
+    <div id="unified-options-bar-container">
+      <div id="text-toolbar-row">
+        <!-- @plugins:bars -->
+      </div>
+    </div>
+
+
+    <!-- Main Content Area -->
+    <div id="main-content">
+
+      <!-- Thumbnails Sidebar (Left) -->
+      <aside id="sidebar" class="hidden">
+        <div id="thumbnail-view"></div>
+      </aside>
+
+      <!-- PDF Viewer Container -->
+      <main id="viewer-container">
+        <div id="viewer" class="pdfViewer">
+          <!-- Canvas items go here -->
+          <!-- Initial State / Loading -->
+          <div id="viewer-placeholder" style="margin-top: 100px; color: #9aa0a6; text-align: center;">
+            <span class="material-symbols-outlined" style="font-size: 48px; opacity: 0.5;">description</span>
+            <p id="placeholder-text">Open a PDF or image to begin.</p>
+            <div id="analysis-loader" class="hidden" style="margin-top: 20px;">
+              <div class="premium-spinner"></div>
+              <p style="margin-top: 16px; color: #8ab4f8; font-weight: 500;">Opening document…</p>
+            </div>
+          </div>
+
+        </div>
+      </main>
+
+      <!-- Right-panel host: each plugin that declares a `sidebar` provides its
+           own container element. The core just drops them in after the viewer;
+           it owns no panel of its own. -->
+      <!-- @plugins:sidebars -->
+
+
+    </div>
+  </div>
+
+  <div id="sidebar-backdrop" class="hidden"></div>
+
+  <!-- @assets -->
+  <script src="core/hooks.js"></script>
+  <script src="core/geometry.js"></script>
+  <script src="core/state.js"></script>
+  <script src="core/doc-service.js"></script>
+  <!-- @plugins:scripts_before_viewer -->
+  <script src="core/pdf-viewer.js"></script>
+  <script src="core/ui-events.js"></script>
+  <script src="core/app.js"></script>
+
+
+  <!-- Polyfill for Fabric.js v5 using 'alphabetical' textBaseline which causes browser warnings -->
+  <script>
+    const originalTextBaseline = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'textBaseline');
+    if (originalTextBaseline) {
+      Object.defineProperty(CanvasRenderingContext2D.prototype, 'textBaseline', {
+        get: function() { return originalTextBaseline.get.call(this); },
+        set: function(val) {
+          if (val === 'alphabetical') val = 'alphabetic';
+          originalTextBaseline.set.call(this, val);
+        }
+      });
+    }
+  </script>
+
+  <!-- @plugins:scripts_after_app -->
+
+  <!--
+  <script>
+    document.getElementById('disclaimer-accept').addEventListener('click', function () {
+      document.getElementById('disclaimer-overlay').classList.add('hidden');
+    });
+  </script>
+  -->
+</body>
+
+</html>

@@ -1,0 +1,14 @@
+{
+ "page_image_type": "image/png",
+ "page_width": 816,
+ "page_height": 1056,
+ "num_pages": 340,
+ "pdf_fonts": [
+  "Helvetica",
+  "Helvetica-Bold",
+  "Times-Roman"
+ ],
+ "suggested_scale": 133,
+ "suggested_size": 11.5,
+ "sha256": "370b1d50ba19fda80a74a530e3f9be3bf959f491e26ee17f085dad21e9cab9aa"
+}

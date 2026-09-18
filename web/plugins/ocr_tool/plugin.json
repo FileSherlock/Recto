@@ -1,0 +1,26 @@
+{
+  "name": "ocr_tool",
+  "order": 60,
+  "styles": [
+    "styles.css"
+  ],
+  "toolbar_button": "toolbar_button.html",
+  "options_bar": "options_bar.html",
+  "ribbon_bar": null,
+  "sidebar": null,
+  "scripts_before_viewer": [],
+  "scripts_after_app": [
+    "engine/core.js",
+    "engine/ocr.js",
+    "engine/ocr-engine.js",
+    "engine/blindocr.js",
+    "engine/render.js",
+    "engine/set-fonts.js",
+    "engine/hypothesis.js",
+    "engine/ftraster.js",
+    "ocr-result.js",
+    "ocr-tool.js",
+    "pixel-view.js",
+    "hypothesis-view.js"
+  ]
+}

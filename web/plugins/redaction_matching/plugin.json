@@ -1,0 +1,15 @@
+{
+  "name": "redaction_matching",
+  "order": 40,
+  "styles": [
+    "styles.css"
+  ],
+  "toolbar_button": "toolbar_button.html",
+  "options_bar": null,
+  "ribbon_bar": null,
+  "sidebar": "sidebar_tools.html",
+  "scripts_before_viewer": [
+    "api.js"
+  ],
+  "scripts_after_app": []
+}

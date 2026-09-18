@@ -1,0 +1,17 @@
+/* ocr_tool — everything inherits the core options-bar / icon-button look;
+   only the status readout and the stop button need their own rules. */
+
+#ocr-tool-bar #ocr-status {
+  max-width: 480px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#ocr-tool-bar #ocr-cancel {
+  color: #f28b82;
+}
+
+/* ocr-toggle-text: hide the OCR text overlay globally (mirror of text_tool's
+   body.hide-embedded-text rule; OCR-detected redaction rects stay visible). */
+body.hide-ocr-text .utb-group[data-type="ocr"] { display: none; }

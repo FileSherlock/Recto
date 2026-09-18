@@ -1,0 +1,257 @@
+{
+ "1": {
+  "image": {
+   "mime": "image/png",
+   "width": 816,
+   "height": 1056,
+   "mode": "L",
+   "sha256_rgba": "7c0d1b87ba7f9947a3647901c1de8ed69e87b0bd95a6c94a7f278feb5665a9c2",
+   "sha256_gray": "8589b577838e7389c4d3733ca3e1bd9e15413581b50421871d0ae3161028fa20"
+  },
+  "thumb": {
+   "mime": "image/png",
+   "width": 180,
+   "height": 233,
+   "mode": "L",
+   "sha256_rgba": "ef35469923d14b564ec6ee80c16385a70c19048bcf90b8b21ea3196100151017",
+   "sha256_gray": "5b4d3ed77620684c12cca2b50ccd82d11a0ff17f1864b50b26e4d9b5d4032e09"
+  },
+  "mask": {
+   "status": 200,
+   "width": 816,
+   "height": 1056,
+   "sha256_gray": "68867f661e86a815a933cf0fecb725bda44e9cf2a9fb6877ecae8879152605dd",
+   "nonzero": 8896,
+   "file": "mask-1.png"
+  },
+  "raster": {
+   "source": "embedded",
+   "page_rect": [
+    0.0,
+    0.0,
+    612.0,
+    810.0
+   ],
+   "rotation": 0,
+   "embedded": {
+    "width": 816,
+    "height": 1056,
+    "bpc": 8,
+    "colorspace": "DeviceGray",
+    "filter": "FlateDecode"
+   },
+   "rect": [
+    0.0,
+    0.0,
+    612.0,
+    792.0
+   ],
+   "text_rect": [
+    0.0,
+    0.0,
+    612.0,
+    792.0
+   ]
+  }
+ },
+ "2": {
+  "image": {
+   "mime": "image/png",
+   "width": 816,
+   "height": 1056,
+   "mode": "L",
+   "sha256_rgba": "20a22f8ce04eab874186f0ca4a1040ec0f364eac6f797f9230fb9bbdcda1b395",
+   "sha256_gray": "ceb783bb02d292a40f1189b02fdfedddb1c12c0dc56a5bf2d5b48f86ca4ac756"
+  },
+  "thumb": {
+   "mime": "image/png",
+   "width": 180,
+   "height": 233,
+   "mode": "L",
+   "sha256_rgba": "aae00322631707be0b20031d256a53d2d30dde4c45982ad47a3ac6d58737f8ba",
+   "sha256_gray": "02af5152636d866bc2091105e28548854aa9eacce0dbd1bccccebb92421fc128"
+  },
+  "mask": {
+   "status": 204
+  },
+  "raster": {
+   "source": "embedded",
+   "page_rect": [
+    0.0,
+    0.0,
+    612.0,
+    810.0
+   ],
+   "rotation": 0,
+   "embedded": {
+    "width": 816,
+    "height": 1056,
+    "bpc": 8,
+    "colorspace": "DeviceGray",
+    "filter": "FlateDecode"
+   },
+   "rect": [
+    0.0,
+    0.0,
+    612.0,
+    792.0
+   ],
+   "text_rect": [
+    0.0,
+    0.0,
+    612.0,
+    792.0
+   ]
+  }
+ },
+ "3": {
+  "image": {
+   "mime": "image/png",
+   "width": 816,
+   "height": 1056,
+   "mode": "L",
+   "sha256_rgba": "6060548cd811e3a62165fbdd3dd15c2569545823c2838a44eb1afbb14d2d8820",
+   "sha256_gray": "bafae6cad413029709616e9c8ad99144c4da2226574ce5e11edefe591b42ec93"
+  },
+  "thumb": {
+   "mime": "image/png",
+   "width": 180,
+   "height": 233,
+   "mode": "L",
+   "sha256_rgba": "28c17509dc46b0c5ca25d732f622dfdd0e020dffd3823c30ff26a8e5b6ef982e",
+   "sha256_gray": "ac5013c958e16b26bd68e93694e1b70376a9ef14edbeb26086b6c1fceeefc500"
+  },
+  "mask": {
+   "status": 204
+  },
+  "raster": {
+   "source": "embedded",
+   "page_rect": [
+    0.0,
+    0.0,
+    612.0,
+    810.0
+   ],
+   "rotation": 0,
+   "embedded": {
+    "width": 816,
+    "height": 1056,
+    "bpc": 8,
+    "colorspace": "DeviceGray",
+    "filter": "FlateDecode"
+   },
+   "rect": [
+    0.0,
+    0.0,
+    612.0,
+    792.0
+   ],
+   "text_rect": [
+    0.0,
+    0.0,
+    612.0,
+    792.0
+   ]
+  }
+ },
+ "4": {
+  "image": {
+   "mime": "image/png",
+   "width": 816,
+   "height": 1056,
+   "mode": "L",
+   "sha256_rgba": "482310f97a4bf81be3751f0042e0defa521854aeb8ae6ce6f79132b75af33b79",
+   "sha256_gray": "9bfd7b2caa9c5ed0fbcf43b81e6e76945f235a620b117ad2237b804db9a403c8"
+  },
+  "thumb": {
+   "mime": "image/png",
+   "width": 180,
+   "height": 233,
+   "mode": "L",
+   "sha256_rgba": "f488345a8a3e0cee5254439bcd5bc23db75ec273a5157ea9b0adc79e39a51004",
+   "sha256_gray": "d1f84ec5691553676c2843f25134d8511fe19356ccf9cd5c85e0a3b6fbb3ec1f"
+  },
+  "mask": {
+   "status": 204
+  },
+  "raster": {
+   "source": "embedded",
+   "page_rect": [
+    0.0,
+    0.0,
+    612.0,
+    810.0
+   ],
+   "rotation": 0,
+   "embedded": {
+    "width": 816,
+    "height": 1056,
+    "bpc": 8,
+    "colorspace": "DeviceGray",
+    "filter": "FlateDecode"
+   },
+   "rect": [
+    0.0,
+    0.0,
+    612.0,
+    792.0
+   ],
+   "text_rect": [
+    0.0,
+    0.0,
+    612.0,
+    792.0
+   ]
+  }
+ },
+ "5": {
+  "image": {
+   "mime": "image/png",
+   "width": 816,
+   "height": 1056,
+   "mode": "L",
+   "sha256_rgba": "3e369ebbcdb5b8587e2ea7acd08522914fb6e0859f28a0854e24a32be41df2ae",
+   "sha256_gray": "184b6d535ab95cdc27e14eed3692d20cce22945c213704a237b7b47a3568ab0a"
+  },
+  "thumb": {
+   "mime": "image/png",
+   "width": 180,
+   "height": 233,
+   "mode": "L",
+   "sha256_rgba": "8143b90a1e72f00454bacabe0b48fa8c6067a8ab041f21747c26e538b83a9798",
+   "sha256_gray": "00196152b60c7001afe6825f5209b173cb94915c1c89d8abde13bce66a4d66e8"
+  },
+  "mask": {
+   "status": 204
+  },
+  "raster": {
+   "source": "embedded",
+   "page_rect": [
+    0.0,
+    0.0,
+    612.0,
+    810.0
+   ],
+   "rotation": 0,
+   "embedded": {
+    "width": 816,
+    "height": 1056,
+    "bpc": 8,
+    "colorspace": "DeviceGray",
+    "filter": "FlateDecode"
+   },
+   "rect": [
+    0.0,
+    0.0,
+    612.0,
+    792.0
+   ],
+   "text_rect": [
+    0.0,
+    0.0,
+    612.0,
+    792.0
+   ]
+  }
+ }
+}

@@ -1,0 +1,148 @@
+# Recto
+
+An extensible PDF editor that runs entirely in the browser. Open a PDF or scanned image, edit
+and add real text with true font metrics, mask regions, and inspect embedded text — then
+extend it with drop-in plugins.
+
+Recto is a static website: a folder of files, no server-side code. MuPDF and HarfBuzz run as
+WebAssembly, analysis runs in workers, and **the document you open never leaves your
+browser**.
+
+## How it works
+
+Recto's core does one thing: it opens a document, renders its pages, and exposes a plugin
+API. Everything else is a plugin.
+
+- **`web/core/`** — the shell. Opens the document in a MuPDF worker, rasterizes pages on
+  demand, reports the document's typography, and hosts the viewer. It runs no analysis of its
+  own; it hands plugins the primitives (page pixels, raw structured text) through the `Doc`
+  service.
+- **`web/plugins/text_tool/`** — edit and add text with real font metrics (HarfBuzz-shaped
+  widths).
+- **`web/plugins/embedded_text_viewer/`** — inspect the text already embedded in the PDF.
+- **`web/plugins/webgl_mask/`** — find the blacked-out regions of a scanned page and tint
+  them on the GPU.
+
+Optional plugins ship separately and are documented in [`guide/plugins/`](guide/plugins/) —
+nothing in the core or the list above depends on them.
+
+A plugin is a folder under `web/plugins/` with a `plugin.json`. **Drop a folder in to add a
+tool; drag it out to remove it.** The manifest declares the UI slots the plugin fills (toolbar
+button, ribbon bar, sidebar, scripts, styles); `tools/build.mjs` scans the manifests and
+writes the page. At run time the plugin subscribes to lifecycle events on the `PDFHooks` bus —
+so the core never calls a plugin by name, and removing one leaves nothing dangling.
+
+See [`guide/tool-expansion-guide.md`](guide/tool-expansion-guide.md) to write one.
+
+## Run
+
+> **Requires:** [Node.js](https://nodejs.org/) (developed with Node 22). Node is needed for
+> the development server, the build and the tests only — there is nothing to install, and the
+> site itself needs no Node.
+
+```bash
+node tools/serve.mjs            # → http://localhost:5000
+node tools/serve.mjs 8080       # another port
+node tools/serve.mjs --no-isolate   # without the COOP/COEP headers
+```
+
+Then open <http://localhost:5000>. The server is a zero-dependency static file server for
+`web/` that also runs the build on every request for `index.html`, so a plugin folder dropped
+into or taken out of `web/plugins/` shows on reload. It serves `.wasm` as `application/wasm`
+and sends COOP/COEP headers (cross-origin isolation, which exposes memory measurement in the
+browser). It listens on `127.0.0.1` only and is meant for development.
+
+The PDF directly in `web/assets/pdfs/` is the startup document; without one the app starts
+empty.
+
+## Test
+
+```bash
+node --test "tests/**/*.test.mjs"   # every suite — a few seconds, no browser, no dependencies
+node tests/smoke/smoke.mjs          # the whole site in headless Chrome, once per golden document
+```
+
+The suites hold each computation to recorded reference outputs in `tests/golden/`: page
+rasters and masks pixel for pixel, embedded-text spans within 1e-6, HarfBuzz widths to the
+last digit. They also check the generated page — script order, every control, and that a
+plugin which is not there leaves no trace. A suite skips a sample document that is not in
+the checkout (`tests/samples/` holds a 66 MB one).
+
+The smoke test needs Chrome and `puppeteer-core`. The latter is not a dependency of this
+repository; the script looks for it in `./node_modules` and `../tol0/node_modules` and exits
+with code 2 when it finds neither.
+
+## Deploy
+
+```bash
+node tools/build.mjs     # writes web/index.html and web/generated/*
+```
+
+Then publish the `web/` folder on any static file host. What the host has to get right:
+
+- **`.wasm` is served as `application/wasm`** — streaming compilation requires it.
+- **`index.html` and `generated/*.json` are revalidated** (`Cache-Control: no-cache`).
+  `index.html` is the one file that names every content hash.
+- **Everything else may be cached for a long time.** Every URL the page uses carries a
+  content hash (`?v=<first 8 hex digits of the file's sha256>`), so a changed file gets a new
+  URL. The exceptions are the few files the vendored modules import by a plain relative URL —
+  see `web/vendor/README.md`. A cache in front of the site must keep the query string in its
+  cache key.
+- **COOP/COEP headers are optional.** The app works without cross-origin isolation.
+
+The page loads Fabric.js from cdnjs and its icon and UI fonts from Google Fonts; everything
+else comes from `web/`. There is no bundler, no transpiler and no package manager.
+`web/index.html` and `web/generated/` are build outputs and are not committed.
+
+Details: [`guide/setup-and-deployment/`](guide/setup-and-deployment/setup-deployment.md).
+
+## Layout
+
+```
+web/                     everything the static site serves
+  index.html             GENERATED by tools/build.mjs — never edited by hand
+  core/                  the core: page template, hook bus, document service + MuPDF worker, viewer
+  plugins/<name>/        one self-contained folder per plugin: plugin.json + HTML fragments + js + css
+  vendor/                pinned third-party WebAssembly builds (see below)
+  assets/fonts/          fonts.json (the font catalogue) + the face files it names
+  assets/pdfs/           the startup document
+  generated/             GENERATED: plugins.json, fonts.json, default-document.json
+tools/
+  build.mjs              the scan: web/plugins/*/plugin.json → web/index.html + web/generated/*
+  serve.mjs              the development server
+  dev/                   standalone maintenance scripts; not needed to run, build or test
+tests/
+  *.test.mjs             node:test suites          plugins/<name>/   a plugin's own suites
+  golden/                recorded reference outputs   samples/       the documents they were recorded from
+  smoke/smoke.mjs        browser smoke test
+guide/                   documentation
+```
+
+A clean checkout is about 119 MB: `web/` 49 MB — fonts 24, plugins 14, MuPDF 11, HarfBuzz
+0.5, the startup PDF 0.6 — and `tests/` 69 MB, of which the sample documents are 67.
+
+## Vendored binaries
+
+Third-party builds the site loads at run time, copied in verbatim and pinned. Versions,
+sources and upgrade notes are in [`web/vendor/README.md`](web/vendor/README.md).
+
+| Folder | What | Version | Licence |
+|---|---|---|---|
+| `web/vendor/mupdf/` | MuPDF as WebAssembly (`mupdf.js`, `mupdf-wasm.js`, `mupdf-wasm.wasm`, ~10 MB) | 1.28.0 (npm `mupdf@1.28.0`) | AGPL-3.0 — `web/vendor/mupdf/LICENSE` |
+| `web/vendor/harfbuzz/` | HarfBuzz as WebAssembly (`index.mjs`, `harfbuzz.js`, `harfbuzz.wasm`, ~0.5 MB) | harfbuzzjs 1.6.1 = HarfBuzz 14.4.0 | MIT — `web/vendor/harfbuzz/LICENSE` |
+
+Recto's own code is under the MIT licence ([`LICENSE`](LICENSE)). The licences above are those
+of the vendored components as their upstreams state them; each folder carries the full text.
+
+`web/assets/fonts/` holds the free URW and DejaVu faces beside Windows faces (Times New
+Roman, Arial, Courier New and others), which are proprietary. The font catalogue records per
+family which files are present, and the font menu marks a family without its files as not
+installed, so the app still works in a checkout without them (`tests/shaping.test.mjs` needs
+the faces its goldens name).
+
+## Documentation
+
+Full documentation is in [`guide/`](guide/) — start with the
+[architecture overview](guide/architecture/architecture-overview.md). The original
+server-based version lives on the `main` branch; [`MIGRATING.md`](MIGRATING.md) maps its
+plugin model onto this one.

@@ -1,0 +1,285 @@
+{
+ "families": [
+  {
+   "family": "Nimbus Roman",
+   "class": "mupdf",
+   "note": "URW base-35 Times — the face MuPDF itself draws unembedded Times with",
+   "pdfNames": [
+    "Times-Roman",
+    "Times-Bold",
+    "Times-Italic",
+    "Times-BoldItalic",
+    "Times",
+    "NimbusRoman"
+   ],
+   "files": {
+    "regular": "NimbusRoman-Regular.otf",
+    "bold": "NimbusRoman-Bold.otf",
+    "italic": "NimbusRoman-Italic.otf"
+   },
+   "present": {
+    "regular": true,
+    "bold": true,
+    "italic": true
+   }
+  },
+  {
+   "family": "Nimbus Sans",
+   "class": "mupdf",
+   "note": "URW base-35 Helvetica — MuPDF's substitute for unembedded Helvetica/Arial",
+   "pdfNames": [
+    "Helvetica",
+    "Helvetica-Bold",
+    "Helvetica-Oblique",
+    "Helvetica-BoldOblique",
+    "NimbusSans"
+   ],
+   "files": {
+    "regular": "NimbusSans-Regular.otf",
+    "bold": "NimbusSans-Bold.otf"
+   },
+   "present": {
+    "regular": true,
+    "bold": true
+   }
+  },
+  {
+   "family": "Nimbus Mono PS",
+   "class": "mupdf",
+   "note": "URW base-35 Courier — MuPDF's builtin Courier (the Outside In email family reads with it)",
+   "pdfNames": [
+    "Courier",
+    "Courier-Bold",
+    "Courier-Oblique",
+    "Courier-BoldOblique",
+    "NimbusMono"
+   ],
+   "files": {
+    "regular": "NimbusMonoPS-Regular.otf"
+   },
+   "present": {
+    "regular": true
+   }
+  },
+  {
+   "family": "DejaVu Serif",
+   "class": "free",
+   "note": "DejaVu Serif — a per-user font install seen in the corpus (EFTA01150379 family)",
+   "pdfNames": [
+    "DejaVuSerif"
+   ],
+   "files": {
+    "regular": "DejaVuSerif.ttf"
+   },
+   "present": {
+    "regular": true
+   }
+  },
+  {
+   "family": "Times New Roman",
+   "class": "windows",
+   "note": "",
+   "pdfNames": [
+    "TimesNewRoman",
+    "TimesNewRomanPSMT",
+    "TimesNewRomanPS"
+   ],
+   "files": {
+    "regular": "times.ttf",
+    "bold": "timesbd.ttf",
+    "italic": "timesi.ttf",
+    "bolditalic": "timesbi.ttf"
+   },
+   "present": {
+    "regular": true,
+    "bold": true,
+    "italic": true,
+    "bolditalic": true
+   }
+  },
+  {
+   "family": "Arial",
+   "class": "windows",
+   "note": "",
+   "pdfNames": [
+    "Arial",
+    "ArialMT",
+    "Arial-BoldMT",
+    "Arial-ItalicMT"
+   ],
+   "files": {
+    "regular": "arial.ttf",
+    "bold": "arialbd.ttf",
+    "italic": "ariali.ttf",
+    "bolditalic": "arialbi.ttf"
+   },
+   "present": {
+    "regular": true,
+    "bold": true,
+    "italic": true,
+    "bolditalic": true
+   }
+  },
+  {
+   "family": "Courier New",
+   "class": "windows",
+   "note": "",
+   "pdfNames": [
+    "CourierNew",
+    "CourierNewPSMT",
+    "CourierNewPS"
+   ],
+   "files": {
+    "regular": "cour.ttf",
+    "bold": "courbd.ttf",
+    "italic": "couri.ttf",
+    "bolditalic": "courbi.ttf"
+   },
+   "present": {
+    "regular": true,
+    "bold": true,
+    "italic": true,
+    "bolditalic": true
+   }
+  },
+  {
+   "family": "Calibri",
+   "class": "windows",
+   "note": "",
+   "pdfNames": [
+    "Calibri"
+   ],
+   "files": {
+    "regular": "calibri.ttf",
+    "bold": "calibrib.ttf",
+    "italic": "calibrii.ttf",
+    "bolditalic": "calibriz.ttf"
+   },
+   "present": {
+    "regular": true,
+    "bold": true,
+    "italic": true,
+    "bolditalic": true
+   }
+  },
+  {
+   "family": "Cambria",
+   "class": "windows",
+   "note": "",
+   "pdfNames": [
+    "Cambria"
+   ],
+   "files": {
+    "regular": "cambria.ttf",
+    "bold": "cambriab.ttf",
+    "italic": "cambriai.ttf",
+    "bolditalic": "cambriaz.ttf"
+   },
+   "present": {
+    "regular": true,
+    "bold": true,
+    "italic": true,
+    "bolditalic": true
+   }
+  },
+  {
+   "family": "Georgia",
+   "class": "windows",
+   "note": "",
+   "pdfNames": [
+    "Georgia"
+   ],
+   "files": {
+    "regular": "georgia.ttf",
+    "bold": "georgiab.ttf",
+    "italic": "georgiai.ttf",
+    "bolditalic": "georgiaz.ttf"
+   },
+   "present": {
+    "regular": true,
+    "bold": true,
+    "italic": true,
+    "bolditalic": true
+   }
+  },
+  {
+   "family": "Tahoma",
+   "class": "windows",
+   "note": "",
+   "pdfNames": [
+    "Tahoma"
+   ],
+   "files": {
+    "regular": "tahoma.ttf",
+    "bold": "tahomabd.ttf"
+   },
+   "present": {
+    "regular": true,
+    "bold": true
+   }
+  },
+  {
+   "family": "Segoe UI",
+   "class": "windows",
+   "note": "",
+   "pdfNames": [
+    "SegoeUI"
+   ],
+   "files": {
+    "regular": "segoeui.ttf",
+    "bold": "segoeuib.ttf",
+    "italic": "segoeuii.ttf",
+    "bolditalic": "segoeuiz.ttf"
+   },
+   "present": {
+    "regular": true,
+    "bold": true,
+    "italic": true,
+    "bolditalic": true
+   }
+  },
+  {
+   "family": "Verdana",
+   "class": "windows",
+   "note": "",
+   "pdfNames": [
+    "Verdana"
+   ],
+   "files": {
+    "regular": "verdana.ttf",
+    "bold": "verdanab.ttf",
+    "italic": "verdanai.ttf",
+    "bolditalic": "verdanaz.ttf"
+   },
+   "present": {
+    "regular": true,
+    "bold": true,
+    "italic": true,
+    "bolditalic": true
+   }
+  },
+  {
+   "family": "Century Schoolbook",
+   "class": "windows",
+   "note": "",
+   "pdfNames": [
+    "CenturySchoolbook",
+    "NewCenturySchlbk"
+   ],
+   "files": {
+    "regular": "censcbk.ttf",
+    "bold": "schlbkb.ttf",
+    "italic": "schlbki.ttf",
+    "bolditalic": "schlbkbi.ttf"
+   },
+   "present": {
+    "regular": true,
+    "bold": true,
+    "italic": true,
+    "bolditalic": true
+   }
+  }
+ ],
+ "default": "Times New Roman",
+ "static": "/static/fonts/"
+}

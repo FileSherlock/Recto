@@ -1,0 +1,690 @@
+/* Reset and Base Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body,
+html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: #525659;
+}
+
+/* Material Icons configuration */
+.material-symbols-outlined {
+  font-size: 20px;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 20
+}
+
+/* Drag and Drop Overlay */
+#drag-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#drag-overlay.hidden {
+  display: none;
+}
+
+.drag-text {
+  color: white;
+  font-size: 32px;
+  font-weight: 500;
+  pointer-events: none;
+  background: rgba(32, 33, 36, 0.9);
+  padding: 24px 48px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* Layout Container */
+#app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+/* ----------------- Toolbar ----------------- */
+#toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 48px;
+  background-color: #323639;
+  color: #F1F3F4;
+  padding: 0 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+#toolbar-left,
+#toolbar-center,
+#toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#toolbar-left {
+  flex: 1;
+}
+
+#toolbar-center {
+  flex: 0;
+  justify-content: center;
+}
+
+#toolbar-right {
+  flex: 1;
+  justify-content: flex-end;
+}
+
+/* Toolbar Buttons */
+.icon-button {
+  background: transparent;
+  border: none;
+  color: #bdc1c6;
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.icon-button:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #F1F3F4;
+}
+
+.icon-button.active {
+  background-color: rgba(138, 180, 248, 0.12);
+  color: #8ab4f8;
+}
+
+.icon-button:active {
+  background-color: rgba(138, 180, 248, 0.2);
+  transform: scale(0.95);
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background-color: rgba(255, 255, 255, 0.1);
+  margin: 0 4px;
+}
+
+/* Document Title */
+#document-title {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+  color: #e8eaed;
+  margin-left: 4px;
+}
+
+/* Inputs (Page Number, Zoom) */
+.toolbar-input {
+  background-color: #202124;
+  border: 1px solid transparent;
+  color: #F1F3F4;
+  height: 28px;
+  border-radius: 4px;
+  padding: 0 8px;
+  font-family: inherit;
+  font-size: 13px;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.toolbar-input:hover,
+.toolbar-input:focus {
+  background-color: #202124;
+  border: 1px solid #1A73E8;
+  outline: none;
+}
+
+#page-input {
+  width: 50px;
+  text-align: right;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+#page-input::-webkit-outer-spin-button,
+#page-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+#page-count {
+  font-size: 13px;
+  color: #bdc1c6;
+  white-space: nowrap;
+}
+
+/* Zoom Controls Group */
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 18px;
+  padding: 2px;
+}
+
+.zoom-input-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+#zoom-input {
+  width: 60px;
+  background: transparent;
+  border: none;
+  color: #F1F3F4;
+  text-align: center;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+#zoom-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+/* Premium Loading Spinner */
+.premium-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(138, 180, 248, 0.1);
+  border-left-color: #8ab4f8;
+  border-radius: 50%;
+  margin: 0 auto;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.hidden {
+  display: none !important;
+}
+
+
+/* ----------------- Main Content Area ----------------- */
+#main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ----------------- Thumbnails Sidebar (Left) ----------------- */
+#sidebar {
+  width: 200px;
+  background-color: #323639;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  overflow-y: auto;
+  transition: width 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+#sidebar.hidden {
+  width: 0;
+  border-right: none;
+  overflow: hidden;
+}
+
+#thumbnail-view {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+.thumbnail-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.thumbnail {
+  width: 100%;
+  background-color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: border-color 0.1s;
+}
+
+.thumbnail-container.active .thumbnail {
+  border-color: #1A73E8;
+}
+
+.thumbnail-page-num {
+  font-size: 12px;
+  color: #bdc1c6;
+  margin-top: 6px;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(40, 40, 40);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #525659;
+  border-radius: 8px;
+  border: 3px solid rgb(40, 40, 40);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #73777A;
+}
+
+/* Viewer Container */
+#viewer-container {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  touch-action: pan-x pan-y;
+  background: #525659;
+}
+
+#viewer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  gap: 16px;
+  position: relative;
+  transform-origin: top center;
+}
+
+/* Individual PDF Page Canvas styling */
+.page-container {
+  position: relative;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  display: inline-block;
+  margin: 0 auto;
+  /* CSS scale scaling logic from chrome */
+  width: calc(var(--page-width, 816px) * var(--scale-factor, 1));
+  height: calc(var(--page-height, 1056px) * var(--scale-factor, 1));
+}
+
+/* The :not(.webgl-overlay) guard keeps this generic canvas sizing from
+   overriding the webgl_mask plugin's own .webgl-overlay rule (in that plugin's
+   stylesheet). It is inert when the plugin folder is absent. */
+.page-container > canvas:not(.lower-canvas):not(.upper-canvas):not(.webgl-overlay),
+.page-container > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: auto;
+}
+
+/* Switch to nearest-neighbour only when zoomed above 100% so pixels stay sharp
+   without the aliasing that pixelated causes when downscaling. */
+.pdfViewer.zoom-in .page-container > img {
+  image-rendering: pixelated;
+}
+
+/* The right-panel "tools sidebar" (#tools-sidebar) and its inner primitives
+   (.tool-card, .tool-input, .tool-btn, …) are owned by the plugin that provides
+   that panel — its own stylesheet carries them; the core styles no right panel. */
+
+/* ----------------- Sub-Toolbar (Ribbon) ----------------- */
+#unified-options-bar-container {
+  display: flex;
+  flex-direction: column;
+  background-color: #292a2d;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  z-index: 90;
+  padding: 6px 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+#text-toolbar-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;        /* single Word-style ribbon line — never stack onto a 2nd level */
+  overflow-x: auto;         /* if it can't fit, scroll horizontally instead of wrapping */
+  overflow-y: hidden;
+  min-height: 44px;
+  scrollbar-width: thin;
+}
+
+#text-toolbar-row::-webkit-scrollbar { height: 6px; }
+#text-toolbar-row::-webkit-scrollbar-track { background: transparent; }
+#text-toolbar-row::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  border-radius: 3px;
+}
+
+/* The ribbon is built from "bars". Every bar shares the same flex layout via
+   `.ribbon-bar`. A bar that ALSO carries `.options-bar` is one that
+   `openSubtoolbar` manages (mutually-exclusive / contextual); a bar with only
+   `.ribbon-bar` is a persistent, always-visible region of the ribbon. Styling by
+   class means the core never enumerates specific plugins. Visibility of the
+   contextual bars is handled by the global `.hidden` rule above. */
+.options-bar,
+.ribbon-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: transparent;
+  padding: 0 12px;
+  flex-shrink: 0;
+  color: #e8eaed;
+  font-size: 13px;
+}
+
+/* Reading order across the ribbon is set by each plugin in its own stylesheet
+   (`order:` on its bar), so the core never names a plugin's bar and the ribbon
+   reads left-to-right regardless of the order plugins inject themselves. */
+
+.options-group {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 3px;
+  position: relative;
+  padding: 3px 0;
+}
+
+/* Word-ribbon convention: the group label sits *below* its controls. */
+.options-group-header {
+  order: 2;
+  font-size: 9px;
+  text-transform: uppercase;
+  color: #80868b;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  user-select: none;
+}
+
+.options-group-controls {
+  order: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.options-divider {
+  width: 1px;
+  height: 32px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.1), transparent);
+  flex-shrink: 0;
+  margin: 0 4px;
+  align-self: center;
+}
+
+/* A shorter divider used *inside* a group's control row, between adjacent
+   clusters of controls. */
+.options-divider--inline {
+  height: 20px;
+  margin: 0 6px;
+}
+
+.options-label {
+  font-size: 12px;
+  color: #bdc1c6;
+}
+
+/* Inputs & selects (Chrome style) */
+.toolbar-select,
+.toolbar-input-small {
+  background-color: #1f1f1f !important;
+  border: 1px solid #3c4043 !important;
+  color: #e8eaed !important;
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 12px;
+  height: 26px;
+  font-family: inherit;
+  transition: border-color 0.15s, background-color 0.15s;
+  outline: none;
+}
+
+.toolbar-select:hover,
+.toolbar-input-small:hover {
+  border-color: #5f6368 !important;
+  background-color: #252525 !important;
+}
+
+.toolbar-select:focus,
+.toolbar-input-small:focus {
+  border-color: #8ab4f8 !important;
+  background-color: #1f1f1f !important;
+  box-shadow: 0 0 0 1px #8ab4f8;
+}
+
+/* Specific Widths. Core controls only — a plugin sizes its own inputs in its
+   own stylesheet, so the core never names a plugin's DOM. */
+#fabric-font-family { min-width: 120px; }
+#fabric-font-size, #fabric-letter-spacing { width: 44px; text-align: center; }
+
+/* Customizing Checkboxes */
+.checkbox-lbl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #e8eaed;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  transition: background 0.2s;
+}
+
+.checkbox-lbl:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.checkbox-lbl input {
+  accent-color: #8ab4f8;
+  width: 14px;
+  height: 14px;
+}
+
+/* ----------------- Disclaimer Modal ----------------- */
+#disclaimer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#disclaimer-overlay.hidden {
+  display: none;
+}
+
+#disclaimer {
+  background: #202124;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 28px 32px;
+  max-width: 540px;
+  width: 90%;
+  color: #e8eaed;
+  font-size: 13px;
+  line-height: 1.6;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+#disclaimer h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  color: #f28b82;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#disclaimer h3::before {
+  content: "⚠";
+  font-size: 18px;
+}
+
+#disclaimer p {
+  margin-bottom: 10px;
+  color: #bdc1c6;
+}
+
+#disclaimer p strong {
+  color: #e8eaed;
+}
+
+#disclaimer-accept {
+  margin-top: 18px;
+  width: 100%;
+  padding: 10px;
+  background: #1A73E8;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+#disclaimer-accept:hover {
+  background: #1557b0;
+}
+
+/* ----------------- Mobile Specific Styles (Portrait) ----------------- */
+@media (max-width: 768px) {
+  #toolbar {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  #toolbar-left {
+    order: 1;
+    flex: 0 0 auto;
+  }
+
+  #toolbar-center {
+    order: 3;
+    flex: 1 0 100%;
+    margin-top: 4px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+    padding: 4px;
+  }
+
+  #toolbar-right {
+    order: 2;
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  #document-title {
+    display: none; /* Auto-hide title on mobile to save space */
+  }
+
+  .zoom-controls {
+    display: none; /* Zoom is secondary on mobile; pinch-zoom is preferred */
+  }
+
+  /* Overlay Sidebars — the left thumbnails panel. The right-panel overlay
+     rules (#tools-sidebar) live with the plugin that owns that panel. */
+  #sidebar {
+    position: fixed;
+    top: 56px; /* Below toolbar */
+    bottom: 0;
+    width: 280px;
+    z-index: 1000;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    border: none;
+    left: 0;
+    transform: translateX(0);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  #sidebar.hidden {
+    transform: translateX(-100%);
+    display: flex !important; /* Keep flex context for animation */
+    pointer-events: none;
+  }
+
+  #sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 999;
+    backdrop-filter: blur(2px);
+    transition: opacity 0.3s;
+  }
+
+  #sidebar-backdrop.hidden {
+    display: none;
+  }
+
+  /* Sub-toolbar (Ribbon) refinements */
+  #unified-options-bar-container {
+    height: auto;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .options-group-controls {
+    gap: 12px; /* More finger spacing */
+  }
+
+  /* Ribbon scrolling - ensure scrollbar is less obtrusive but present if needed */
+  #text-toolbar-row::-webkit-scrollbar {
+    height: 4px;
+  }
+  #text-toolbar-row::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+

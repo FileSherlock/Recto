@@ -1,0 +1,29 @@
+
+<!-- Base64 Decoder Sub-toolbar -->
+    <div id="b64-tool-bar" class="options-bar hidden">
+      <div class="options-divider"></div>
+      <div class="options-group">
+        <div class="options-group-header">Base64 Attachment</div>
+        <div class="options-group-controls">
+          <button id="b64-scan" class="icon-button" title="Scan the text layer for base64 blocks">
+            <span class="material-symbols-outlined">search</span>
+          </button>
+          <select id="b64-blocks" class="toolbar-select" title="Detected base64 blocks"></select>
+          <button id="b64-view" class="icon-button" title="View decoded file in a new tab" disabled>
+            <span class="material-symbols-outlined">open_in_new</span>
+          </button>
+          <button id="b64-download" class="icon-button" title="Download decoded file" disabled>
+            <span class="material-symbols-outlined">download</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="options-divider"></div>
+
+      <div class="options-group">
+        <div class="options-group-header">Result</div>
+        <div class="options-group-controls">
+          <span id="b64-status" class="options-label">idle</span>
+        </div>
+      </div>
+    </div>

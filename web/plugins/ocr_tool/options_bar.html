@@ -1,0 +1,48 @@
+
+<!-- Auto OCR Sub-toolbar -->
+    <div id="ocr-tool-bar" class="options-bar hidden">
+      <div class="options-divider"></div>
+      <div class="options-group">
+        <div class="options-group-header">Auto OCR</div>
+        <div class="options-group-controls">
+          <button id="ocr-run-page" class="icon-button" title="Read this page — byte-exact blind reader">
+            <span class="material-symbols-outlined">play_arrow</span>
+          </button>
+          <button id="ocr-run-all" class="icon-button" title="Read all pages">
+            <span class="material-symbols-outlined">playlist_play</span>
+          </button>
+          <button id="ocr-toggle-text" class="icon-button active" title="Toggle OCR Text">
+            <span class="material-symbols-outlined">visibility</span>
+          </button>
+          <button id="ocr-cancel" class="icon-button hidden" title="Stop reading (the page in progress is abandoned)">
+            <span class="material-symbols-outlined">stop</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="options-divider"></div>
+
+      <!-- MuPDF pixel view (pixel-view.js): draw every text box from the
+           reader's glyph bitmaps on mupdf's ¼-px lattice instead of SVG text;
+           Diff keeps only the pixels that differ from the page, in red. -->
+      <div class="options-group">
+        <div class="options-group-header">MuPDF view</div>
+        <div class="options-group-controls">
+          <button id="ocr-pixel-view" class="icon-button options-toggle" title="Show text as MuPDF pixels (the reader's glyph bitmaps on the ¼-px lattice)">
+            <span class="material-symbols-outlined">grid_on</span>
+          </button>
+          <button id="ocr-pixel-diff" class="icon-button options-toggle" disabled title="Highlight pixels that differ from the page (red) — needs MuPDF pixels on">
+            <span class="material-symbols-outlined">difference</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="options-divider"></div>
+
+      <div class="options-group">
+        <div class="options-group-header">Result</div>
+        <div class="options-group-controls">
+          <span id="ocr-status" class="options-label">idle</span>
+        </div>
+      </div>
+    </div>

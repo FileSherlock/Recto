@@ -1,0 +1,107 @@
+[
+ {
+  "name": "startup",
+  "sha256": "2da97a0ae0a3285da3f28712ee17123ddd4b7754a971277575c8c64e6e417957",
+  "bytes": 656725,
+  "num_pages": 5,
+  "pages": [
+   1,
+   2,
+   3,
+   4,
+   5
+  ],
+  "source": "web/assets/pdfs/EFTA00434905.pdf"
+ },
+ {
+  "name": "efta00382083",
+  "sha256": "dabdfd3066eb03e5df358564008b8811211e860e1586fa1a85d142ab08f24df3",
+  "bytes": 3642689,
+  "num_pages": 25,
+  "pages": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19,
+   20,
+   21,
+   22,
+   23,
+   24,
+   25
+  ],
+  "source": "tests/samples/EFTA00382083.pdf"
+ },
+ {
+  "name": "efta01011184",
+  "sha256": "370b1d50ba19fda80a74a530e3f9be3bf959f491e26ee17f085dad21e9cab9aa",
+  "bytes": 66026693,
+  "num_pages": 340,
+  "pages": [
+   1,
+   2,
+   3,
+   85,
+   170,
+   255,
+   340
+  ],
+  "source": "tests/samples/EFTA01011184.pdf"
+ },
+ {
+  "name": "vector",
+  "sha256": "1987f999b3d1b309c05e27e6e623d07aad3f80bc960eabe8ee5d840dec130c61",
+  "bytes": 7155,
+  "num_pages": 2,
+  "pages": [
+   1,
+   2
+  ],
+  "source": "tests/golden/_inputs/vector.pdf"
+ },
+ {
+  "name": "scan-tall",
+  "sha256": "991e8056c4a29c73d1c2d413a280b42bf4321fd6969538b7398b82518a24a211",
+  "bytes": 9276,
+  "num_pages": 1,
+  "pages": [
+   1
+  ],
+  "source": "tests/golden/_inputs/scan-tall.pdf"
+ },
+ {
+  "name": "image-png",
+  "sha256": "7924da98980cc42594ef395373cc623c666afea4690e592ccf99f646f9a7294f",
+  "bytes": 3285,
+  "num_pages": 1,
+  "pages": [
+   1
+  ],
+  "source": "tests/golden/_inputs/image.png"
+ },
+ {
+  "name": "image-jpg",
+  "sha256": "e84f309243f3078c222c0565e4872332584ec602b8af1118f3cab1773879bfc8",
+  "bytes": 19050,
+  "num_pages": 1,
+  "pages": [
+   1
+  ],
+  "source": "tests/golden/_inputs/image.jpg"
+ }
+]

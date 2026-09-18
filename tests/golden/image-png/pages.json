@@ -1,0 +1,24 @@
+{
+ "1": {
+  "image": {
+   "mime": "image/png",
+   "width": 640,
+   "height": 480,
+   "mode": "RGB",
+   "sha256_rgba": "4a3b9aad39297c991bfc76c4bd86a72e4d8142184ab703f6ca6883a9c574d5e7",
+   "sha256_gray": null,
+   "sha256_bytes": "7924da98980cc42594ef395373cc623c666afea4690e592ccf99f646f9a7294f"
+  },
+  "thumb": {
+   "mime": "image/png",
+   "width": 180,
+   "height": 135,
+   "mode": "RGB",
+   "sha256_rgba": "7340cad85f70e88845bff54444ba59f5f64e090863f5159aefc553d5c2b7f910",
+   "sha256_gray": null
+  },
+  "mask": {
+   "status": 204
+  }
+ }
+}
