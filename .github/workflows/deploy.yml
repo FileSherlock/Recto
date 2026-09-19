@@ -1,0 +1,41 @@
+# Build web/ and publish it to unbarpdf.com on every push to main — the same steps as tools/deploy.sh.
+# Needs one repository secret, DEPLOY_SSH_KEY: the private half of a key whose public half is in the
+# server's /root/.ssh/authorized_keys.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: node tools/build.mjs
+
+      - name: Set up SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          # The server's host key, pinned: a changed key fails the deploy instead of being trusted.
+          echo '46.225.122.81 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBoj5/SUhOYMGc5sRNp+BrcowD65PvAzoTdYQ5SEMURr' > ~/.ssh/known_hosts
+          printf 'Host unbarpdf\n  HostName 46.225.122.81\n  User root\n  IdentityFile ~/.ssh/deploy\n  IdentitiesOnly yes\n' > ~/.ssh/config
+
+      # Assets first, index.html last: a visitor never gets a page that points at files not uploaded yet.
+      - name: Upload
+        run: |
+          rsync -rtz --delete --chmod=D755,F644 --exclude=/index.html web/ unbarpdf:/var/www/unbarpdf/
+          rsync -tz --chmod=F644 web/index.html unbarpdf:/var/www/unbarpdf/index.html
+
+      - run: curl -sfI https://unbarpdf.com/ | head -1
