@@ -167,17 +167,20 @@ async function initWebGLOverlay(canvas, pageNum) {
           void main() {
             vec3 page = texture2D(uPage, vTexCoord).rgb;
             float mask = texture2D(uMask, vTexCoord).r;
-            float alpha = mask * uStrength;
             vec3 result;
             if (mask > 0.999) {
-              // Fully redacted interior (mask == 1.0): page ≈ 0 so division recovers nothing.
-              // Original content is unrecoverable — just show white.
-              result = vec3(uStrength);
+              // Fully redacted interior (mask == 1.0), or a rim pixel mask-core.js declared
+              // paper outright: page ≈ 0 so division recovers nothing — just show white.
+              result = vec3(1.0);
             } else {
-              // Anti-aliased border or clear pixel: invert the alpha blend
-              // multiplicatively, per channel — the page stays in color.
-              result = min(page / max(1.0 - alpha, 0.001), 1.0);
+              // A box's rim (mask = 1 − t, the page shows through as page · t) or a clear
+              // pixel: divide t out again, per channel — the page stays in color, and
+              // text under the rim comes back as dark as it was.
+              result = min(page / max(1.0 - mask, 0.001), 1.0);
             }
+            // Reveal Strength fades from the page as it is to the page revealed: linear in
+            // brightness for the interior and the rims alike — the box thins out evenly.
+            result = mix(page, result, uStrength);
             gl_FragColor = vec4(result, 1.0);
           }
         `;

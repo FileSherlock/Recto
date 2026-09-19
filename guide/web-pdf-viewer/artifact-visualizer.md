@@ -18,15 +18,15 @@ Doc.pagePixels(n, { gray: true })        ← core document service: the page ras
   └─ webgl-mask.js  buildPageMask()      ← only when raster.source === 'embedded' (the page's scan)
        └─ mask-worker.js                 ← the plugin's own worker; the gray buffer is transferred
             └─ MaskCore.buildMask(gray, width, height)      ← mask-core.js
-                 ├─ black pixels → disc rule → 5×5 open → component filter → filled regions
-                 └─ two border rings, shaded per edge run
+                 ├─ regions:       black pixels → disc rule → 5×5 open → component filter
+                 └─ transmission:  the outline's sides → rim levels per piece → t per pixel
             └─ mask → lossless PNG Blob (or null: no redaction on this page)
        └─ cached per page, loaded as the uMask texture
 ```
 
 `mask-core.js` is pure loops with no DOM in it: the worker runs it in the browser, and
-`tests/masks.test.mjs` loads the very same file under Node and holds it to recorded
-reference masks pixel for pixel.
+`tests/masks.test.mjs` loads the very same file under Node and holds its regions to the
+recorded reference masks pixel for pixel, its edges to pages built with known rims and ink.
 
 ---
 
@@ -98,66 +98,74 @@ hole of another is skipped; when the outer shape is kept, its fill (step 6) cove
   corner points, in float32. This writes out what OpenCV's `findContours` /
   `contourArea` / `arcLength` compute, so the reference masks are met exactly.
 
-**Step 6 — Filled regions**
+**Step 6 — Regions, not filled**
 
-A kept component is written into the result **filled**: the component plus everything it
-encloses. The fill floods from outside the component's bounding box (a one-pixel ring
-around it) through every pixel that is not the component's, 4-connected; whatever the flood
-cannot reach is inside. White specks and scanner noise inside a bar therefore belong to
-the region.
+A kept component is written into the region map as it is — its own pixels and nothing it
+encloses. Where the bars of adjacent lines touch they are one component, and the white
+gaps between them, with the punctuation standing there, stay page.
 
-If no component survives, `buildMask` returns `null` and the page gets no overlay.
+If no component survives, `regions` and `buildMask` return `null` and the page gets no overlay.
 
 ---
 
 ## Mask Construction
 
-### Interior fill
+### Interior
 
 ```js
-if (black[p]) mask[p] = 255;
+mask[p] = B[p] ? 255 : …
 ```
 
-Every pixel of a filled region is 255 (fully redacted).
+Every pixel of a region is 255 (fully redacted).
 
-### Two border rings — uniform shading per edge run
+### The rims — `transmission(gray, w, h, B)`
 
-A redaction bar drawn onto a page is anti-aliased: the one or two pixel rows and columns
-just outside it are the page blended with black. Two rings capture them:
+A redaction bar is drawn with a soft rim: up to three pixel rows and columns outside it,
+all the way round and through the corners, are the page showing through the box —
+`page × t`, with `t` constant along one side of one box. Boxes overlap into one region,
+and where their rims cross the `t` multiply. `transmission` reads those `t` off the page:
 
 ```
-outer1 = dilate4(black)        ring 1 = outer1 and not black
-outer2 = dilate4(outer1)       ring 2 = outer2 and not outer1
-```
-
-`dilate4` grows a region by one pixel up, down, left and right, without wrapping around
-the image edges.
-
-Each ring pixel is **horizontal** when the region lies directly above or below it, else
-**vertical**. Horizontal ring pixels are grouped into runs along their row, vertical ones
-into runs along their column, and every pixel of a run gets one value:
-
-```js
-mask[run] = 255 - max(gray[run]);     // the brightest page pixel along the run
+sides    the region's outline, cut into its straight stretches (sidesOf)
+lines    rows 1..3 outward of a side
+level    of a line: its brightest pixel, vouched for by a second one
+pieces   of a side: the plateaus of its first line — two boxes can end in one pixel column
+corners  where a horizontal side ends and the region stops: t = 1 − (1 − tx)(1 − ty)
+t        per pixel: the product of every line and corner block on it
 ```
 
 **Why the brightest pixel?**
 The strip beside a bar holds a mix of paper and letter strokes, all darkened by the same
-blend. The brightest pixel of the run is taken to be paper — white before the bar was
-drawn — so `255 − brightest` is the blend factor α of that edge. One value per run keeps
-the correction uniform along the edge: dark strokes crossing it stay proportionally dark
-instead of being flattened to white.
+rim. The brightest pixel of a line is taken to be paper — white before the bar was drawn —
+so `brightest / 255` is that rim's `t`. One value per line keeps the correction uniform:
+dark strokes crossing the rim stay proportionally dark instead of being flattened to white.
 
-(The above/below test wraps from the last row to the first — the arithmetic of an array
-roll. It only matters for a region on the very top or bottom row.)
+**Why pieces, and why so guarded?**
+A straight side can carry two rims (the bars of two text lines, ending in the same pixel
+column with different sub-pixel positions), so one brightest pixel per side would leave
+the darker rim behind as a line. But a plateau on the first rim line can also be text: the
+bar of a T under the rim, a stem standing against the box — and under a dark rim any text
+flattens into plateaus. A darker plateau is therefore a box's only when it reaches an end
+of the side (a corner of the outline) or is longer than any stroke, and only when its
+next line outward is lighter, as a rim's is. A level that no second pixel vouches for is
+no level, and one pixel is never evidence. The full rule set and what it costs and buys:
+[frontend/webgl-mask.md](../frontend/webgl-mask.md#edges--maskcoretransmission-this-plugins-own).
+
+```js
+mask[p] = T[p] === 0 ? 255 : Math.min(254, 255 - Math.round(255 * T[p]));
+```
+
+`T = 0` marks the few rim pixels declared paper outright (under rims that hide 7/8 of the
+page: where two stacked boxes overlap, the step between two pieces, the ringing pixel at a
+convex corner) — `0 / t` would stay black, so they are shown white like the region.
 
 ### Mask value semantics
 
 | Value | Meaning | In the shader (`mask = value / 255`) |
 |-------|---------|--------------------------------------|
 | `0` | Clear page | `page / 1` — unchanged |
-| `1–254` | Border ring: blend factor of that edge run | `min(page / (1 − mask · uStrength), 1)` — the blend is inverted |
-| `255` | Redacted interior | `uStrength` as gray — white at full strength; the content under a bar is not recoverable |
+| `1–254` | A rim: `255 · (1 − t)` of that pixel | `min(page / (1 − mask), 1)` — the blend is inverted — mixed with the page by `uStrength` |
+| `255` | Redacted interior | white, mixed with the page by `uStrength`; the content under a bar is not recoverable |
 
 ---
 
@@ -193,13 +201,13 @@ Fragment shader:
 ```glsl
 vec3 page = texture2D(uPage, vTexCoord).rgb;
 float mask = texture2D(uMask, vTexCoord).r;
-float alpha = mask * uStrength;
 vec3 result;
 if (mask > 0.999) {
-  result = vec3(uStrength);                           // interior: nothing to recover, show white
+  result = vec3(1.0);                           // interior: nothing to recover, show white
 } else {
-  result = min(page / max(1.0 - alpha, 0.001), 1.0);  // border or clear pixel: invert the blend, per channel
+  result = min(page / max(1.0 - mask, 0.001), 1.0);  // border or clear pixel: invert the blend, per channel
 }
+result = mix(page, result, uStrength);   // Reveal Strength: a linear fade from the page as it is to the page revealed
 gl_FragColor = vec4(result, 1.0);
 ```
 

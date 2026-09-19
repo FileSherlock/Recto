@@ -552,6 +552,31 @@ Notes for later phases (append as you learn):
   `Doc.pageImageURL(n)` when `Doc.pagePixels` yields `null`, and the worker
   decodes it over white and grays it with `MaskCore.grayOf`; the
   `state.hasPdf` guard on `page:rendered` is gone.
+- **After the migration (2026-09-19): the mask's edges are reworked — a third
+  deliberate deviation.** The server's two rings (one `255 − max` per
+  contiguous ring run) left behind: the diagonal corner pixels of a two-line
+  rim; the darker of two rims on one straight side (two boxes ending in the
+  same pixel column — a black sliver beside a semicolon on EFTA00173953);
+  pixels under two crossing rims; a third rim line. Measured on that page: a
+  rim pixel is `page × t`, `t` constant along one side of one box; crossing
+  rims multiply exactly (`bc · d3 / 255 = 9b`); a box covers `ax · ay` of its
+  corner pixel; resampling rings by a few levels next to convex corners.
+  `MaskCore.transmission` reads `t` off the page per side, piece, line and
+  corner (guide/frontend/webgl-mask.md has the rules); detection is untouched
+  and is now `MaskCore.regions`. **The mask goldens hold the regions, no
+  longer the ring values**: `tests/masks.test.mjs` requires region ⇔ 255 in
+  the recorded mask (one recorded pixel is a black page pixel on a server
+  ring), and holds the edges to pages built in the test. The yardstick was
+  text: on a real text page with boxes of known rims laid at random over the
+  text, rim residue fell 10–40×, text lost under light and medium rims stayed
+  level or fell, and under rims darker than 90 % it rose by some tens of
+  pixels a page — the price of the four dark-rim rules, each of which was
+  kept only after looser versions had been measured and thrown out (a paper
+  tolerance in the shader: ×5 text lost under dark rims; overlap dips without
+  outline evidence: ×2–10). 48 redacted pages of the local corpus: non-white
+  pixels within 3 px of a region 18 423 → 11 457, the rest being text; every
+  pixel the old mask kept dark and the new one whitens was checked to be rim.
+  ~10–60 ms a page on top of detection. The shader is unchanged.
 - **Phase 4: what was built.** `web/vendor/harfbuzz/` is harfbuzzjs 1.6.1 =
   HarfBuzz **14.4.0**, the very version Python's uharfbuzz 0.56.1 recorded the
   goldens with — so the numbers are equal, not close.

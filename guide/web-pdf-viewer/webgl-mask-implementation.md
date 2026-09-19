@@ -19,18 +19,16 @@ The input is the page's gray pixels from the core's document service:
 `Doc.pagePixels(pageNum, { gray: true })` → `{ width, height, samples, source, … }`.
 
 - **Which pages:** only a page whose raster is its embedded scan (`source === 'embedded'`) is masked. A born-digital page, shown as a 96-dpi render, is not analysed and gets no overlay. For an image document `Doc.pagePixels` yields `null`: the plugin's worker decodes `Doc.pageImageURL(n)` itself (over white, gray by `MaskCore.grayOf`) and masks that.
-- **Black-bar detection** (`MaskCore.buildMask`):
+- **Black-bar detection** (`MaskCore.regions`):
   1. Threshold pixels ≤ 0 → the black image
   2. A shape rule removes hole punches and bullet discs (square box, 16–44 px across, filled to about π/4)
   3. A 5×5 opening removes text strokes that touch a bar
   4. External 8-connected components are kept when their box is at least 17 × 10 px and `area / perimeter ≥ 2` (thin lines go), and written back as they are — nothing a component encloses is filled, so the gaps between touching bars keep their text
-- **Mask synthesis:**
-  - Interior pixels → `255` (fully masked)
-  - Two border rings computed by 4-neighbour dilation:
-    - Ring 1 (`dilate4(black) & ~black`)
-    - Ring 2 (`dilate4(outer1) & ~outer1`)
-  - Both top/bottom and left/right edges use both rings
-  - Each run of border pixels → `255 - max(gray[run])`, encoding the anti-aliasing blend factor
+- **Mask synthesis** (`MaskCore.transmission` → `buildMask`):
+  - Interior pixels → `255` (fully masked, shown white)
+  - Every box has a soft rim of 1–3 px through which the page shows as `page × t`. The region's outline is cut into straight sides; per side and rim line the level is read off the page as the brightest vouched-for pixel (text only darkens), per *piece* of the side where two boxes end in one pixel column; convex corners get `1 − (1 − tx)(1 − ty)`, crossing rims multiply
+  - Rim pixels → `255 · (1 − t)`, which the shader divides out again; a pixel darker than its line's level is text and stays that much darker
+  - The rules, their text-safety and the measurements behind them: [frontend/webgl-mask.md](../frontend/webgl-mask.md#edges--maskcoretransmission-this-plugins-own)
 - **Sparse optimization:** Pages with no masked regions return `null` — no PNG is encoded and no GL context is created.
 
 The algorithm is described step by step in [Artifact Visualizer](artifact-visualizer.md).

@@ -48,26 +48,40 @@ Nothing is fetched and nothing leaves the browser: the page's pixels come from t
 
 **Only pages whose raster is the embedded scan get a mask.** A born-digital page, shown as a 96-DPI render, carries no scan to analyse, so `buildPageMask` answers `null` without starting the worker. An image document is its own scan: `Doc.pagePixels` answers `null` for it, so the plugin fetches `Doc.pageImageURL(n)` and hands the blob to its worker, which decodes it over white (a transparent pixel shows the page behind it, it is not black) and takes its gray with `MaskCore.grayOf`.
 
-## Mask detection — `mask-core.js`
+## The mask — `mask-core.js`
 
 `MaskCore.buildMask(gray, width, height)` takes one byte per pixel and returns a gray mask of the same size, or `null` when the page has no blacked-out region:
 
 | Mask value | Meaning |
 |------------|---------|
-| `255` | Inside a blacked-out region |
+| `255` | Inside a blacked-out region — nothing to recover, the shader shows white |
 | `0` | Clear page |
-| mid-gray | On the two pixel rings around a region: the paper's brightness along that edge, which the shader un-blends the anti-aliased border with |
+| `255 · (1 − t)` | On a box's rim, where the page shows through the box as `page × t`; the shader divides `t` out again, so text under the rim comes back with the paper |
 
-The steps, all written out as plain loops — no image-processing library is involved:
+It has two halves, all written out as plain loops — no image-processing library is involved.
+
+### Detection — `MaskCore.regions` (the port of the server's)
 
 1. **Threshold.** A pixel counts as black only when its gray value is `0`.
 2. **Drop discs** (`removeDiscs`). Punched holes and bullet discs are black and solid too. A component is a disc when its bounding box is square within 2 px, 16–44 px across, and filled to about π/4 of the box (70–85 %).
 3. **Open** with a 5 × 5 element (erode, then dilate; pixels outside the image never erode the edge). Thin text protrusions and hairlines disappear, solid blocks survive.
 4. **Keep the solid external components** (`filterComponents`). Components are 8-connected; one lying inside another's hole is ignored. A component must be at least 17 × 10 px, and its `area / perimeter` — measured over its outer border, followed the way Suzuki's border-following algorithm does — must be at least 2: for a thin stroke that ratio is about half the thickness, for a block far more.
-5. **No fill.** The mask is the kept component's own pixels. What a component encloses stays page: where the bars of adjacent lines touch they form one component, and the white gaps between them — with the punctuation standing there — must not be masked. (The server filled them; no recorded page has such a gap, so the goldens are unaffected.)
-6. **Edge lines.** The region is dilated twice by one pixel (4-connected). Each ring pixel is "horizontal" when the region lies above or below it, else "vertical"; each run of ring pixels takes `255 −` the brightest page pixel along it. That value is the mask alpha the shader divides by.
+5. **No fill.** A region is the kept component's own pixels. What a component encloses stays page: where the bars of adjacent lines touch they form one component, and the white gaps between them — with the punctuation standing there — must not be masked. (The server filled them; no recorded page has such a gap, so the goldens are unaffected.)
 
-`tests/masks.test.mjs` runs the same `mask-core.js` in Node over every recorded page and requires each mask — or its absence — to equal the recorded masks in `tests/golden/` pixel for pixel. One page differs by design: a scan taller than 8.5 × 11 is masked over the cropped raster the viewer shows, so its mask equals the recording's top rows.
+### Edges — `MaskCore.transmission` (this plugin's own)
+
+What the pages show (measured, see the migration notes): a redaction is a black rectangle with a soft rim of 1–3 pixels, all the way round, corners included. A rim pixel reads `page × t` with `t` constant along one side of one box. Boxes overlap into one region; where their rims cross, the `t` multiply (`bc · d3 / 255 = 9b`, to the digit); a box covers `ax · ay` of its own corner pixel. The boxes themselves cannot be told from the region's shape — but every straight stretch of its outline is a side of some box, and that is enough:
+
+- **Sides.** The outline is cut into its straight sides (`sidesOf`). Outward of a side lie its *lines*, rows 1..3.
+- **Levels.** The level of a line — what white paper reads under it — is its **brightest** pixel: text only ever darkens. A second pixel must vouch for it (within 6 %), and the two pixels at either end of a long side are left out (a corner's transition). A level nothing vouches for is no level: that rim stays as it is.
+- **Pieces.** One side can belong to two boxes that end in the same pixel column (one with a faint rim, one with a dark two-line rim). A side is cut into pieces, the plateaus of its first line (≥ 6 px within 2 levels; a piece's level is the value most of its pixels hold). A plateau darker than the side's brightest could be a flat stroke of text under the rim, so it counts as a box's only when it reaches an end of the side — a corner of the outline — or runs longer than any stroke (20 px); under a dark rim text itself flattens into plateaus, and only length counts. And a rim gets lighter outward: a plateau whose next line is darker still is a stem standing against the box, not a rim.
+- **Shared lines.** Lines read their level from pixels no other line or corner reaches. A line shared from end to end — a short step of the outline, a narrow gap between two boxes — waits, and takes what is left once the known levels are divided out (nearest lines first, longest sides first). One pixel is never evidence.
+- **Corners.** Where a horizontal side ends and the region stops, the vertical side starting there is the same box's: the 3 × 3 corner block gets `1 − (1 − tx)(1 − ty)`.
+- **Paint.** Every pixel's `t` is the product of the lines and corner blocks on it. A pixel darker than its line's level is text and keeps its darkness.
+
+**Every rule errs toward text.** The only places where something darker than its line is declared paper (`t = 0`, shown white like the region) all lie under a rim that hides 7/8 of the page or more (`DARK`): a dip of at most 4 px where two stacked boxes overlap — at a row where the region's outline shows a box ending, confined to the rim, white right beyond it; the few pixels of the step between two pieces; the single pixel next to a convex corner, where the resampling rings; a corner pixel under two dark rims. What this costs and buys was measured on pages built from a real text page plus boxes with known rims laid at random over the text: against the server's two rings the rim residue drops by a factor of 10–40, text lost under light and medium rims stays level or drops, and under rims darker than 90 % it rises by some tens of pixels per page. Loosening any of the rules above (dips without outline evidence, a paper tolerance in the shader) was tried and cost two to ten times the text.
+
+`tests/masks.test.mjs` runs the same `mask-core.js` in Node. The **regions** of every recorded page must equal the 255 pixels of the recorded masks in `tests/golden/` (one page differs by design: a scan taller than 8.5 × 11 is masked over the cropped raster the viewer shows, so its regions equal the recording's top rows). The **edges** are held to pages built in the test, where the truth is known: a rim comes off — sides, second line, corner blocks, the two pieces of a flush side — and ink under or beside it stays: strokes running into a rim, a flat bar under it, a stem standing against the box, ink on a one-pixel step.
 
 ### The worker — `mask-worker.js`
 
@@ -112,15 +126,15 @@ Draws a full-screen quad; maps clip-space coords to UV with Y-flip.
 ```glsl
 vec3 page = texture2D(uPage, vTexCoord).rgb;
 float mask = texture2D(uMask, vTexCoord).r;
-float alpha = mask * uStrength;
 vec3 result;
 if (mask > 0.999) {
   // Interior: fully covered, original unrecoverable — show white
-  result = vec3(uStrength);
+  result = vec3(1.0);
 } else {
   // Border/clear: invert anti-aliasing multiplication, per channel
-  result = min(page / max(1.0 - alpha, 0.001), 1.0);
+  result = min(page / max(1.0 - mask, 0.001), 1.0);
 }
+result = mix(page, result, uStrength);   // Reveal Strength: a linear fade from the page as it is to the page revealed
 gl_FragColor = vec4(result, 1.0);
 ```
 
@@ -128,8 +142,8 @@ gl_FragColor = vec4(result, 1.0);
 
 | Pixel type | `mask` | Behaviour |
 |---|---|---|
-| Interior | 1.0 | Outputs `uStrength` (white at full slider) |
-| Border | 0 < m < 1 | `page / (1 - mask × strength)` — recovers original via division |
+| Interior | 1.0 | White, faded in by `uStrength` |
+| Border | 0 < m < 1 | `page / (1 - mask)` — recovers original via division — faded in by `uStrength` |
 | Clear | 0.0 | `page / 1.0` — passes through unchanged |
 
 The multiplicative recovery correctly reverses anti-aliasing: dark text under a border pixel stays dark; a white background pixel is scaled back to white.
