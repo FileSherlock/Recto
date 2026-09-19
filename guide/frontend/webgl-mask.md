@@ -16,7 +16,7 @@
 | PDFHooks event | Handler does |
 |----------------|--------------|
 | `ui:ready` | wires the `#toggle-webgl` button + `#edge-subtract` slider; calls `registerSubtoolbar(toggleBtn)` |
-| `page:rendered` | **creates** the `.webgl-overlay` `<canvas>` for that page and appends it (the core owns no overlay DOM), then `setupWebGLOverlay(...)` when the document is a PDF (`state.hasPdf`) |
+| `page:rendered` | **creates** the `.webgl-overlay` `<canvas>` for that page and appends it (the core owns no overlay DOM), then `setupWebGLOverlay(...)` |
 | `pages:refresh` | `refreshWebGLCanvases()` |
 | `viewer:clear` | `clearWebGLContexts()` |
 
@@ -32,6 +32,8 @@ flowchart TD
     C -- yes --> H
     C -- no --> D["Doc.pagePixels(pageNum, { gray: true })<br/>document service → MuPDF worker"]
     D --> E{"raster.source"}
+    D -- "null (an image document)" --> P["fetch Doc.pageImageURL(pageNum)<br/>worker decodes it on white → MaskCore.grayOf"]
+    P --> F
     E -- "'render' (born-digital page)" --> N["null — no mask"]
     E -- "'embedded' (a scan)" --> F["mask-worker.js<br/>MaskCore.buildMask(gray, w, h)"]
     F --> G["PNG Blob, or null = no redaction"]
@@ -44,7 +46,7 @@ flowchart TD
 
 Nothing is fetched and nothing leaves the browser: the page's pixels come from the document service, the detection runs in the plugin's worker, and the result is cached in `maskBlobCache` (a `null` entry remembers "no mask here", so page revisits skip the detection entirely). The cache is owned by the document identified by `maskCacheHash` and is validated against `state.docHash` on every use — a page overlay can initialize before any document-change event lands in the plugin. A mask that finishes after another document was opened is dropped.
 
-**Only pages whose raster is the embedded scan get a mask.** A born-digital page, shown as a 96-DPI render, carries no scan to analyse, so `buildPageMask` answers `null` without starting the worker. An image document gets no mask either: `Doc.pagePixels` answers `null` for it.
+**Only pages whose raster is the embedded scan get a mask.** A born-digital page, shown as a 96-DPI render, carries no scan to analyse, so `buildPageMask` answers `null` without starting the worker. An image document is its own scan: `Doc.pagePixels` answers `null` for it, so the plugin fetches `Doc.pageImageURL(n)` and hands the blob to its worker, which decodes it over white (a transparent pixel shows the page behind it, it is not black) and takes its gray with `MaskCore.grayOf`.
 
 ## Mask detection — `mask-core.js`
 
@@ -62,7 +64,7 @@ The steps, all written out as plain loops — no image-processing library is inv
 2. **Drop discs** (`removeDiscs`). Punched holes and bullet discs are black and solid too. A component is a disc when its bounding box is square within 2 px, 16–44 px across, and filled to about π/4 of the box (70–85 %).
 3. **Open** with a 5 × 5 element (erode, then dilate; pixels outside the image never erode the edge). Thin text protrusions and hairlines disappear, solid blocks survive.
 4. **Keep the solid external components** (`filterComponents`). Components are 8-connected; one lying inside another's hole is ignored. A component must be at least 17 × 10 px, and its `area / perimeter` — measured over its outer border, followed the way Suzuki's border-following algorithm does — must be at least 2: for a thin stroke that ratio is about half the thickness, for a block far more.
-5. **Fill.** Each kept component is filled together with everything it encloses.
+5. **No fill.** The mask is the kept component's own pixels. What a component encloses stays page: where the bars of adjacent lines touch they form one component, and the white gaps between them — with the punctuation standing there — must not be masked. (The server filled them; no recorded page has such a gap, so the goldens are unaffected.)
 6. **Edge lines.** The region is dilated twice by one pixel (4-connected). Each ring pixel is "horizontal" when the region lies above or below it, else "vertical"; each run of ring pixels takes `255 −` the brightest page pixel along it. That value is the mask alpha the shader divides by.
 
 `tests/masks.test.mjs` runs the same `mask-core.js` in Node over every recorded page and requires each mask — or its absence — to equal the recorded masks in `tests/golden/` pixel for pixel. One page differs by design: a scan taller than 8.5 × 11 is masked over the cropped raster the viewer shows, so its mask equals the recording's top rows.

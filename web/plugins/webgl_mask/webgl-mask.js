@@ -54,7 +54,8 @@ function destroyWebGLOverlay(pageNum) {
 // ── The mask worker ────────────────────────────────────────────
 // mask-worker.js runs mask-core.js (the port of the server's masking) off the
 // main thread. Only pages that carry a scan are masked — a born-digital page
-// (shown as a render) has none, as on the server.
+// (shown as a render) has none, as on the server. An image document is its own
+// scan: Doc has no pixels for it, so the worker decodes the page image itself.
 let maskWorker = null, maskJobId = 0;
 const maskJobs = new Map();   // id -> resolve
 
@@ -78,13 +79,17 @@ function maskWorkerReady() {
 }
 
 async function buildPageMask(pageNum) {
-  let raster = null;
-  try { raster = await Doc.pagePixels(pageNum, { gray: true }); } catch { /* the document went away */ }
-  if (!raster || raster.source !== 'embedded') return null;
+  let raster = null, image = null;
+  try {
+    raster = await Doc.pagePixels(pageNum, { gray: true });
+    if (!raster) image = await (await fetch(await Doc.pageImageURL(pageNum))).blob();   // an image document
+  } catch { /* the document went away */ }
+  if (raster ? raster.source !== 'embedded' : !image) return null;
   return new Promise(resolve => {
     const id = ++maskJobId;
     maskJobs.set(id, resolve);
-    maskWorkerReady().postMessage({ id, gray: raster.samples, width: raster.width, height: raster.height }, [raster.samples.buffer]);
+    if (raster) maskWorkerReady().postMessage({ id, gray: raster.samples, width: raster.width, height: raster.height }, [raster.samples.buffer]);
+    else maskWorkerReady().postMessage({ id, image });
   });
 }
 
@@ -317,7 +322,7 @@ PDFHooks.on('page:rendered', ({ pageContainer, pageNum }) => {
   canvas.style.display = active ? 'block' : 'none';
   pageContainer.appendChild(canvas);
 
-  if (state.hasPdf) setupWebGLOverlay(pageContainer, canvas, pageNum);
+  setupWebGLOverlay(pageContainer, canvas, pageNum);
 });
 
 PDFHooks.on('pages:refresh', () => refreshWebGLCanvases());

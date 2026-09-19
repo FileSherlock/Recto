@@ -18,12 +18,12 @@ web/plugins/webgl_mask/
 The input is the page's gray pixels from the core's document service:
 `Doc.pagePixels(pageNum, { gray: true })` → `{ width, height, samples, source, … }`.
 
-- **Which pages:** only a page whose raster is its embedded scan (`source === 'embedded'`) is masked. A born-digital page, shown as a 96-dpi render, is not analysed, and for an image document `Doc.pagePixels` yields `null`. Neither gets an overlay.
+- **Which pages:** only a page whose raster is its embedded scan (`source === 'embedded'`) is masked. A born-digital page, shown as a 96-dpi render, is not analysed and gets no overlay. For an image document `Doc.pagePixels` yields `null`: the plugin's worker decodes `Doc.pageImageURL(n)` itself (over white, gray by `MaskCore.grayOf`) and masks that.
 - **Black-bar detection** (`MaskCore.buildMask`):
   1. Threshold pixels ≤ 0 → the black image
   2. A shape rule removes hole punches and bullet discs (square box, 16–44 px across, filled to about π/4)
   3. A 5×5 opening removes text strokes that touch a bar
-  4. External 8-connected components are kept when their box is at least 17 × 10 px and `area / perimeter ≥ 2` (thin lines go), and written back filled — holes included
+  4. External 8-connected components are kept when their box is at least 17 × 10 px and `area / perimeter ≥ 2` (thin lines go), and written back as they are — nothing a component encloses is filled, so the gaps between touching bars keep their text
 - **Mask synthesis:**
   - Interior pixels → `255` (fully masked)
   - Two border rings computed by 4-neighbour dilation:
@@ -79,7 +79,7 @@ The canvas is drawn opaque with blending disabled, so it replaces the page image
 
 | Hook | What the plugin does |
 |------|----------------------|
-| `page:rendered` | Creates the overlay canvas for that page and, for a PDF (`state.hasPdf`), starts observing the page container |
+| `page:rendered` | Creates the overlay canvas for that page and starts observing the page container |
 | `viewer:clear` | Releases every GL context before the viewer swaps pages |
 | `pages:refresh` | Re-initializes missing overlays and redraws the existing ones |
 | `ui:ready` | Wires `#toggle-webgl` (registered with `registerSubtoolbar`, opens `#webgl-options-bar` through `openSubtoolbar`) and the slider |

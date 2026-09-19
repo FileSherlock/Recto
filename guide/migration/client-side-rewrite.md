@@ -540,6 +540,18 @@ Notes for later phases (append as you learn):
   the page's *first* image even when it was a JPEG the viewer does not show;
   the port masks only a page whose shown raster is the embedded scan
   (`source === 'embedded'`), and a rendered page has no mask, as before.
+- **After the migration (2026-09-19): two deliberate mask deviations.**
+  (1) *No fill.* The server's `drawContours FILLED` masked whatever a region
+  enclosed; on EFTA00173953 the bars of adjacent lines touch, form one
+  component, and the white gaps between them — semicolons included — were
+  masked. The mask is now the component's own pixels. None of the 366 corpus
+  pages has an enclosed gap, so every mask golden still passes; a synthetic
+  case in `tests/masks.test.mjs` holds the rule. (2) *Image documents are
+  masked.* The server answered 204 for them (the `image-*` goldens still say
+  so; the mask suite only runs PDFs). `webgl-mask.js` now fetches
+  `Doc.pageImageURL(n)` when `Doc.pagePixels` yields `null`, and the worker
+  decodes it over white and grays it with `MaskCore.grayOf`; the
+  `state.hasPdf` guard on `page:rendered` is gone.
 - **Phase 4: what was built.** `web/vendor/harfbuzz/` is harfbuzzjs 1.6.1 =
   HarfBuzz **14.4.0**, the very version Python's uharfbuzz 0.56.1 recorded the
   goldens with — so the numbers are equal, not close.

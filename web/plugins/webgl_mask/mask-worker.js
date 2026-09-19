@@ -2,6 +2,7 @@
 //
 //   → { type: 'init', core }                          the content-hashed URL of mask-core.js
 //   → { id, gray: Uint8Array, width, height }         one page's gray pixels (transferred)
+//   → { id, image: Blob }                             or the page image of an image document, decoded here
 //   ← { id, png: Blob | null, ms }                    the mask as a lossless PNG; null = no redaction on the page
 //
 // The mask goes back as a PNG blob because that is what the overlay loads into
@@ -14,6 +15,18 @@ self.onmessage = async e => {
   if (m.type === 'init') { importScripts(m.core); return; }
   try {
     const t0 = performance.now();
+    if (m.image) {
+      // An image document's page: decoded here, on white — a transparent pixel
+      // shows the paper-white page behind it, it is not black.
+      const bitmap = await createImageBitmap(m.image);
+      m.width = bitmap.width; m.height = bitmap.height;
+      const ctx = new OffscreenCanvas(m.width, m.height).getContext('2d', { willReadFrequently: true });
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, m.width, m.height);
+      ctx.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      m.gray = MaskCore.grayOf(ctx.getImageData(0, 0, m.width, m.height).data);
+    }
     const mask = MaskCore.buildMask(m.gray, m.width, m.height);
     let png = null;
     if (mask) {

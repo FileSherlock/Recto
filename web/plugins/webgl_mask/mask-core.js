@@ -8,6 +8,7 @@
 // has no such region.
 //
 //   MaskCore.buildMask(gray: Uint8Array, width, height) → Uint8Array | null
+//   MaskCore.grayOf(rgba)                               → Uint8Array   gray of a decoded image document
 //
 // Pure loops, no DOM: mask-worker.js runs it off the main thread, and
 // tests/masks.test.mjs holds it to the recorded server masks pixel for pixel.
@@ -16,8 +17,12 @@
 //   findContours EXTERNAL     8-connected components that no other encloses,
 //                             their outer border followed as Suzuki's does
 //   contourArea / arcLength   shoelace over the border, float32 segment lengths
-//   drawContours FILLED       the component plus everything it encloses
-// and one rule is replaced: the server ran a Hough circle transform to drop
+// One rule is dropped: the server drew each contour FILLED, so whatever a
+// region enclosed became mask too — where the bars of adjacent lines touch,
+// the white gaps between them and the punctuation standing there. The mask is
+// the black component itself; nothing is filled (no corpus page has such a
+// gap, so the goldens hold).
+// And one rule is replaced: the server ran a Hough circle transform to drop
 // punched holes and bullet discs (radius 8–20 px). Here a black component is a
 // disc when its bounding box is square and it fills π/4 of it — no OpenCV, and
 // the goldens agree (the transform finds no circle on any corpus page).
@@ -180,6 +185,7 @@
           || outside[p - 1] || outside[p + 1] || outside[p - w] || outside[p + w]) external[id] = 1;
     }
 
+    const keep = new Uint8Array(comps.length);
     for (let id = 1; id < comps.length; id++) {
       const c = comps[id];
       if (!external[id]) continue;
@@ -188,30 +194,11 @@
       // far more for a solid block.
       const { area, perimeter } = areaAndPerimeter(outerBorder(labels, w, h, id, c.first));
       if (perimeter > 0 && area / perimeter < 2) continue;
-
-      // FILLED: the component and everything it encloses — all of its box that
-      // the box's outside cannot reach through pixels that are not the component's.
-      const bw = c.x1 - c.x0 + 3, bh = c.y1 - c.y0 + 3;            // the box and a ring around it
-      const reach = new Uint8Array(bw * bh);
-      const at = (bx, by) => {
-        const x = c.x0 - 1 + bx, y = c.y0 - 1 + by;
-        return x >= 0 && x < w && y >= 0 && y < h && labels[y * w + x] === id;
-      };
-      const flood = [0];
-      reach[0] = 1;
-      while (flood.length) {
-        const q = flood.pop(), bx = q % bw, by = (q - bx) / bw;
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          const nx = bx + dx, ny = by + dy;
-          if (nx < 0 || nx >= bw || ny < 0 || ny >= bh) continue;
-          const r = ny * bw + nx;
-          if (!reach[r] && !at(nx, ny)) { reach[r] = 1; flood.push(r); }
-        }
-      }
-      for (let by = 1; by < bh - 1; by++)
-        for (let bx = 1; bx < bw - 1; bx++)
-          if (!reach[by * bw + bx]) result[(c.y0 - 1 + by) * w + (c.x0 - 1 + bx)] = 1;
+      keep[id] = 1;
     }
+    // The component's own pixels and nothing else: what it encloses is page —
+    // the gap between two bars of touching lines, with its punctuation.
+    for (let p = 0; p < w * h; p++) if (keep[labels[p]]) result[p] = 1;
     return result;
   }
 
@@ -268,5 +255,13 @@
     return mask;
   }
 
-  globalThis.MaskCore = { buildMask, labelComponents, filterComponents, removeDiscs };
+  // Opaque RGBA → gray, for a page that arrives as an image instead of MuPDF's
+  // gray samples. Integer weights that sum to 256: black stays 0, white 255.
+  function grayOf(rgba) {
+    const gray = new Uint8Array(rgba.length / 4);
+    for (let p = 0, j = 0; p < gray.length; p++, j += 4) gray[p] = (rgba[j] * 77 + rgba[j + 1] * 150 + rgba[j + 2] * 29) >> 8;
+    return gray;
+  }
+
+  globalThis.MaskCore = { buildMask, grayOf, labelComponents, filterComponents, removeDiscs };
 })();

@@ -78,3 +78,23 @@ for (const d of documents) {
     } finally { pdf.close(); }
   });
 }
+
+// Nothing is filled: where the bars of adjacent lines touch they are one
+// component that encloses the white gaps between them — those stay page.
+test('an enclosed gap is not masked', () => {
+  const w = 120, h = 80, gray = new Uint8Array(w * h).fill(255);
+  const bar = (x0, y0, x1, y1) => { for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) gray[y * w + x] = 0; };
+  bar(10, 10, 110, 30);                                  // line 1, one bar
+  bar(10, 30, 50, 50); bar(60, 30, 110, 50);             // line 2, two bars with a gap
+  bar(10, 50, 110, 70);                                  // line 3 closes the gap in
+  gray[40 * w + 55] = 40;                                // a semicolon's worth of ink in the gap
+  const mask = buildMask(gray, w, h);
+  assert.equal(mask[20 * w + 55], 255, 'the bar is masked');
+  for (let y = 32; y < 48; y++) for (let x = 52; x < 58; x++) assert.notEqual(mask[y * w + x], 255, `gap pixel ${x},${y}`);
+  assert.equal(mask[40 * w + 55], 0, 'the ink in the gap is clear of the mask and its rings');
+});
+
+test('grayOf keeps black at 0 and white at 255', () => {
+  const gray = globalThis.MaskCore.grayOf(Uint8ClampedArray.from([0, 0, 0, 255, 255, 255, 255, 255, 255, 0, 0, 255]));
+  assert.deepEqual([...gray], [0, 255, 76]);
+});
