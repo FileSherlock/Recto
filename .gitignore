@@ -40,3 +40,6 @@ desktop.ini
 
 # Lab — local measurement tools over the OCR engine (see lab/README.md); never committed
 lab/
+
+# Claude
+.claude/
