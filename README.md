@@ -131,14 +131,25 @@ sources and upgrade notes are in [`web/vendor/README.md`](web/vendor/README.md).
 | `web/vendor/mupdf/` | MuPDF as WebAssembly (`mupdf.js`, `mupdf-wasm.js`, `mupdf-wasm.wasm`, ~10 MB) | 1.28.0 (npm `mupdf@1.28.0`) | AGPL-3.0 — `web/vendor/mupdf/LICENSE` |
 | `web/vendor/harfbuzz/` | HarfBuzz as WebAssembly (`index.mjs`, `harfbuzz.js`, `harfbuzz.wasm`, ~0.5 MB) | harfbuzzjs 1.6.1 = HarfBuzz 14.4.0 | MIT — `web/vendor/harfbuzz/LICENSE` |
 
-Recto's own code is under the MIT licence ([`LICENSE`](LICENSE)). The licences above are those
-of the vendored components as their upstreams state them; each folder carries the full text.
+The licences above are those of the vendored components as their upstreams state them; each
+folder carries the full text.
 
 `web/assets/fonts/` holds the free URW and DejaVu faces beside Windows faces (Times New
 Roman, Arial, Courier New and others), which are proprietary. The font catalogue records per
 family which files are present, and the font menu marks a family without its files as not
 installed, so the app still works in a checkout without them (`tests/shaping.test.mjs` needs
 the faces its goldens name).
+
+## Licence
+
+Recto is free software under the [GNU Affero General Public License, version 3](LICENSE).
+
+It has to be: the site ships MuPDF, which Artifex licenses under the GNU AGPL, and the AGPL
+extends to what is built with it — including the duty to offer the full source of a system
+that uses it, also when it is only used over a network. Make sure you can comply before you
+deploy or redistribute Recto. It comes as it is, with no warranty and no support. Whoever
+cannot work under the AGPL needs a commercial MuPDF licence from
+[Artifex](https://artifex.com/licensing) — that covers MuPDF, not Recto's own code.
 
 ## Documentation
 

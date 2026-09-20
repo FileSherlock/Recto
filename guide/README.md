@@ -15,7 +15,7 @@ features:
     details: HarfBuzz text shaping measures and places text with true font metrics, so what you add matches what was already there.
   - title: Runs in the Browser
     details: A static site. MuPDF and HarfBuzz run as WebAssembly, analysis runs in workers, and the document you open never leaves your machine.
-footer: MIT Licensed | Copyright © 2026
+footer: AGPL-3.0 Licensed | Copyright © 2026
 ---
 
 # Recto Documentation
