@@ -27,7 +27,6 @@ function normalise(html) {
     // caused, long after the last call into it had been removed — the static page loads no outside script
     .replace(/<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/fabric\.js\/[^"]*"><\/script>/, '')
     .replace(/<script>\s*const originalTextBaseline =[\s\S]*?<\/script>/, '')
-    .replace(/github\.com\/JaguarM\/Recto/g, 'github.com/FileSherlock/Recto')   // the repository moved
     .replace(/\/static\/text_tool\/geometry\.js/g, 'core/geometry.js')    // geometry.js moved into the core
     .replace(/\/static\/pdf_core\//g, 'core/')
     .replace(/\/static\/(\w+)\//g, 'plugins/$1/')
