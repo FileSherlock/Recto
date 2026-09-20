@@ -4,10 +4,12 @@
 // Why: render.js producerMetrics searches the laid size to 5e-6 for every
 // hypothesis (advances at 1/1000 em or the set's hmtx, kerned or not) — about
 // 130 scorings of every certified word per hypothesis, each quadratic in the
-// word's length. Measured 2026-09 on the startup document: 0.65–1.04 s per
-// Courier page (65 lines, ~4900 glyphs), run after EVERY page of a read and
-// for every page of a cache replay — on the main thread that froze scrolling
-// and zooming for that long, page after page. It is pure arithmetic on the
+// word's length. Measured 2026-09 on the startup document: about a second
+// per searched hypothesis on a Courier page (65 lines, ~4900 glyphs), after
+// EVERY page of a read and for every page of a cache replay — on the main
+// thread that froze scrolling and zooming for that long, page after page.
+// (Since 2026-09-20 the engine skips a search that cannot win, and such a
+// page costs ~12 ms; a page laid at another size still searches.) It is pure arithmetic on the
 // slim entries and the face's kern table, so it runs here, in a worker of its
 // own: the reader's worker stays free for the next page.
 //

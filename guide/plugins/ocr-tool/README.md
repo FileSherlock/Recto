@@ -269,9 +269,11 @@ Two toggles in the **MuPDF view** group of the OCR bar (`pixel-view.js`):
   the face's own table or not — with `render.js producerMetrics` and the
   kern table from `text_tool` (`FontCatalog.metrics` → `Shaping.fontMetrics`,
   HarfBuzz in the browser). The search is about a second of arithmetic per
-  Courier page (measured 2026-09 on the startup document: 0.65–1.04 s for 65
-  lines, most of it in hypotheses that can no longer win), after every page
-  of a read and for every page of a cache replay — so it runs in a Worker of
+  searched hypothesis on a Courier page (measured 2026-09 on the startup
+  document, 65 lines; since 2026-09-20 the engine skips a search that can no
+  longer win, which brings a page whose pens scale 1 already writes to
+  ~12 ms), after every page of a read and for every page of a cache replay —
+  so it runs in a Worker of
   its own, `law-worker.js`, which imports the page's own `engine/render.js`
   and gets the slim entries and the kern table by structured clone; the
   reader's worker goes on with the next page meanwhile, and the main thread

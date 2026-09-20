@@ -381,11 +381,11 @@ window.ocrProducerList = function (pageNum) {
   return [...ocrProducer.entries()].filter(([k]) => k.startsWith(pre)).map(([, m]) => m);
 };
 
-// producerMetrics searches the laid size for every hypothesis — about a
-// second of plain arithmetic per Courier page (measured 2026-09: 0.65–1.04 s
-// on the startup document), after every page of a read and for every page of
-// a cache replay. On the main thread that froze the page for that long, page
-// after page; law-worker.js runs the same engine file in a Worker of its own,
+// producerMetrics searches the laid size for every hypothesis that can still
+// win — about a second of plain arithmetic per searched hypothesis on a
+// Courier page (measured 2026-09 on the startup document), after every page
+// of a read and for every page of a cache replay. On the main thread that
+// froze the page for that long, page after page; law-worker.js runs the same engine file in a Worker of its own,
 // so the reader's worker goes on with the next page meanwhile.
 const OCR_LAW_WORKER_URL = assetURL('plugins/ocr_tool/law-worker.js');
 const ocrLawJobs = new Map();   // id -> { resolve, reject }

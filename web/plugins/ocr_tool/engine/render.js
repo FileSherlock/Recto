@@ -266,7 +266,9 @@
   // {quant, scale, kerned, kern: Map pair → px as laid, adv: Map (empty —
   // reserved for per-glyph overrides), sizePx: the laid size, words, glyphs,
   // hit: pens some start writes, exact: words written entirely, kernable,
-  // alternatives: every hypothesis with its hit}.
+  // alternatives: every hypothesis with its hit, and searched: whether its
+  // scale was — not when scale 1 writes every pen, nor when a hypothesis
+  // that wins the tie already does}.
   function producerMetrics(lines, opts) {
     const sizePx = opts?.sizePx ?? null;
     const table = opts?.kernTable ? asMap(opts.kernTable) : null;
@@ -288,19 +290,24 @@
       return { hit, exact };
     };
     const better = (a, b) => !b || a.hit > b.hit || (a.hit === b.hit && Math.abs(a.scale - 1) < Math.abs(b.scale - 1) - 1e-12);
-    const combos = [];
-    for (const quant of [1000, null]) { combos.push({ quant, kerned: false }); if (kernable) combos.push({ quant, kerned: true }); }
+    // in the order ties are broken (rank, below), so a later hypothesis wins only with MORE pens
+    const combos = [{ quant: 1000, kerned: false }, { quant: null, kerned: false }];
+    if (kernable) combos.push({ quant: 1000, kerned: true }, { quant: null, kerned: true });
     const range = opts?.scaleRange ?? 0.005;
     const results = [];
     for (const c of combos) {
       const ev = scale => ({ quant: c.quant, kerned: c.kerned, scale, ...score({ quant: c.quant, scale, kern: c.kerned ? lawKern(c.quant, scale) : null }) });
       let best = ev(1);
-      if (best.hit < glyphs) {
+      // the page's pens are the ceiling: once a lesser assumption writes them
+      // all, no search of this one can win — 132 scorings of every word, for a
+      // number in `alternatives`. It is given as scale 1 reads it, unsearched.
+      const searched = best.hit < glyphs && !results.some(r => r.hit === glyphs);
+      if (searched) {
         for (let sc = 1 - range; sc <= 1 + range + 1e-12; sc += 2e-4) { const r = ev(+sc.toFixed(6)); if (better(r, best)) best = r; }
         const c0 = best.scale;
         for (let sc = c0 - 2e-4; sc <= c0 + 2e-4 + 1e-12; sc += 5e-6) { const r = ev(+sc.toFixed(7)); if (better(r, best)) best = r; }
       }
-      results.push(best);
+      results.push({ ...best, searched });
     }
     const rank = r => (r.quant === 1000 ? 0 : 1) + (r.kerned ? 2 : 0);
     results.sort((a, b) => b.hit - a.hit || rank(a) - rank(b) || Math.abs(a.scale - 1) - Math.abs(b.scale - 1));
@@ -309,7 +316,7 @@
     if (win.kerned) { const plain = results.find(r => r.quant === win.quant && !r.kerned); if (plain && plain.hit >= win.hit) win = plain; }
     return { quant: win.quant, scale: win.scale, kerned: win.kerned, kern: win.kerned ? lawKern(win.quant, win.scale) : new Map(), adv: new Map(),
       sizePx: sizePx * win.scale, words: ws.length, glyphs, hit: win.hit, exact: win.exact, kernable,
-      alternatives: results.map(r => ({ quant: r.quant, kerned: r.kerned, scale: r.scale, hit: r.hit, exact: r.exact })) };
+      alternatives: results.map(r => ({ quant: r.quant, kerned: r.kerned, scale: r.scale, hit: r.hit, exact: r.exact, searched: r.searched })) };
   }
 
   // the start a certified line's first word was laid from under a law:
