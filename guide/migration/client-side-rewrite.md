@@ -332,17 +332,11 @@ tree.
 - Do not name an optional plugin in core code or core docs.
 - Keep `destroy()` discipline in every worker; check the heap after each
   phase on the 340-page sample.
-- Licensed Windows fonts live in `assets/fonts/` today and are served
-  publicly already; before the new repository is made public, ask the user
-  which fonts may be redistributed.
 
 ## Open decisions (ask the user when the phase arrives)
 
-1. Phase 2: keep opened documents across reloads (OPFS / IndexedDB), or
-   reopen from disk each time? Default: reopen — nothing is persisted.
-2. Phase 5: is circle rejection in the mask worth an 8 MB opencv.js if the
+- Phase 5: is circle rejection in the mask worth an 8 MB opencv.js if the
    shape test cannot match it?
-3. Phase 8: which fonts ship in the public repository.
 
 ## Progress
 
