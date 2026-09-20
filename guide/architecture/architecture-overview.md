@@ -28,7 +28,7 @@ GPU — is a plugin like any other, and deleting its folder leaves the core unto
 | **PDF parsing and rasters** | MuPDF 1.28.0 as WebAssembly (`web/vendor/mupdf/`), inside a module worker | Open the document, hand out page rasters, structured text, image placement |
 | **Text shaping** | HarfBuzz 14.4.0 as WebAssembly (harfbuzzjs 1.6.1, `web/vendor/harfbuzz/`) | Measure precise pixel widths of text, kerning included (`text_tool`) |
 | **Mask detection** | Plain JavaScript in a worker (`web/plugins/webgl_mask/mask-core.js`) | Detect black rectangular regions in a page's pixels and build a gray mask |
-| **Frontend rendering** | Vanilla JS, Fabric.js, WebGL | Page display, SVG text overlays, GPU-accelerated mask tinting |
+| **Frontend rendering** | Vanilla JS, SVG, WebGL | Page display, SVG text overlays, GPU-accelerated mask tinting |
 | **Plugin integration** | `plugin.json` manifests + `PDFHooks` event bus | Decoupled wiring: the page is assembled from manifests, the lifecycle runs by event |
 | **Build and development** | Node, zero dependencies: `tools/build.mjs`, `tools/serve.mjs` | Scan the plugins into `web/index.html`; serve `web/` locally |
 | **Tests** | `node:test` suites against recorded goldens, plus a browser smoke test | Hold every computation to reference outputs (`tests/`) |

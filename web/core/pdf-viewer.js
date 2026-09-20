@@ -16,14 +16,61 @@
 // startup document. 'document:opening' goes out first: between it and
 // 'document:loaded' the viewer already shows the new document's pages.
 async function openDocument(source, name, file) {
-  // Before anything changes: per-document plugin state (a finished flag, a
-  // run in progress) belongs to the document that is about to go away.
-  await PDFHooks.emit('document:opening', { file, name, isDefault: !file });
-  let shown = null;
-  const data = await Doc.open(source, name, { early: info => { shown = showDocument(info); } });
-  await (shown || showDocument(data));
-  await announceDocument(data, file);
-  return data;
+  const turn = openDocument.turn = (openDocument.turn || 0) + 1;
+  try {
+    // Before anything changes: per-document plugin state (a finished flag, a
+    // run in progress) belongs to the document that is about to go away.
+    await PDFHooks.emit('document:opening', { file, name, isDefault: !file });
+    let shown = null;
+    const data = await Doc.open(source, name, { early: info => { shown = showDocument(info); } });
+    await (shown || showDocument(data));
+    await announceDocument(data, file);
+    return data;
+  } catch (e) {
+    // An open that a later one overtook fails too ("another document was
+    // opened meanwhile"); the caller must not report that one — the screen
+    // belongs to the later open.
+    e.superseded = turn !== openDocument.turn;
+    throw e;
+  }
+}
+
+// Nothing is open — what a failed open leaves behind. Doc.open() closed the
+// previous document before it tried the new one, and plugins dropped their
+// per-document state on 'document:opening'; the old page cannot stay up, it
+// would look open while every page request fails.
+function showNoDocument(message) {
+  Doc.close();
+  goToPage.turn = (goToPage.turn || 0) + 1;      // a page still on its way in is not shown
+  state.numPages = 0;
+  state.currentPage = 1;
+  state.docHash = null;
+  state.hasPdf = false;
+  state.currentFile = null;
+  if (typeof utbState !== 'undefined') {
+    utbState.reset();
+    if (typeof clearAllSVGLayers === 'function') clearAllSVGLayers();
+  }
+  PDFHooks.emit('viewer:clear');
+
+  els.titleElem.textContent = 'No PDF Loaded';
+  els.pageCountElem.textContent = '/ 0';
+  els.pageInputElem.value = 0;
+  els.pageInputElem.max = 0;
+  els.pdfFile.value = '';                        // the same file can be chosen again
+  renderThumbnails();                            // none
+
+  els.viewer.innerHTML = '';
+  if (!els.placeholder) return;
+  els.loader?.classList.add('hidden');
+  els.placeholder.querySelector('.material-symbols-outlined')?.classList.remove('hidden');
+  if (els.placeholderText) {
+    els.placeholderText.textContent = message || 'Open a PDF or image to begin.';
+    els.placeholderText.classList.toggle('error', !!message);
+    els.placeholderText.classList.remove('hidden');
+  }
+  els.placeholder.classList.remove('hidden');
+  els.viewer.appendChild(els.placeholder);
 }
 
 // `data` is Doc.open()'s result (or its early form). Page rasters are not part
@@ -81,12 +128,14 @@ async function handleFileUpload(e) {
   state.currentFile = file;
   els.titleElem.textContent = file.name;
 
-  // Premium: Show loader and hide placeholder icons
-  const placeholder = document.getElementById('viewer-placeholder');
-  const loader = document.getElementById('analysis-loader');
+  // Premium: Show loader and hide placeholder icons (the placeholder is on
+  // screen only while nothing is open — otherwise the old page stays up
+  // until the new one replaces it)
+  const placeholder = els.placeholder;
+  const loader = els.loader;
   const placeholderIcon = placeholder?.querySelector('.material-symbols-outlined');
-  const placeholderText = document.getElementById('placeholder-text');
-  
+  const placeholderText = els.placeholderText;
+
   if (loader) loader.classList.remove('hidden');
   if (placeholderText) placeholderText.classList.add('hidden');
   if (placeholderIcon) placeholderIcon.classList.add('hidden');
@@ -97,13 +146,9 @@ async function handleFileUpload(e) {
     // Hide placeholder entirely once loaded
     if (placeholder) placeholder.classList.add('hidden');
   } catch (e) {
+    if (e.superseded) return;                    // a later open owns the screen, and reports its own outcome
     console.error('Error opening document:', e.message);
-    if (loader) loader.classList.add('hidden');
-    if (placeholderText) {
-      placeholderText.textContent = `Error: ${e.message}`;
-      placeholderText.classList.remove('hidden', 'error');
-      placeholderText.style.color = '#f28b82';
-    }
+    showNoDocument(`Could not open ${file.name}: ${e.message}`);
   }
 }
 

@@ -218,6 +218,13 @@ html {
   border-radius: 4px;
 }
 
+/* A document that failed to open (pdf-viewer.js showNoDocument) */
+#placeholder-text.error {
+  color: #f28b82;
+  max-width: 80%;
+  overflow-wrap: anywhere;
+}
+
 /* Premium Loading Spinner */
 .premium-spinner {
   width: 48px;

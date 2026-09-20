@@ -103,8 +103,8 @@ Cross-Origin-Embedder-Policy: credentialless
 These two headers make the page cross-origin isolated, which exposes
 `performance.measureUserAgentSpecificMemory()` — a way to measure the wasm heap and the
 workers. The app does not need them; the dev server sends them so memory can be checked
-during development. Prefer `credentialless` to `require-corp`: the page loads Fabric.js and
-web fonts from public CDNs, and `credentialless` keeps those loading without each of them
+during development. Prefer `credentialless` to `require-corp`: the page loads web
+fonts from a public CDN, and `credentialless` keeps those loading without each of them
 having to opt in with a `Cross-Origin-Resource-Policy` header.
 
 ### 5. Optional: compression

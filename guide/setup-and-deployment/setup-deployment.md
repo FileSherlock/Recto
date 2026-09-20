@@ -50,4 +50,4 @@ Everything the site serves lives under `web/`:
 
 The vendored binaries are pinned copies; `web/vendor/README.md` records their versions,
 origins and licences, and what to check before upgrading one. The page additionally loads
-Fabric.js and two icon/text web fonts from public CDNs.
+two icon/text web fonts from a public font CDN; every script comes from `web/`.

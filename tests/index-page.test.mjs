@@ -23,6 +23,11 @@ function normalise(html) {
     .replace(/<script src="core\/doc-service\.js[^"]*"><\/script>/, '')   // the document service (new)
     .replace(/<script src="plugins\/embedded_text_viewer\/extract\.js[^"]*"><\/script>/, '')   // the extractor port (new)
     .replace(/<script src="plugins\/text_tool\/shaping\.js[^"]*"><\/script>/, '')             // HarfBuzz measurement (new)
+    // Fabric.js (gone): the server's page loaded it from cdnjs, with a polyfill for a warning it
+    // caused, long after the last call into it had been removed — the static page loads no outside script
+    .replace(/<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/fabric\.js\/[^"]*"><\/script>/, '')
+    .replace(/<script>\s*const originalTextBaseline =[\s\S]*?<\/script>/, '')
+    .replace(/github\.com\/JaguarM\/Recto/g, 'github.com/FileSherlock/Recto')   // the repository moved
     .replace(/\/static\/text_tool\/geometry\.js/g, 'core/geometry.js')    // geometry.js moved into the core
     .replace(/\/static\/pdf_core\//g, 'core/')
     .replace(/\/static\/(\w+)\//g, 'plugins/$1/')
@@ -37,6 +42,12 @@ test('generated index.html matches the server-rendered page', () => {
   const built = normalise(build({ write: false }).html);
   assert.deepEqual(scripts(built), scripts(golden), 'script order');
   assert.equal(built, golden);
+});
+
+test('the page loads no script from another origin', () => {
+  // a document never leaves the browser — and no third party is handed the means to change that
+  const outside = scripts(build({ write: false }).html).filter(src => /^([a-z][a-z0-9+.-]*:)?\/\//i.test(src));
+  assert.deepEqual(outside, []);
 });
 
 test('every local URL of the page carries the content hash of an existing file', () => {

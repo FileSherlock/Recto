@@ -1,5 +1,5 @@
 // ocr-tool.js — Auto OCR plugin adapter (Recto-owned, NOT synced from tol0;
-// the others are ocr-worker.js, ocr-result.js and pixel-view.js). Runs the
+// the others are ocr-worker.js, law-worker.js, ocr-result.js and pixel-view.js). Runs the
 // blind reader (engine/blindocr.js) on the page rasters the viewer already
 // holds — inside a Worker (ocr-worker.js), so the page stays live while a
 // read runs — and feeds the results into the unified text box system exactly
@@ -381,6 +381,64 @@ window.ocrProducerList = function (pageNum) {
   return [...ocrProducer.entries()].filter(([k]) => k.startsWith(pre)).map(([, m]) => m);
 };
 
+// producerMetrics searches the laid size for every hypothesis — about a
+// second of plain arithmetic per Courier page (measured 2026-09: 0.65–1.04 s
+// on the startup document), after every page of a read and for every page of
+// a cache replay. On the main thread that froze the page for that long, page
+// after page; law-worker.js runs the same engine file in a Worker of its own,
+// so the reader's worker goes on with the next page meanwhile.
+const OCR_LAW_WORKER_URL = assetURL('plugins/ocr_tool/law-worker.js');
+const ocrLawJobs = new Map();   // id -> { resolve, reject }
+let ocrLawWorkerReady = null;   // promise of the worker; rejected = no Worker, learn inline
+let ocrLawSeq = 0;
+
+function ocrLawWorker() {
+  if (ocrLawWorkerReady) return ocrLawWorkerReady;
+  ocrLawWorkerReady = new Promise((resolve, reject) => {
+    if (typeof Worker === 'undefined') return reject(new Error('no Worker support'));
+    // the engine script exactly as this page loaded it (the build's content-hashed url)
+    const script = [...document.querySelectorAll('script[src]')].map(el => el.src)
+      .find(src => /\/ocr_tool\/engine\/render\.js/.test(src));
+    if (!script) return reject(new Error('engine/render.js not found on the page'));
+    let w;
+    try { w = new Worker(OCR_LAW_WORKER_URL); } catch (e) { return reject(e); }
+    const fail = (err) => {
+      reject(err);
+      for (const job of ocrLawJobs.values()) job.reject(err);
+      ocrLawJobs.clear();
+    };
+    w.onerror = (e) => fail(e.error || new Error(e.message || 'law worker error'));
+    w.onmessage = (e) => {
+      const m = e.data;
+      if (m.type === 'ready') { resolve(w); return; }
+      if (m.type === 'error' && m.id === null) { fail(new Error(m.message)); return; }
+      const job = ocrLawJobs.get(m.id);
+      if (!job) return;
+      ocrLawJobs.delete(m.id);
+      if (m.type === 'law') job.resolve(m.metrics); else job.reject(new Error(m.message));
+    };
+    w.postMessage({ type: 'init', script });
+  });
+  return ocrLawWorkerReady;
+}
+
+// render.js producerMetrics(lines, opts) → the law; in the worker, inline only
+// where there is no Worker (or it failed) — the same function either way
+async function ocrProducerMetrics(lines, opts) {
+  try {
+    const w = await ocrLawWorker();
+    return await new Promise((resolve, reject) => {
+      const id = ++ocrLawSeq;
+      ocrLawJobs.set(id, { resolve, reject });
+      w.postMessage({ type: 'learn', id, lines, opts });
+    });
+  } catch (e) {
+    if (!ocrProducerMetrics.warned) console.warn('OCR: law worker unavailable, learning on the main thread:', e.message || e);
+    ocrProducerMetrics.warned = true;
+    return OCRRender.producerMetrics(lines, opts);
+  }
+}
+
 async function ocrLearnProducer(pageNum, res) {
   if (typeof OCRRender === 'undefined' || typeof OCRRender.producerMetrics !== 'function') return;
   const hash = state.docHash;
@@ -405,7 +463,8 @@ async function ocrLearnProducer(pageNum, res) {
     let table = null;
     try { table = (await window.FontCatalog?.metrics?.(family, bold, italic, sizePx))?.kern || null; } catch { table = null; }
     if (hash !== state.docHash) return;                 // the document changed while the table was fetched
-    const m = OCRRender.producerMetrics(lines, { sizePx, kernTable: table, spaceAdv: res.spaceAdv ?? null });
+    const m = await ocrProducerMetrics(lines, { sizePx, kernTable: table, spaceAdv: res.spaceAdv ?? null });
+    if (hash !== state.docHash) return;                 // … or while the law was learned
     m.set = name; m.family = family; m.tableKnown = !!table;
     ocrProducer.set(ocrProducerKey(pageNum, name), m);
     learned++;

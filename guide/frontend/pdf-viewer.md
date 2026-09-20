@@ -45,6 +45,8 @@ The one way a document comes on screen — used by the file input, by drag-and-d
 3. Awaits that `showDocument` (or runs it now, with the final result, when `early` never fired — an image document).
 4. Calls `announceDocument(data, file)`, which emits `document:loaded`.
 
+An open that fails rethrows its error with `e.superseded` set: `true` when a later `openDocument()` had started meanwhile (the earlier open fails *because* of it — "another document was opened meanwhile" — and the screen belongs to the later one), `false` for a real failure.
+
 `file` is the user's `File`, or `null` for the startup document; `isDefault` is `!file`. Between `document:opening` and `document:loaded` the viewer already shows the new document's pages, so a plugin sees `page:rendered` for the new document **before** its `document:loaded`.
 
 ### `showDocument(info)`
@@ -70,7 +72,11 @@ anything that appears on top of the page was put there by a plugin subscribing t
 
 ### `handleFileUpload()`
 
-Triggered when a file is selected or dropped (`app.js` accepts PDFs and PNG, JPEG, TIFF, BMP, WebP images). Sets `state.currentFile`, `state.hasPdf` (is it a `.pdf`) and the title, shows the loader in `#viewer-placeholder`, and calls `openDocument(file, file.name, file)`. A failure is shown in `#placeholder-text`.
+Triggered when a file is selected or dropped (`app.js` accepts PDFs and PNG, JPEG, TIFF, BMP, WebP images). Sets `state.currentFile`, `state.hasPdf` (is it a `.pdf`) and the title, shows the loader in `#viewer-placeholder`, and calls `openDocument(file, file.name, file)`. A failure that is not `superseded` goes to `showNoDocument(message)`.
+
+### `showNoDocument(message)`
+
+The "nothing is open" screen, which is what a failed open leaves: `Doc.open()` closed the previous document before it tried the new one and plugins dropped their per-document state on `document:opening`, so the old page cannot stay up — it would look open while every page request fails. Closes `Doc`, zeroes `state.numPages` / `state.docHash` / `state.currentFile`, resets the text boxes, emits `viewer:clear`, empties the viewer and the thumbnails, resets the title and page counter, clears the file input (the same file can be chosen again) and puts `#viewer-placeholder` back with the message in `#placeholder-text` (class `error`). The first rendered page detaches the placeholder from `#viewer`; `els.placeholder`, `els.placeholderText` and `els.loader` (`state.js`) keep it for this.
 
 ### The startup document
 

@@ -127,7 +127,13 @@ async function initWebGLOverlay(canvas, pageNum) {
     }
 
     const img = new Image();
+    // The mask's blob: URL is only the way into the <img>: once it has loaded
+    // (or failed) the URL goes, or every page turn would leave one behind —
+    // and with it a reference that keeps the PNG alive after the cache drops it.
+    const maskURL = URL.createObjectURL(blob);
+    img.onerror = () => URL.revokeObjectURL(maskURL);
     img.onload = () => {
+      URL.revokeObjectURL(maskURL);
       if (!webglContexts.has(pageNum)) return; // Was destroyed before load
 
       const pageImg = document.getElementById(`page${pageNum}`);
@@ -255,7 +261,7 @@ async function initWebGLOverlay(canvas, pageNum) {
         pageImg.addEventListener('load', proceed, { once: true });
       }
     };
-    img.src = URL.createObjectURL(blob);
+    img.src = maskURL;
   } catch (e) {
     console.error("Could not load mask", e);
     canvas.remove();

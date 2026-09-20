@@ -2,18 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## This branch: `client-side-rewrite`
+## Where this came from
 
-Recto as a static website: everything runs in the browser (JavaScript, MuPDF and HarfBuzz as WebAssembly).
-`guide/migration/client-side-rewrite.md` holds the plan, the phases with their acceptance criteria, the progress
-checklist and — in its Progress notes — every measurement and every deviation made on the way; read it before
-continuing the migration, and keep it current. `main` is the original server-based version and is never touched from
-this branch. Python files that remain in the tree are leftovers awaiting the plan's last phase; nothing runs them.
+Recto is a static website: everything runs in the browser (JavaScript, MuPDF and HarfBuzz as WebAssembly). It was a
+Django application once; the move is finished, and `main` here is the static site. `guide/migration/client-side-rewrite.md`
+is the record of that move — the plan, and in its Progress notes every measurement and every deviation made on the
+way; read it when a design decision looks odd. `MIGRATING.md` tells a plugin author how to bring a server-based plugin
+over. The site needs no Python: `tools/dev/*.py` are standalone maintenance scripts (font files, the refiner's word
+list), run by hand when their inputs change.
 
 ## What this is
 
 Recto is an extensible PDF editor: open a PDF or scanned image, edit/add text with true font metrics (HarfBuzz
-shaping), mask regions, inspect embedded text. Vanilla JS + Fabric.js + WebGL, MuPDF and HarfBuzz as WebAssembly. No
+shaping), mask regions, inspect embedded text. Vanilla JS + SVG + WebGL, MuPDF and HarfBuzz as WebAssembly. No
 server code, no build step beyond one scan script, no bundler, no JS package manager. A user's document never leaves
 the browser.
 

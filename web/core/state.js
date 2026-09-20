@@ -38,6 +38,12 @@ const els = {
   prevPageBtn: document.getElementById('prev-page'),
   nextPageBtn: document.getElementById('next-page'),
 
+  // The "nothing open" screen. The first page to render empties #viewer and
+  // detaches it; these references keep it, so a failed open can put it back.
+  placeholder: document.getElementById('viewer-placeholder'),
+  placeholderText: document.getElementById('placeholder-text'),
+  loader: document.getElementById('analysis-loader'),
+
   toolAddBoxBtn: document.getElementById('tool-add-box'),
   toolTextBtn: document.getElementById('tool-text'),
   // Plugin-owned controls (including the right-panel "tools sidebar" and its

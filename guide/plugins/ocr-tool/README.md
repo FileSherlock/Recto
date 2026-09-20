@@ -115,7 +115,8 @@ here.** The workflow:
 
 Only `ocr-tool.js` (the adapter: UI wiring, page-raster → engine buffer,
 lines → UnifiedTextBoxes), `ocr-worker.js` (the Worker the adapter reads
-in), `ocr-result.js` (the slim result shape shared by the worker, the cache
+in), `law-worker.js` (the Worker it learns the producer's law in),
+`ocr-result.js` (the slim result shape shared by the worker, the cache
 and `ocrAddBoxes`), `pixel-view.js` (the MuPDF pixel view) and
 `hypothesis-view.js` (the hypothesis and width seams) are owned by this
 plugin and edited here, together with `plugin.json`, the two HTML fragments
@@ -267,7 +268,15 @@ Two toggles in the **MuPDF view** group of the OCR bar (`pixel-view.js`):
   1/1000 em or the set's hmtx, the laid size searched to 5e-6, kerned with
   the face's own table or not — with `render.js producerMetrics` and the
   kern table from `text_tool` (`FontCatalog.metrics` → `Shaping.fontMetrics`,
-  HarfBuzz in the browser). A pair the page never wrote ("Yo", "Ve") is therefore laid with
+  HarfBuzz in the browser). The search is about a second of arithmetic per
+  Courier page (measured 2026-09 on the startup document: 0.65–1.04 s for 65
+  lines, most of it in hypotheses that can no longer win), after every page
+  of a read and for every page of a cache replay — so it runs in a Worker of
+  its own, `law-worker.js`, which imports the page's own `engine/render.js`
+  and gets the slim entries and the kern table by structured clone; the
+  reader's worker goes on with the next page meanwhile, and the main thread
+  only fetches the kern table and stores the answer (inline as before in a
+  browser without Workers). A pair the page never wrote ("Yo", "Ve") is therefore laid with
   the font's kern only on a page whose producer kerned. `window.ocrProducerFor(page,
   set)` returns the law; the status line names it on selection (`law 1/1000
   em × 1.00000, no kerning (300/300 words written back)`); a set the page

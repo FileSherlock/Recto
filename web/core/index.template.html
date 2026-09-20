@@ -12,9 +12,6 @@
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Fabric.js v5 -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
-
   <link rel="stylesheet" href="core/styles.css">
   <!-- @plugins:styles -->
 </head>
@@ -141,19 +138,6 @@
   <script src="core/app.js"></script>
 
 
-  <!-- Polyfill for Fabric.js v5 using 'alphabetical' textBaseline which causes browser warnings -->
-  <script>
-    const originalTextBaseline = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'textBaseline');
-    if (originalTextBaseline) {
-      Object.defineProperty(CanvasRenderingContext2D.prototype, 'textBaseline', {
-        get: function() { return originalTextBaseline.get.call(this); },
-        set: function(val) {
-          if (val === 'alphabetical') val = 'alphabetic';
-          originalTextBaseline.set.call(this, val);
-        }
-      });
-    }
-  </script>
 
   <!-- @plugins:scripts_after_app -->
 

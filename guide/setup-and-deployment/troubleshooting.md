@@ -35,7 +35,7 @@ a plugin, and is skipped.
 - **Opened by double-clicking `web/index.html` (`file://`).** Browsers block `fetch()` and
   workers on `file://` pages. Use `node tools/serve.mjs` or any static file server.
 - **The page has no styling or no icons.** The toolbar icons and the UI font come from a
-  public font CDN, and Fabric.js from a public script CDN; an offline machine or a filter
+  public font CDN (the only files not served from `web/`); an offline machine or a filter
   that blocks them shows text labels instead of icons. The local files (`core/styles.css`,
   plugin styles) are separate — check their status codes in the Network tab.
 

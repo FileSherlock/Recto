@@ -90,8 +90,8 @@ Then publish the `web/` folder on any static file host. What the host has to get
   cache key.
 - **COOP/COEP headers are optional.** The app works without cross-origin isolation.
 
-The page loads Fabric.js from cdnjs and its icon and UI fonts from Google Fonts; everything
-else comes from `web/`. There is no bundler, no transpiler and no package manager.
+The page loads its icon and UI fonts from Google Fonts; everything else — every script —
+comes from `web/`. There is no bundler, no transpiler and no package manager.
 `web/index.html` and `web/generated/` are build outputs and are not committed.
 
 Details: [`guide/setup-and-deployment/`](guide/setup-and-deployment/setup-deployment.md).

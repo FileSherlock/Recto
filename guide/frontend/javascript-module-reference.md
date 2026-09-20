@@ -78,7 +78,6 @@ very files the browser runs.
 |---------|------|---------|
 | MuPDF 1.28.0 (WebAssembly) | `web/vendor/mupdf/` | Opens PDFs, decodes embedded scans, renders pages, structured text |
 | harfbuzzjs 1.6.1 = HarfBuzz 14.4.0 (WebAssembly) | `web/vendor/harfbuzz/` | Text shaping for width measurement |
-| Fabric.js 5.3.1 | cdnjs (Cloudflare) | Legacy canvas — still loaded, not used for text rendering |
 | Material Symbols | Google Fonts | Toolbar icons |
 | Inter font | Google Fonts | UI typography |
 
