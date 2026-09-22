@@ -159,7 +159,10 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
   (`timesbd16` → Times New Roman bold 12 pt, `cour13` → Courier New 9.75 pt).
 - Non-byte-clean lines render in orange (`box.color` override); unreadable
   bands become red `□` marker boxes. `box.ocr = {clean, tol, quant, union,
-  font, baseline, fails}` rides on every box for downstream tooling.
+  font, baseline, fails}` rides on every box for downstream tooling —
+  `trusted` marks a certified line whose letterforms are evidence of the
+  face — one letter at ±2 or better (`To: "`, byte-exact in times16), three
+  on a looser rung (a row of dots certifies in any face at ±10).
 - Detected redaction rectangles become `redaction` boxes — when `box-rules.js`
   (`OCRBoxRules`, DOM-free, tested in `tests/plugins/ocr_tool/box-rules.test.mjs`)
   lets them. The engine's `detectObjects` types by height alone (≤ 4 rows a
@@ -384,6 +387,10 @@ the browser draws its vector text from the URW file itself.
 - When a read finishes (live or replayed from the cache) the adapter emits
   `typography:detected { fontFamily, sizePt, source: 'ocr' }` with the
   dominant face and size of the certified lines (weighted by glyph count);
-  `text_tool`'s `fonts.js` selects it in the font menu and size input.
+  `text_tool`'s `fonts.js` selects it in the font menu and size input. Not
+  after a weak read (`ocrReadIsWeak`: fewer than 3 certified lines, or fewer
+  than half of the lines read): the claim outranks the text layer's, and on
+  a page the reader could not read the two lines it certified at ±10 named
+  Cambria for a Times New Roman 11 pt memo.
 - The pixel view picks the glyph set for a hand-typed box by family and size
   through the same table (`plain` sets only — stock face, stock law).

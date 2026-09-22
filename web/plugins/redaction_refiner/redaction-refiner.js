@@ -390,17 +390,28 @@
   // embedded spans on the box's line are used, and the fragment rule recovers
   // the dropped letters; when OCR lands, 'redactions:connected' fires again and
   // the bar is re-derived from the OCR words.
+  // The row's spans, from its best source: the reader's line when it
+  // certified the row with letters (measured pens in a face it proved),
+  // else the text layer's spans (the bar's own line, else the row's), else a
+  // tolerant read — its pens sit on the ink, its letters and face may not
+  // be the page's, so it is 'ocr-tolerant': no lattice-exact edge, no
+  // reader's-set widths, no page-pixel verdict. Never an unread band.
   function lineSpansFor(box) {
     const ocrRow = spansOnRow(box, 'ocr');
-    if (ocrRow.length) return { spans: ocrRow, source: 'ocr' };
+    // (`trusted` is the reader's flag — certified with letters; a box built
+    // elsewhere carries only `clean`, which then stands for it)
+    const certified = ocrRow.filter((b) => b.ocr && (b.ocr.trusted ?? b.ocr.clean));
+    if (certified.length) return { spans: certified, source: 'ocr' };
 
     if (box.lineId != null) {
       const line = utbState.boxes.filter(
-        (b) => b.page === box.page && b.lineId === box.lineId && usableSpan(b)
+        (b) => b.page === box.page && b.lineId === box.lineId && b.type === 'embedded' && usableSpan(b)
       );
       if (line.length) return { spans: line, source: 'embedded' };
     }
-    return { spans: spansOnRow(box), source: 'embedded' };
+    const embRow = spansOnRow(box, 'embedded');
+    if (embRow.length) return { spans: embRow, source: 'embedded' };
+    return { spans: ocrRow, source: ocrRow.length ? 'ocr-tolerant' : 'embedded' };
   }
 
   // The row's words as [{ text, x0, x1, span }] in absolute image px. A span

@@ -86,10 +86,26 @@ function etvNormalize(spans) {
   if (_utbFetchState.baseApplied) return;
   _utbFetchState.baseApplied = true;
 
-  // the layer's most used face as the toolbar default — a 'layer' claim,
-  // which a plugin that measured the page's face (typography:detected)
-  // outranks whether it spoke before or after these spans arrived
-  if (window.FontCatalog?.select) window.FontCatalog.select(mostUsedFont, undefined, 'layer');
+  // the layer's body face: its most used font at that font's own modal size,
+  // weighted by characters (EFTA00173953: the small print of a warning
+  // paragraph is the median span size, 8 pt, and the core's sample too; the
+  // memo is Times New Roman 11 pt, and Times' own characters say so). It is
+  // the toolbar default — a 'layer' claim, which a plugin that measured the
+  // page's face (typography:detected) outranks whether it spoke before or
+  // after these spans arrived — and the reference for a bar on a row the
+  // reader failed and no span shares (utbConnectRedactionsToLines).
+  const chars = new Map();
+  spans.forEach(span => {
+    const f = typeof normUtbFont === 'function' ? normUtbFont(span.font) : (span.font || 'Times New Roman');
+    if (f !== mostUsedFont) return;
+    const k = Math.round(span.sizePt);
+    chars.set(k, (chars.get(k) || 0) + (span.text || '').replace(/\s+/g, '').length);
+  });
+  let bodyPt = documentBasePt, most = -1;
+  for (const [k, n] of chars) if (n > most) { most = n; bodyPt = k; }
+  _utbFetchState.baseFont = mostUsedFont;
+  _utbFetchState.bodyPt = bodyPt;
+  if (window.FontCatalog?.select) window.FontCatalog.select(mostUsedFont, bodyPt, 'layer');
   else {
     const fabricSel = document.getElementById('fabric-font-family');
     if (fabricSel && Array.from(fabricSel.options).find(o => o.value === mostUsedFont)) {
@@ -239,14 +255,42 @@ function utbConnectRedactionsToLines() {
   const embeddedBoxes = utbState.boxes.filter(b => b.type === 'embedded' || b.type === 'ocr');
   const redactionBoxes = utbState.boxes.filter(b => b.type === 'redaction');
 
+  // A bar links to the best line its row has NOW and moves up when a better
+  // one arrives: the reader's boxes land before the text layer's spans on
+  // one path and after them on the other, so a bar linked to an unread band
+  // takes the layer's span when that lands, and a bar linked to the layer's
+  // span takes the reader's line if the reader certifies the row. A bar on a
+  // failed read takes the layer's body face once the layer is known, once.
+  const rank = b => b.type === 'ocr' ? (b.ocr?.unread ? 0 : (b.ocr?.trusted ?? b.ocr?.clean) ? 3 : 1) : 2;
+  // the face for a bar whose row the reader failed and no span shares: the
+  // adjacent embedded line's — the row above or below, within one and a
+  // half of its own height — else the layer's body face. Not a line further
+  // off: on EFTA00173953 the layer skips the redacted Subject lines, and the
+  // nearest text below the last of them is the small print of the warning
+  // paragraph, two rows down and in another face.
+  const layerFaceFor = rb => {
+    let near = null, dist = Infinity;
+    for (const b of embeddedBoxes) {
+      if (b.type !== 'embedded' || b.page !== rb.page || !/\p{L}/u.test(b.text || '')) continue;
+      const d = Math.abs((b.y + b.h / 2) - (rb.y + rb.h / 2));
+      if (d < dist) { dist = d; near = b; }
+    }
+    if (near && dist <= near.h * 1.5) return { fontFamily: near.fontFamily, sizePt: near.sizePt };
+    return _utbFetchState.baseFont ? { fontFamily: _utbFetchState.baseFont, sizePt: _utbFetchState.bodyPt || _utbFetchState.basePt } : null;
+  };
   redactionBoxes.forEach(rb => {
-    if (rb.lineId !== null) return;
-
-    // The line with the most vertical overlap. When the reader has read the
-    // page, its lines win over the embedded ones: their baseline, height and
-    // size are measured from the glyphs on the page, whereas a scanned
-    // document's embedded text layer only approximates them (its sizes drift
-    // word by word), and a bar must not adopt an 11 pt guess for a 12 pt line.
+    // The line with the most vertical overlap, from the best source the row
+    // has. A line the reader CERTIFIED wins: its baseline, height and size are
+    // measured from the glyphs on the page, whereas a scanned document's
+    // embedded text layer only approximates them (its sizes drift word by
+    // word), and a bar must not adopt an 11 pt guess for a 12 pt line. But a
+    // row the reader failed on has nothing measured to offer: a tolerant read
+    // names whatever set matched at ±10 (Arial bold, Courier 9 pt on a Times
+    // memo), an unread band carries a placeholder. There the text layer is
+    // the reference — the row's own span, else the layer's body face — and
+    // the reader's line lends only its rows. (EFTA00173953: 33 of 46 bands
+    // unread, the rest read at ±10, the layer says Times New Roman 11 pt on
+    // every row.)
     const pageBoxes = embeddedBoxes.filter(b => b.page === rb.page);
     const best = (list) => {
       let box = null, overlap = 0;
@@ -256,20 +300,31 @@ function utbConnectRedactionsToLines() {
       }
       return overlap >= rb.h * 0.3 ? box : null;
     };
-    const bestBox = best(pageBoxes.filter(b => b.type === 'ocr')) || best(pageBoxes);
+    let bestBox = null;
+    for (const r of [3, 2, 1, 0]) if ((bestBox = best(pageBoxes.filter(b => rank(b) === r)))) break;
     if (!bestBox) return;
+    const current = rb.lineId !== null ? pageBoxes.find(b => b.lineId === rb.lineId) : null;
+    const better = rank(bestBox) > (current ? rank(current) : -1);
+    const layerFace = rank(bestBox) <= 1 ? layerFaceFor(rb) : null;
+    if (!better && !(layerFace && !rb._layerFaced)) return;      // nothing new for this bar
 
-    rb.lineId = bestBox.lineId;
-    rb.y = bestBox.y;
-    rb.h = bestBox.h;
+    if (better) {
+      rb.lineId = bestBox.lineId;
+      rb.y = bestBox.y;
+      rb.h = bestBox.h;
+      rb._layerFaced = false;
+    }
     // A detected bar carries no typography of its own; the line it sits on
     // does. Adopt the line's face, size and style — as a manually added bar
     // inherits them from its nearest line — so whatever measures text against
-    // the bar measures in the page's own font, not the box default.
-    if (bestBox.fontFamily) rb.fontFamily = bestBox.fontFamily;
-    if (bestBox.sizePt > 0) rb.sizePt = bestBox.sizePt;
-    rb.bold = !!bestBox.bold;
-    rb.italic = !!bestBox.italic;
+    // the bar measures in the page's own font, not the box default. A row
+    // whose only line is a failed read takes the layer's body face instead.
+    const face = layerFace || bestBox;
+    if (face.fontFamily) rb.fontFamily = face.fontFamily;
+    if (face.sizePt > 0) rb.sizePt = face.sizePt;
+    rb.bold = layerFace ? false : !!bestBox.bold;
+    rb.italic = layerFace ? false : !!bestBox.italic;
+    if (layerFace) rb._layerFaced = true;
 
     const lineBoxes = embeddedBoxes.filter(b => b.page === rb.page && b.lineId === bestBox.lineId);
     // The hidden name is set in capitals when the line writes its other names
@@ -390,6 +445,8 @@ if (window.PDFHooks) {
       _utbFetchState.inflight.clear();
       _utbFetchState.fetched = false;
       _utbFetchState.basePt = null;
+      _utbFetchState.baseFont = null;
+      _utbFetchState.bodyPt = null;
       _utbFetchState.baseApplied = false;
       _utbFetchState.anyText = false;
     }

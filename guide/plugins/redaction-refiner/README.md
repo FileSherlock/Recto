@@ -71,7 +71,7 @@ the box's line (the same lookup `embedded_text_viewer` snaps to), and the
 fragment rule below recovers what that layer dropped. When the OCR pass finishes,
 `redactions:connected` fires again and every bar is re-derived from the OCR
 words. Because both derivations describe the same page they land on the same
-edge; the verdict is recorded on `box.refineInfo` (`source: 'embedded' | 'ocr'`).
+edge; the verdict is recorded on `box.refineInfo` (`source: 'embedded' | 'ocr' | 'ocr-tolerant'`). The row's spans come from its best source (`lineSpansFor`): the reader's line when it certified the row with letters (`box.ocr.trusted`, `source: 'ocr'`), else the text layer's spans (`'embedded'`), else a tolerant read (`'ocr-tolerant'`: its pens sit on the ink, its face may not be the page's, so no lattice-exact edge, no reader's-set widths and no page-pixel verdict come of it) — never an unread band. A page the reader could not read is thus refined against the text layer, and the width seam (`ocrMeasureWidths`, which needs `source: 'ocr'`) leaves such bars to HarfBuzz in the bar's face.
 
 ### The three rules
 

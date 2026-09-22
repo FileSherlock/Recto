@@ -35,8 +35,9 @@ deterministic shaper `text_tool` draws with; measuring with the browser's own
 `getBBox()` instead reports fallback-font metrics until the page font has
 laid out, and the same name then measures a few pixels wider on some loads
 than on others. Names are measured in the **bar's own face, size and style** — a detected bar adopts them from the text line it is
-connected to (`embedded_text_viewer`'s connect step prefers a reader-read
-line, whose size is measured from the glyphs, over the embedded layer's) —
+connected to (`embedded_text_viewer`'s connect step prefers a line the reader
+certified, whose size is measured from the glyphs, over the embedded layer's;
+where the reader failed on the row, the layer is the reference) —
 resolved through the font catalogue (`family` / `bold` / `italic`), with the
 bar's kerning, letter case (as typed, UPPERCASE, or only the first or the
 last name in capitals — `text_tool`'s `utbApplyCase`) and space-width settings

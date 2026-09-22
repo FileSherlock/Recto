@@ -174,11 +174,24 @@ function ocrMajoritySet(seg, fallback) {
 
 // After a read: the dominant face and size of the certified lines, told to
 // the text tool through the generic typography:detected event (fonts.js
-// selects it as the default for new boxes). Weighted by glyph count.
+// selects it as the default for new boxes). Weighted by glyph count. Only a
+// read that certified most of what it saw makes the claim — it outranks the
+// text layer's, and on a page the reader could not read (EFTA00173953: 2 of
+// 46 bands clean, at ±10) the two clean lines named Cambria and every new
+// box took it, while the layer said Times New Roman 11 pt.
+function ocrReadIsWeak() {
+  const lines = new Map();                       // lineId -> certified, with letters?
+  for (const b of utbState.boxes)
+    if (b.type === 'ocr' && b.lineId) lines.set(b.lineId, lines.get(b.lineId) || !!(b.ocr?.trusted ?? b.ocr?.clean));
+  let clean = 0;
+  for (const c of lines.values()) if (c) clean++;
+  return clean < 3 || clean < lines.size * 0.5;
+}
 function ocrEmitTypography() {
+  if (ocrReadIsWeak()) return;
   const tally = new Map();
   for (const b of utbState.boxes) {
-    if (b.type !== 'ocr' || !b.ocr?.clean || !b.text) continue;
+    if (b.type !== 'ocr' || !(b.ocr?.trusted ?? b.ocr?.clean) || !b.text) continue;
     const k = `${b.fontFamily}|${Math.round(b.sizePt * 100) / 100}`;
     tally.set(k, (tally.get(k) || 0) + b.text.replace(/\s+/g, '').length);
   }
@@ -257,6 +270,17 @@ function ocrAddBoxes(pageNum, img, res, pass) {
     }
 
     const set = L.set;
+    // A certified line is evidence of the page's face only through its
+    // letterforms, and only as far as the rung it was certified on: a row of
+    // dots or quotes matches in any face at ±10 (EFTA00173953's two "clean"
+    // lines, "`     ` `" and ".", in tnr8lin10 on an 11 pt Times memo), while
+    // one letter reproduced byte for byte (`To: "` on the startup document,
+    // times16) pins face and size. At ±2 or better one letter is enough; on a
+    // looser rung three are needed. Consumers that take typography from a
+    // line — the connect step, the refiner's width seam, the typography
+    // claim — ask for `trusted`, not `clean`.
+    const letters = (L.text.match(/\p{L}/gu) || []).length;
+    const trusted = !!L.clean && letters >= ((pass.tol || 0) <= 2 ? 1 : 3);
 
     // Which set drew each glyph: a union pool ('a+b') accepts glyphs from
     // several sets, and the engine records that on L.glyphs[].src. Carry it
@@ -309,7 +333,7 @@ function ocrAddBoxes(pageNum, img, res, pass) {
         color: L.clean ? null : OCR_UNCLEAN_COLOR,
       }));
       box.ocrSource = true;
-      box.ocr = { clean: !!L.clean, tol: pass.tol || 0, quant: !!pass.quant,
+      box.ocr = { clean: !!L.clean, trusted, tol: pass.tol || 0, quant: !!pass.quant,
         // the reader's entries for this segment (offset, glyph, pen, advance,
         // drawing set) — what the pixel view re-lays an EDITED line from: the
         // unchanged part keeps its pens, the rest follows the producer's law
