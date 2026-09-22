@@ -160,14 +160,25 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
 - Non-byte-clean lines render in orange (`box.color` override); unreadable
   bands become red `□` marker boxes. `box.ocr = {clean, tol, quant, union,
   font, baseline, fails}` rides on every box for downstream tooling.
-- Detected redaction rectangles become `redaction` boxes — when they are
-  black. The engine's `detectObjects` calls any long near-solid dark run a
-  box, and a grey table cell, a logo's plate or a photograph pass as well; a
-  redaction is solid black ink. `ocrKeepBlackBoxes` (ocr-tool.js) checks each
-  box's interior, one pixel in from every side, against the pixels the reader
-  read: at least 90 % of it must be ≤ 48/255, or the box is dropped before the
-  read is slimmed (so the cache, payload version 3, holds only what stays).
-  `OCRTool.dropped(page)` lists what went, with each region's black fraction.
+- Detected redaction rectangles become `redaction` boxes — when `box-rules.js`
+  (`OCRBoxRules`, DOM-free, tested in `tests/plugins/ocr_tool/box-rules.test.mjs`)
+  lets them. The engine's `detectObjects` types by height alone (≤ 4 rows a
+  rule, taller a box), so a grey table cell, a logo's plate, a thick rule, a
+  photograph or a page border arrive with the redactions. Two rules sort
+  them, applied before the read is slimmed (the cache, payload version 3,
+  holds only what stays): **black** — the interior, one pixel in from every
+  side, is ≥ 90 % ≤ 48/255 (a box too thin to have an interior keeps the
+  reader's word); and **where the text is** — on a page with ≥ 8 distinct
+  text rows (unread bands count) the box either shares its rows with a line
+  (a band overlaps ≥ 0.4 of its height) or stands on the text grid (a line
+  within 0.6 × pitch above or below, and the box ≥ 0.6 × pitch tall — one
+  line's bar or a block of lines); a box narrower than 40 px and taller than
+  1.6 lines is a border or two bars' junction, never a name's bar. A page
+  with fewer rows keeps every black box. Measured 2026-09-22: every real bar
+  on the corpus and on EFTA00173953 overlaps a line by 0.47–0.84 of its
+  height or lies 0–11 px from one and is 0.78–1.27 lines tall, so the rules
+  drop nothing real there. `OCRTool.dropped(page)` lists what went (`why`,
+  black fraction, overlap, gap, height in lines); the status line counts it.
   The survivors are snapped to their text lines via the guarded
   `utbConnectRedactionsToLines?.()` seam, and keep the face of that line (an
   OCR line's face is measured from the glyphs; the embedded layer's most used

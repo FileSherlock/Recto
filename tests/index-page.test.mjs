@@ -24,6 +24,7 @@ function normalise(html) {
     .replace(/<script src="plugins\/embedded_text_viewer\/extract\.js[^"]*"><\/script>/, '')   // the extractor port (new)
     .replace(/<script src="plugins\/text_tool\/shaping\.js[^"]*"><\/script>/, '')             // HarfBuzz measurement (new)
     .replace(/<script src="plugins\/text_tool\/undo\.js[^"]*"><\/script>/, '')                // the undo stack (new)
+    .replace(/<script src="plugins\/ocr_tool\/box-rules\.js[^"]*"><\/script>/, '')             // which boxes are redactions (new)
     // Fabric.js (gone): the server's page loaded it from cdnjs, with a polyfill for a warning it
     // caused, long after the last call into it had been removed — the static page loads no outside script
     .replace(/<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/fabric\.js\/[^"]*"><\/script>/, '')

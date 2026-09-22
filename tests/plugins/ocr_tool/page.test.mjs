@@ -26,5 +26,5 @@ test('every control is on the page', { skip }, () => {
 
 test('ocr_tool: the engine loads before the adapters that use it', { skip }, () => {
   inOrder(['ocr_tool/engine/core.js', 'ocr_tool/engine/ocr.js', 'ocr_tool/engine/ocr-engine.js', 'ocr_tool/engine/blindocr.js',
-           'ocr_tool/engine/render.js', 'ocr_tool/engine/set-fonts.js', 'ocr_tool/ocr-tool.js', 'ocr_tool/pixel-view.js']);
+           'ocr_tool/engine/render.js', 'ocr_tool/engine/set-fonts.js', 'ocr_tool/box-rules.js', 'ocr_tool/ocr-tool.js', 'ocr_tool/pixel-view.js']);
 });

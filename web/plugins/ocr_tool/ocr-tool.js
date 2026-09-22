@@ -1,5 +1,5 @@
 // ocr-tool.js — Auto OCR plugin adapter (Recto-owned, NOT synced from tol0;
-// the others are ocr-worker.js, law-worker.js, ocr-result.js and pixel-view.js). Runs the
+// the others are ocr-worker.js, law-worker.js, ocr-result.js, box-rules.js and pixel-view.js). Runs the
 // blind reader (engine/blindocr.js) on the page rasters the viewer already
 // holds — inside a Worker (ocr-worker.js), so the page stays live while a
 // read runs — and feeds the results into the unified text box system exactly
@@ -590,44 +590,20 @@ function ocrApplyCached(cached) {
     ' · precomputed');
 }
 
-// ── Only black boxes are redactions ───────────────────────────
-// The reader's detectObjects calls any long near-solid dark run a box, and a
-// grey table cell, a logo's dark plate or a scanned photograph pass as well.
-// A redaction is solid black ink. Each box is checked against the pixels the
-// reader read: its interior, one pixel in from every side (past the AA rim),
-// must be at least OCR_BOX_BLACK_FRACTION black (≤ OCR_BOX_BLACK_MAX, a level
-// scan noise stays under); anything else is dropped here, before the read is
-// slimmed, so the cache (version 3) holds only what stays. A box too thin to
-// have an interior keeps the reader's word.
-const OCR_BOX_BLACK_MAX = 48;
-const OCR_BOX_BLACK_FRACTION = 0.9;
-
-// the black fraction of a box's interior, 1 for a box too thin to have one
-function ocrBoxBlackness(page, ob) {
-  const x0 = Math.max(0, ob.x0 + 1), x1 = Math.min(page.w - 1, ob.x1 - 1);
-  const y0 = Math.max(0, ob.y0 + 1), y1 = Math.min(page.h - 1, ob.y1 - 1);
-  if (x1 < x0 || y1 < y0) return 1;
-  let black = 0, n = 0;
-  for (let y = y0; y <= y1; y++) {
-    const row = y * page.w;
-    for (let x = x0; x <= x1; x++, n++) if (page.gray[row + x] <= OCR_BOX_BLACK_MAX) black++;
-  }
-  return black / n;
-}
-
-// The regions dropped on each page stay inspectable: OCRTool.dropped(page) →
-// [{ x0, y0, x1, y1, black }] (raster px; black = the interior's black fraction).
+// ── Which boxes are redactions ────────────────────────────────
+// The reader's detectObjects calls any long near-solid dark run a box; a grey
+// table cell, a logo's plate, a thick rule, a photograph or a page border
+// arrive with the redactions. box-rules.js (OCRBoxRules) keeps a box that is
+// black and stands where text stands — on a line, or on the page's text grid
+// — and drops the rest here, before the read is slimmed, so the cache
+// (version 3) holds only what stays. The dropped regions stay inspectable:
+// OCRTool.dropped(page) → [{ x0, y0, x1, y1, black, onLine, gap, hPitch, why }]
+// (raster px; black = the interior's black fraction; why = what failed).
 const ocrDropped = new Map();
-function ocrKeepBlackBoxes(page, pageNum, res) {
-  if (!res?.objects?.length) return 0;
-  const dropped = [];
-  res.objects = res.objects.filter(o => {
-    if (o.type !== 'box') return true;
-    const black = ocrBoxBlackness(page, o);
-    if (black >= OCR_BOX_BLACK_FRACTION) return true;
-    dropped.push({ x0: o.x0, y0: o.y0, x1: o.x1, y1: o.y1, black: +black.toFixed(3) });
-    return false;
-  });
+function ocrKeepRedactionBoxes(page, pageNum, res) {
+  if (!res?.objects?.length || typeof OCRBoxRules === 'undefined') return 0;
+  const { kept, dropped } = OCRBoxRules.filter(page, res.lines || [], res.objects);
+  res.objects = kept;
   ocrDropped.set(`${state.docHash}|${pageNum}`, dropped);
   return dropped.length;
 }
@@ -661,9 +637,9 @@ async function ocrReadOnePage(pageNum, label, carry) {
     out = await BlindOCR.readPageAuto(page, sets, { passHint: ocrToolState.passHint, carry, progress });
   }
   ocrToolState.passHint = out.pass;
-  const dropped = ocrKeepBlackBoxes(page, pageNum, out.res);
-  if (dropped) console.info(`OCR: page ${pageNum}: ${dropped} dark region(s) not black enough to be a redaction`);
-  return { img, res: out.res, pass: out.pass };
+  const dropped = ocrKeepRedactionBoxes(page, pageNum, out.res);
+  if (dropped) console.info(`OCR: page ${pageNum}: ${dropped} dark region(s) are not redactions —`, ocrDropped.get(`${state.docHash}|${pageNum}`).map(d => d.why).join(', '));
+  return { img, res: out.res, pass: out.pass, dropped };
 }
 
 function ocrSetButtons(running) {
@@ -689,7 +665,7 @@ async function ocrRun(allPages) {
     const nums = allPages
       ? Array.from({ length: state.numPages }, (_, i) => i + 1)
       : [state.currentPage];
-    const totals = { lines: 0, clean: 0, unread: 0, boxes: 0 };
+    const totals = { lines: 0, clean: 0, unread: 0, boxes: 0, dropped: 0 };
     // sequential whole-document read: pages share one hint carry (same as
     // char_training's blindOcrDocument); single-page reads stay stateless
     const carry = allPages ? { fresh: true } : null;
@@ -705,7 +681,7 @@ async function ocrRun(allPages) {
       ocrClearPage(p);
       const t = ocrAddBoxes(p, out.img, out.res, out.pass);
       totals.lines += t.lines; totals.clean += t.clean;
-      totals.unread += t.unread; totals.boxes += t.boxes;
+      totals.unread += t.unread; totals.boxes += t.boxes; totals.dropped += out.dropped || 0;
       lastPass = out.pass;
       for (const L of out.res.lines) if (L.font) fonts.add(L.font);
       collected?.push({ page: p, w: out.img.naturalWidth, h: out.img.naturalHeight,
@@ -725,6 +701,7 @@ async function ocrRun(allPages) {
       setOcrStatus(`${totals.lines} lines, ${totals.clean} ${cert}` +
         (totals.unread ? `, ${totals.unread} unread (□)` : '') +
         (totals.boxes ? ` · ${totals.boxes} redaction boxes` : '') +
+        (totals.dropped ? ` · ${totals.dropped} dark region(s) not redactions` : '') +
         ` · ${shownFonts.join(' ') || '—'}` +
         (lastPass.quant ? ' · palette producer' : '') +
         (ocrToolState.cancel ? ' · cancelled' : ''));

@@ -20,6 +20,7 @@
     "engine/hypothesis.js",
     "engine/ftraster.js",
     "ocr-result.js",
+    "box-rules.js",
     "ocr-tool.js",
     "pixel-view.js",
     "hypothesis-view.js"
