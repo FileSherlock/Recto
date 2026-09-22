@@ -99,7 +99,10 @@ after each width recompute and the chip carries the verdict: `✓` consistent,
 label drawn on the bar takes the same verdict's colour (`box.labelColor`, a
 `text_tool` seam the SVG text and the pixel view both honour): green when the
 page vouched for the name, amber when it left no evidence, red when it
-contradicted it; a bar without a verdict keeps the type's colour. The seam
+contradicted it; a bar without a verdict keeps the type's colour. The label
+sits on the edge the refiner knows exactly (`box.labelAlign`, the same kind
+of seam): a name that ends at a comma or a word's pen but starts somewhere
+after a tab stop is drawn ending at the bar's right edge. The seam
 draws the name where the refiner put the bar and lets the page bytes outside
 the bar's body judge it; two consistent names are a tie. Without a provider
 nothing runs. Design and limits:

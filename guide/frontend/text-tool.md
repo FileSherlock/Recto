@@ -169,6 +169,16 @@ The click itself is caught by the core (`app.js`, a `mousedown` on the viewer), 
 
 `window.utbDeleteBox(id)` is the one removal path for every box type — the toolbar's Delete button and the Delete / Backspace keys both use it. A live inline-edit or micro-typo session on the box is torn down first, so no id in `utbState` outlives the box it points at. The keys are ignored while the caret is in a field, where they mean "erase a character". `utbDeleteBox(id, { silent: true })` is the undo stack taking a box out again — not a step of its own.
 
+## Label seams — `labelColor`, `labelAlign`
+
+Two fields a plugin that judged a box's label may set; `text_tool` reads them and never
+sets them. `box.labelColor` is a CSS colour for the label (`null` = the type's colour; the
+user's own `box.color` wins). `box.labelAlign` is `'right'` when a label laid afresh (no
+measured character positions) should end at the box's right edge instead of starting at
+its left — the SVG text takes `text-anchor: end` at `box.x + box.w`; a pixel renderer lays
+the text so that it ends there. Both are transient like the label itself: the undo stack
+does not keep them.
+
 ## Undo — `undo.js`
 
 One stack (`window.utbUndo`) for what the user does to boxes: add, delete, move, resize, edit the text, change the formatting, nudge a character. What a plugin puts on the page by itself — an OCR read, the embedded text, a matcher's label — is regenerated, never undone, and a new document empties the stack (`document:opening`).

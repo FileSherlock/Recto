@@ -1219,6 +1219,12 @@
           box.labelText = newLabel;
           const v = index >= 0 && entries[index] ? entryVerdict(box, entries[index]) : null;
           box.labelColor = (v && VERDICT_COLOR[v]) || null;
+          // the label sits on the edge the refiner knows exactly: a name that
+          // ends at a comma or a word's pen but starts somewhere after a tab
+          // stop is drawn ending there (text_tool's labelAlign)
+          const ri = box.refineInfo;
+          const pen = s => !!s && s.kind !== 'ink' && s.kind !== 'margin';
+          box.labelAlign = ri && pen(ri.right) && !pen(ri.left) ? 'right' : 'left';
           if (typeof renderBox === 'function') renderBox(box);
         }
 

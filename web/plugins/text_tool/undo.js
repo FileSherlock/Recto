@@ -24,7 +24,7 @@
   // candidate widths, verdicts, the refiner's findings, the pixel raster — is
   // derived again after a restore, not kept.
   const DERIVED = new Set(['_pixel', '_refine', '_candidateOwners', 'candidates', 'widths', 'widthFace',
-    'verdicts', 'refineInfo', 'refined', 'labelColor', 'picked']);
+    'verdicts', 'refineInfo', 'refined', 'labelColor', 'labelAlign', 'picked']);
   function snapshot(box) {
     const out = {};
     for (const k of Object.keys(box)) if (!DERIVED.has(k)) out[k] = clone(box[k]);

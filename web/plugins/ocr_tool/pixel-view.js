@@ -298,8 +298,15 @@ function pvLayout(box, primary, byName, law) {
     start = box.x + ll.delta;
     spaceWidths = manualSpace == null ? ll.spaceWidths : null;
   }
-  const lay = OCRRender.layoutLine(primary, box.text, start, { spaceAdv: manualSpace ?? pvSpaceAdv(box, primary), spaceWidths, metrics: law,
-    letterSpacing, glyphSets: same ? ents.map(e => setOf(e.src)) : null, metricsBySet });
+  const opts = { spaceAdv: manualSpace ?? pvSpaceAdv(box, primary), spaceWidths, metrics: law,
+    letterSpacing, glyphSets: same ? ents.map(e => setOf(e.src)) : null, metricsBySet };
+  let lay = OCRRender.layoutLine(primary, box.text, start, opts);
+  // a label its owner aligns to the box's right edge (text_tool's
+  // labelAlign): laid again from the start that ends it there
+  if (box.labelAlign === 'right' && !ents.length && lay.advanceW > 0) {
+    start = box.x + box.w - lay.advanceW;
+    lay = OCRRender.layoutLine(primary, box.text, start, opts);
+  }
   const glyphs = lay.glyphs.map(g => ({ ch: g.ch, pen: g.pen, set: g.set || primary }));
   return { glyphs, advanceW: lay.advanceW, missing: lay.missing, start };
 }

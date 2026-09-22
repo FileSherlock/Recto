@@ -69,6 +69,11 @@ class UnifiedTextBox {
     // page-pixel verdict on a redaction's name), null = the type's colour;
     // the user's own `color` always wins over it.
     this.labelColor = data.labelColor || null;
+    // Where a label narrower than its box sits: 'left' (default) or 'right' —
+    // a plugin that knows which edge of a redaction box is the hidden name's
+    // exact edge aligns the label to it. Only a box laid afresh (no measured
+    // character positions) follows it.
+    this.labelAlign = data.labelAlign || null;
 
     // Kerning. `kerning` is always the EFFECTIVE boolean every reader uses
     // (SVG fontKerning, width requests, a pixel renderer). `kerningAuto` says

@@ -247,9 +247,14 @@ function _updateText(g, box) {
 
   // Per-character x array or single x position
   if (xs.length === 1) {
-    text.setAttribute('x', xs[0]);
+    // a label laid afresh sits on the edge its owner knows exactly
+    // (box.labelAlign, a plugin's hint): the right edge, or the left
+    const right = box.labelAlign === 'right' && !utbCharsValid(box);
+    text.setAttribute('x', right ? (box.x || 0) + (box.w || 0) : xs[0]);
+    if (right) text.setAttribute('text-anchor', 'end'); else text.removeAttribute('text-anchor');
   } else {
     text.setAttribute('x', xs.join(' '));
+    text.removeAttribute('text-anchor');
   }
 
   text.textContent = box.text;

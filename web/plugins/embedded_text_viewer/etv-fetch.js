@@ -291,18 +291,36 @@ function utbConnectRedactionsToLines() {
     // the reader's line lends only its rows. (EFTA00173953: 33 of 46 bands
     // unread, the rest read at ±10, the layer says Times New Roman 11 pt on
     // every row.)
+    // A line is on the bar's row when the two overlap by half the shorter of
+    // their heights (every real bar of the corpus overlaps its line fully by
+    // that measure). A third of the BAR's height let the row above claim a
+    // bar through a tall text-layer span (EFTA00173953: "Target Profile:"
+    // reached the second Subject line's first bar by 5 of its 16 rows, and
+    // the bar was then refined against that row's words).
     const pageBoxes = embeddedBoxes.filter(b => b.page === rb.page);
     const best = (list) => {
-      let box = null, overlap = 0;
+      let box = null, overlap = 0, need = Infinity;
       for (const eb of list) {
         const o = Math.min(rb.y + rb.h, eb.y + eb.h) - Math.max(rb.y, eb.y);
-        if (o > overlap) { overlap = o; box = eb; }
+        if (o > overlap) { overlap = o; box = eb; need = 0.5 * Math.min(rb.h, eb.h); }
       }
-      return overlap >= rb.h * 0.3 ? box : null;
+      return box && overlap >= need ? box : null;
     };
     let bestBox = null;
     for (const r of [3, 2, 1, 0]) if ((bestBox = best(pageBoxes.filter(b => rank(b) === r)))) break;
-    if (!bestBox) return;
+    if (!bestBox) {
+      // no line on the row at all: the bar keeps its own rows and takes the
+      // layer's face once, like a bar on a failed read
+      const lf = !rb._layerFaced && layerFaceFor(rb);
+      if (lf) {
+        rb.fontFamily = lf.fontFamily;
+        if (lf.sizePt > 0) rb.sizePt = lf.sizePt;
+        rb.bold = false; rb.italic = false;
+        rb._layerFaced = true;
+        renderBox(rb);
+      }
+      return;
+    }
     const current = rb.lineId !== null ? pageBoxes.find(b => b.lineId === rb.lineId) : null;
     const better = rank(bestBox) > (current ? rank(current) : -1);
     const layerFace = rank(bestBox) <= 1 ? layerFaceFor(rb) : null;
