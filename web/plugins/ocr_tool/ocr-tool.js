@@ -372,6 +372,9 @@ function ocrAddBoxes(pageNum, img, res, pass) {
       w: (ob.x1 - ob.x0 + 1) * sx, h: (ob.y1 - ob.y0 + 1) * sy,
     }));
     box.ocrSource = true;
+    // the black ink's own extent (viewBox px), kept apart from x/w which a
+    // refiner moves: the hidden text can start no earlier and end no later
+    box.ink = { x0: box.x, x1: box.x + box.w };
     tally.boxes++;
   }
 

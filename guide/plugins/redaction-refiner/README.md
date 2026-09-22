@@ -34,7 +34,22 @@ A word *between* the bar and its sibling is still legitimate evidence
 (`███ and ███`). Only when there is no word in between does the edge keep its
 **detected** position: there, the painted ink is the only evidence there is.
 Such an edge is never `exact`, because it comes from the detector rather than a
-reader pen. `box.refineInfo.blocked` reports which sides were bounded this way —
+reader pen.
+
+The **ink bounds the hidden text** the same way. A detected bar carries its black
+ink's extent (`box.ink`, set by the reader's adapter; a bar drawn by hand has
+none), and the name can start no earlier than the ink and end no later — the
+redactor's box covers it. So a neighbour whose spaced edge lies further out
+than the ink (past a 2 px rim) is not the name's neighbour: nothing was written
+between the two, and the edge stays the ink's, recorded as `kind: 'ink'`,
+`reason: 'gap'` with the gap. On EFTA00173953 "From:" sits a tab stop before its
+box; the word rule had pulled the bar 62 px left and let a 24-letter name fit a
+95 px box. An ink edge is never `exact` and gets the detector's slack in the
+matcher. A side with no neighbour whose ink reaches the text column's edge
+(`columnEdges`: where the page's lines start and end, else one-inch margins)
+runs **to the margin** — the name may end anywhere before it — and
+`box.refineInfo.margin.left / .right` say so; the matcher notes it.
+`box.refineInfo.blocked` reports which sides a sibling bar bounded —
 also for a bar with no neighbour at all, which gets a verdict (`left` / `right`
 null, `blocked` set) though nothing moves it. That is how a matcher tells a
 lone bar from one whose only company on the row is the other half of a name
@@ -204,8 +219,10 @@ itself needs neither the network sources nor Python. The licence notice is
   After a run, `box.refineInfo` says what each side was judged to be
   (`punct` / `word` / `fragment`, the token, the completion and its placement,
   `partial` when the bar covers part of the neighbour), which sides a sibling
-  bar bounded (`blocked`), the `x`/`w` it produced, and `exact` — true when
-  both edges came from the reader's OCR pens read whole, so the width is exact
+  bar bounded (`blocked`), which sides the ink held against a distant
+  neighbour (`kind: 'ink'`) or run to the margin (`margin`), the `x`/`w` it
+  produced, and `exact` — true when both edges came from the reader's OCR
+  pens read whole (never an ink edge), so the width is exact
   to mupdf's ¼-px lattice. A matcher reads `exact` to match names to a quarter
   pixel instead of a pixel tolerance, a missing side to allow for the
   redactor's padding, and `blocked` to pair bars (`redaction_matching` does).

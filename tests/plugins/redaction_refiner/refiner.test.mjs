@@ -753,6 +753,76 @@ test('refineAllRedactions skips the selected box and re-measures once', async ()
 
 // ── Run ────────────────────────────────────────────────────
 let failed = 0;
+// ── The ink bounds the hidden text ──────────────────────────
+test('a neighbour a tab stop away does not pull the bar off its ink', async () => {
+  // "From:<tab>[box]" — the colon is spaced, but nothing was written across
+  // the tab: the black ink says where the hidden name starts (EFTA00173953,
+  // where the stretched bar let a 24-letter name fit a 95 px box)
+  reset();
+  const label = span({ text: 'From:', x: 95, w: widthPx('From:', 12), baseCharPositions: charsFor('From:'), lineId: 'L' });
+  const box = redaction(201, 296); box.lineId = 'L'; box.ink = { x0: 201, x1: 296 };
+  utbState.boxes.push(label, box);
+  await R.refineRedaction(box);
+  assert.equal(box.refineInfo.left.kind, 'ink');
+  assert.equal(box.refineInfo.left.reason, 'gap');
+  assert.ok(box.refineInfo.left.gap > 50, 'the gap to the colon is the tab');
+  near(box.x, 201, 0.01, 'the bar starts at its ink');
+  near(box.x + box.w, 296, 0.01, 'and ends there');
+  assert.equal(box.refineInfo.exact, false);
+});
+
+test('a neighbour a space away still places the edge, within the ink\'s rim', async () => {
+  reset();
+  const label = span({ text: 'From:', x: 95, w: widthPx('From:', 12), baseCharPositions: charsFor('From:'), lineId: 'L' });
+  const x1 = inkEnd(label);
+  // the detector's edge sits 1.5 px inside the true box edge (its rim)
+  const box = redaction(x1 + SPACE + 1.5, x1 + 120); box.lineId = 'L'; box.ink = { x0: x1 + SPACE + 1.5, x1: x1 + 120 };
+  utbState.boxes.push(label, box);
+  await R.refineRedaction(box);
+  assert.equal(box.refineInfo.left.kind, 'punct');
+  near(box.x, x1 + SPACE, 0.05, 'the colon plus a space places the edge');
+});
+
+test('a bar drawn by hand has no ink to hold it: the neighbour places the edge as before', async () => {
+  reset();
+  const label = span({ text: 'From:', x: 95, w: widthPx('From:', 12), baseCharPositions: charsFor('From:'), lineId: 'L' });
+  const box = redaction(201, 296); box.lineId = 'L';
+  utbState.boxes.push(label, box);
+  await R.refineRedaction(box);
+  assert.equal(box.refineInfo.left.kind, 'punct');
+  near(box.x, inkEnd(label) + SPACE, 0.05);
+});
+
+test('a bar whose ink reaches the text column\'s edge is noted as running to the margin', async () => {
+  reset();
+  const above = span({ text: 'a line that runs to the column edge', x: 96, w: widthPx('a line that runs to the column edge', 12), baseCharPositions: charsFor('a line that runs to the column edge'), lineId: 'A', y: 60 });
+  const before = span({ text: 'Name:', x: 96, w: widthPx('Name:', 12), baseCharPositions: charsFor('Name:'), lineId: 'L' });
+  utbState.boxes.push(above, before);
+  const col = R.columnEdges(before.page);                            // where the longer line ends
+  const x0 = inkEnd(before) + SPACE;
+  const box = redaction(x0, col.x1); box.lineId = 'L'; box.ink = { x0, x1: col.x1 };
+  utbState.boxes.push(box);
+  await R.refineRedaction(box);
+  assert.deepEqual(box.refineInfo.margin, { left: false, right: true });
+  assert.equal(box.refineInfo.right, null);
+  assert.equal(box.refineInfo.exact, false);
+});
+
+test('the text column is where lines agree, not where a stamp in the margin reaches', () => {
+  reset();
+  const line = (text, x, y) => span({ text, x, w: widthPx(text, 12), baseCharPositions: charsFor(text), lineId: `L${y}`, y });
+  // a ragged column: no two lines end together, and the stamp's end stands alone a word past the longest
+  const body = ['one line of the body text here', 'another line of the body text', 'a third line of the body text', 'a fourth'];
+  const rows = body.map((t, i) => line(t, 96, 60 + 18 * i));
+  const stamp = line('EFTA00173953', 700, 1000);                       // the Bates number, past the column
+  utbState.boxes.push(...rows, stamp);
+  const col = R.columnEdges(rows[0].page);
+  const ends = rows.map((r) => inkEnd(r));
+  assert.ok(col.x1 <= Math.max(...ends) + 0.01 && col.x1 >= Math.min(...ends) - 0.01, `column edge ${col.x1} is where the body lines end, not the stamp at ${inkEnd(stamp)}`);
+  near(col.x0, 96, 0.01);
+});
+
+
 for (const t of tests) {
   try {
     await t.fn();

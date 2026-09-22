@@ -94,6 +94,9 @@
 
   // A refined bar narrower than this would be a degenerate zero-width box.
   const MIN_REFINED_WIDTH_PX = 4;
+  // px the detector's edge may sit inside the true box edge (its AA rim): a
+  // neighbour's spaced edge this close to the ink still places the bar
+  const INK_RIM_PX = 2;
 
   // A neighbour whose glyphs run further than this under the bar was read
   // from a sliver: its pen is evidence, but not lattice-exact. (A detector
@@ -644,6 +647,55 @@
   }
 
   // Refine one redaction box in place. Returns true when its geometry changed.
+  // The text column of a page: where its lines' glyphs start and end. An
+  // edge is where lines AGREE — the outermost value that at least three lines
+  // reach within 4 px — so a stamp in the margin (the Bates number at the
+  // foot of EFTA00173953, 80 px past the column) does not become the edge.
+  // On a ragged column nothing agrees: then the outermost line stands, unless
+  // among several it stands alone more than a word past the next. A page
+  // with no text has the letter-size default of one-inch margins.
+  function columnEdges(page) {
+    const starts = [], ends = [];
+    for (const b of utbState.boxes) {
+      if (b.page !== page || !usableSpan(b)) continue;
+      const cps = (b.baseCharPositions || []).filter((cp) => cp.c && cp.c.trim() && cp.w > 0);
+      starts.push(cps.length ? b.x + Math.min(...cps.map((cp) => cp.x)) : b.x);
+      ends.push(cps.length ? b.x + Math.max(...cps.map((cp) => cp.x + cp.w)) : b.x + b.w);
+    }
+    const pw = (typeof state !== 'undefined' && state.pageWidth) || 816;
+    if (!starts.length) return { x0: pw / 8.5, x1: pw - pw / 8.5 };
+    const agreed = (values, outward) => {
+      const v = [...values].sort((a, b) => outward * (b - a));   // outermost first
+      for (let i = 0; i < v.length; i++)                          // three lines agree within 4 px
+        if (v.filter((x) => Math.abs(x - v[i]) <= 4).length >= 3) return v[i];
+      return v.length >= 4 && Math.abs(v[0] - v[1]) > 40 ? v[1] : v[0];
+    };
+    return { x0: agreed(starts, -1), x1: Math.min(agreed(ends, 1), pw - 24) };
+  }
+
+  // A detected bar knows its black ink (box.ink, the reader's object; a bar
+  // drawn by hand has none). The hidden text starts no earlier than the ink
+  // and ends no later — the redactor's box covers it — so a neighbour whose
+  // spaced edge lies further out is not the name's neighbour: nothing was
+  // written between the two, and the bar ends at the ink, kind 'ink', which
+  // is not a pen. "From:" a tab stop before its box (EFTA00173953) pulled the
+  // bar 62 px left and let a 24-letter name fit a 95 px box. A side with no
+  // neighbour whose ink reaches the text column's edge runs to the margin —
+  // the name may end anywhere before it — and refineInfo.margin says so.
+  function inkBounds(box, left, right) {
+    const ink = box.ink;
+    const out = { left, right, margin: { left: false, right: false } };
+    if (!ink) return out;
+    const asInk = (side, edge, gap) => ({ edge, wordEdge: edge, inkEdge: side.inkEdge, kind: 'ink', reason: 'gap',
+      token: side.token, space: side.space, gap, partial: false });
+    if (left && left.edge < ink.x0 - INK_RIM_PX) out.left = asInk(left, ink.x0, ink.x0 - left.edge);
+    if (right && right.edge > ink.x1 + INK_RIM_PX) out.right = asInk(right, ink.x1, right.edge - ink.x1);
+    const col = columnEdges(box.page);
+    const near = (x, edge) => Math.abs(x - edge) <= Math.max(4, (left && left.space) || (right && right.space) || 0);
+    out.margin = { left: !left && near(ink.x0, col.x0), right: !right && near(ink.x1, col.x1) };
+    return out;
+  }
+
   // The verdict is recorded on box.refineInfo for inspection.
   async function refineRedaction(box, opts = {}) {
     if (!box || box.type !== 'redaction') return false;
@@ -656,6 +708,7 @@
       // is another bar — the other half of a name.
       box.refineInfo = {
         source: nb.source, left: null, right: null, remnants: nb.remnants, blocked: nb.blocked,
+        margin: inkBounds(box, null, null).margin,
         x: box.x, w: box.w, exact: false,
       };
       return false;
@@ -669,8 +722,10 @@
       if (userEdited && prev.source === nb.source) return false;   // keep the user's edit
     }
 
-    const left = nb.left ? await resolveEdge(box, nb.left, 'left', nb.spans) : null;
-    const right = nb.right ? await resolveEdge(box, nb.right, 'right', nb.spans) : null;
+    const bounds = inkBounds(box,
+      nb.left ? await resolveEdge(box, nb.left, 'left', nb.spans) : null,
+      nb.right ? await resolveEdge(box, nb.right, 'right', nb.spans) : null);
+    const { left, right } = bounds;
 
     let newX0 = left ? left.edge : box.x;
     let newX1 = right ? right.edge : box.x + box.w;
@@ -695,12 +750,13 @@
     // guide/plugins/redaction-refiner/pixel-evidence-plan.md §0). `x`/`w` are
     // the geometry this verdict produced; a bar moved since is no longer exact.
     box.refineInfo = {
-      source: nb.source, left, right, remnants: nb.remnants, blocked: nb.blocked,
+      source: nb.source, left, right, remnants: nb.remnants, blocked: nb.blocked, margin: bounds.margin,
       x: box.x, w: box.w,
       // An edge bounded by a sibling bar is the detector's, not a reader pen,
       // so a pair-adjacent bar is never lattice-exact; nor is an edge read
-      // from a neighbour the bar partly covers.
-      exact: nb.source === 'ocr' && !!left && !!right && !left.partial && !right.partial,
+      // from a neighbour the bar partly covers, nor one that is the ink's.
+      exact: nb.source === 'ocr' && !!left && !!right && !left.partial && !right.partial &&
+        left.kind !== 'ink' && right.kind !== 'ink',
     };
     box._refine = { sig, source: nb.source, x: box.x, w: box.w };
     if (changed && typeof renderBox === 'function') renderBox(box);
@@ -754,7 +810,7 @@
   window.refineAllRedactions = refineAllRedactions;
   window.RedactionRefiner = {
     setDictionary, loadDictionary, isWord, completions, hiddenPart, facingToken,
-    caseOf, classifyToken, rowWords, neighboursFor, isRemnant, rowSpaceWidth, resolveEdge,
+    caseOf, classifyToken, rowWords, neighboursFor, isRemnant, rowSpaceWidth, resolveEdge, inkBounds, columnEdges,
     siblingBars, isSentenceEnd, sentenceSpaces,
     facingRun, punctBindsToward,
     refineRedaction, refineAllRedactions,

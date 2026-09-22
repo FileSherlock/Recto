@@ -835,7 +835,7 @@
     function fitRange(box) {
       const over = effectiveTolerance(box);
       const i = box.refineInfo;
-      const detectorEdge = !i || !i.left || !i.right;
+      const detectorEdge = !i || !i.left || !i.right || i.left.kind === 'ink' || i.right.kind === 'ink';
       const pad = Math.min(DETECTOR_PAD_MAX_PX, DETECTOR_PAD_EM * emPx(box));
       return { over, under: detectorEdge ? Math.max(over, pad) : over };
     }
@@ -1239,9 +1239,23 @@
           : '';
         const faceNote = box.widthFace ? ` · ${escAttr(box.widthFace)}` : '';
         const faceTitle = box.widthFace ? ` Names measured in the page's own face (the reader's ${box.widthFace} set).` : '';
+        // what bounds the bar where no pen does: its black ink (the nearest
+        // word is further off — a tab stop, a column), or the text column's
+        // edge (the name may end anywhere before it)
+        const ri = box.refineInfo;
+        const inkSides = ['left', 'right'].filter(s => ri?.[s]?.kind === 'ink');
+        const marginSides = ['left', 'right'].filter(s => ri?.margin?.[s]);
+        const boundsNote = [
+          inkSides.length ? ` · ink ${inkSides.join(' + ')}` : '',
+          marginSides.length ? ` · to the ${marginSides.join(' + ')} margin` : '',
+        ].join('');
+        const boundsTitle = [
+          inkSides.length ? ` The bar ends at its black ink on the ${inkSides.join(' and ')}: the nearest word there is further off than a space, so the ink bounds the name.` : '',
+          marginSides.length ? ` The ink reaches the text column's ${marginSides.join(' and ')} edge: the name may end anywhere before it.` : '',
+        ].join('');
         const tolNote = penExact(box)
           ? `<span class="match-tol" title="Both edges come from the reader's ¼-px pens: the width is exact to the lattice.${escAttr(faceTitle)}">±${tol.toFixed(2)} px · pens${faceNote}</span>`
-          : `<span class="match-tol" title="Edges from the raster — the Tolerance field applies.${escAttr(faceTitle)}">±${tol} px${faceNote}</span>`;
+          : `<span class="match-tol" title="Edges from the raster — the Tolerance field applies.${escAttr(boundsTitle)}${escAttr(faceTitle)}">±${tol} px${escAttr(boundsNote)}${faceNote}</span>`;
         const looseNote = loose
           ? `<div class="match-loose">No name fits the pen-exact width (±${PEN_TOL_PX} px). Nearest within ±${tol} px:</div>`
           : '';

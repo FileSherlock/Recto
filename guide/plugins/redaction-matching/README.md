@@ -66,10 +66,13 @@ A name fits when its measured width lies within the bar's **fit range**:
   tighter field still wins. The row shows which (`±0.30 px · pens` / `±3 px`).
 - **Under** (narrower than the bar): the same, unless an edge is the
   **detector's** — no reader pen on that side (a line end, a bar bounded by a
-  sibling bar, or no refiner at all) — in which case the bar ends where the
+  sibling bar, an edge the ink held against a word a tab stop away —
+  `refineInfo.left/right.kind === 'ink'` — or no refiner at all) — in which
+  case the bar ends where the
   black box ends, and the redactor drew that box with room to spare (4.4 px
   past *BLEDSOE* on the reference page). Then a name may be narrower by up to
-  0.4 em, capped at 10 px.
+  0.4 em, capped at 10 px. The row's tolerance note names what bounds the bar
+  where no pen does (`· ink left`, `· to the right margin`).
 
 Names are listed best first: by **page verdict** when a hypothesis tester
 scored them (below), then a pair reading before a single one, then a fit

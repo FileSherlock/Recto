@@ -162,7 +162,10 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
   font, baseline, fails}` rides on every box for downstream tooling —
   `trusted` marks a certified line whose letterforms are evidence of the
   face — one letter at ±2 or better (`To: "`, byte-exact in times16), three
-  on a looser rung (a row of dots certifies in any face at ±10).
+  on a looser rung (a row of dots certifies in any face at ±10). A detected
+  redaction box carries `box.ink = { x0, x1 }`, the black ink's own extent in
+  viewBox px, kept apart from `x`/`w` which a refiner moves: the hidden text
+  can start no earlier and end no later.
 - Detected redaction rectangles become `redaction` boxes — when `box-rules.js`
   (`OCRBoxRules`, DOM-free, tested in `tests/plugins/ocr_tool/box-rules.test.mjs`)
   lets them. The engine's `detectObjects` types by height alone (≤ 4 rows a
