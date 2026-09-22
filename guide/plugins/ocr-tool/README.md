@@ -170,9 +170,14 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
   (`OCRBoxRules`, DOM-free, tested in `tests/plugins/ocr_tool/box-rules.test.mjs`)
   lets them. The engine's `detectObjects` types by height alone (≤ 4 rows a
   rule, taller a box), so a grey table cell, a logo's plate, a thick rule, a
-  photograph or a page border arrive with the redactions. Two rules sort
-  them, applied before the read is slimmed (the cache, payload version 3,
-  holds only what stays): **black** — the interior, one pixel in from every
+  photograph or a page border arrive with the redactions. First, bars that
+  touch across a separator arrive twice — the rows the separator's ink
+  bridges make one run across two or three bars, the other rows make each
+  bar on its own — so a box containing other boxes on its rows is replaced
+  by what it covers beyond them (`deoverlap`: the first bar of a `[bar]:[bar]:[bar]`
+  line, 3 px of separator left out). Then two rules sort the boxes, applied
+  before the read is slimmed (the cache, payload version 3, holds only what
+  stays): **black** — the interior, one pixel in from every
   side, is ≥ 90 % ≤ 48/255 (a box too thin to have an interior keeps the
   reader's word); and **where the text is** — on a page with ≥ 8 distinct
   text rows (unread bands count) the box either shares its rows with a line

@@ -33,6 +33,14 @@
 // from the text, a page border along it, the 35 × 34 px junction piece the
 // touching Subject-block bars of EFTA00173953 leave (redaction ink, but no
 // name fits it).
+//
+// Before either question: bars that touch across a separator come out of the
+// engine's segmentation twice — the rows the separator's ink bridges make one
+// long run across two or three bars, and the rows it does not make each bar
+// on its own — so a box CONTAINING other boxes on its rows arrives beside its
+// pieces (EFTA00173953's Subject block: 291–615 beside 434–529 and 536–615).
+// The container is no bar; what it covers beyond its pieces, the first bar,
+// is. deoverlap() replaces every container by those remainders.
 (function (root) {
   'use strict';
 
@@ -108,12 +116,45 @@
     return { ...out, keep: false, why: 'away from the text' };
   }
 
+  const PIECE_MIN_PX = 9;      // a remainder (or a piece) narrower than this is a separator's bridge, not a bar
+  const PIECE_SLACK_PX = 3;    // the separator glyph beside a piece, left out of the remainder
+  const PIECE_ROWS_PX = 4;     // rows a piece may reach beyond its container (the bridge's AA)
+
+  // Containers replaced by their remainders (see the file's head). A box
+  // contains another when the other lies within it horizontally (a 2 px rim
+  // allowed), is narrower by at least a piece, and shares its rows — within
+  // a few rows either way, as the bridged and the unbridged rows of one bar
+  // differ. A box reaching well beyond the container's rows is another
+  // row's ink, not a piece: the 35 × 34 px junction the touching bars of two
+  // Subject-block lines leave (EFTA00173953) lies inside the lower line's
+  // last bar horizontally and must not cut it in two. A remainder keeps the
+  // container's rows.
+  function deoverlap(objects) {
+    const boxes = (objects || []).filter(o => o.type === 'box');
+    const out = [];
+    for (const o of objects || []) {
+      if (o.type !== 'box') { out.push(o); continue; }
+      const pieces = boxes.filter(b => b !== o && b.x0 >= o.x0 - 2 && b.x1 <= o.x1 + 2 && (b.x1 - b.x0) <= (o.x1 - o.x0) - PIECE_MIN_PX &&
+        b.y0 >= o.y0 - PIECE_ROWS_PX && b.y1 <= o.y1 + PIECE_ROWS_PX)
+        .sort((a, b) => a.x0 - b.x0);
+      if (!pieces.length) { out.push(o); continue; }
+      let x = o.x0;
+      for (const p of pieces) {
+        const end = p.x0 - PIECE_SLACK_PX;
+        if (end - x >= PIECE_MIN_PX) out.push({ ...o, x0: x, x1: end, remainder: true });
+        x = Math.max(x, p.x1 + PIECE_SLACK_PX);
+      }
+      if (o.x1 - x >= PIECE_MIN_PX) out.push({ ...o, x0: x, x1: o.x1, remainder: true });
+    }
+    return out;
+  }
+
   // every 'box' object of a page read: { kept: objects (the others untouched,
   // in order), dropped: [{ x0, y0, x1, y1, black, onLine, gap, hPitch, why }] }
   function filter(page, lines, objects) {
     const g = grid(lines);
     const kept = [], dropped = [];
-    for (const o of objects || []) {
+    for (const o of deoverlap(objects)) {
       if (o.type !== 'box') { kept.push(o); continue; }
       const v = verdict(page, lines, o, g);
       if (v.keep) kept.push(o);
@@ -122,6 +163,6 @@
     return { kept, dropped };
   }
 
-  root.OCRBoxRules = { blackness, grid, anchoring, verdict, filter,
+  root.OCRBoxRules = { blackness, grid, anchoring, verdict, deoverlap, filter,
     BLACK_MAX, BLACK_FRACTION, MIN_ROWS, ON_LINE, GRID_GAP, GRID_MIN_H, NARROW_PX, NARROW_TALL };
 })(globalThis);

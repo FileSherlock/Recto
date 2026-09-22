@@ -108,3 +108,28 @@ test('filter: the boxes of a read, the rest untouched, the dropped ones explaine
   assert.equal(dropped[0].why, 'shorter than a line');
   assert.deepEqual([dropped[0].x0, dropped[0].y0, dropped[0].x1, dropped[0].y1, dropped[0].black], [40, 64, 500, 70, 1]);
 });
+
+test('a box containing other boxes on its rows is replaced by what it covers beyond them', { skip }, () => {
+  // EFTA00173953's first Subject line: [bar]:[bar]:[bar] — the colons' ink
+  // bridges the bars on the rows it spans, so the engine also yields the
+  // whole line's extent as one box beside the second and third bars
+  const objects = [box(291, 362, 614, 379), box(434, 362, 528, 379), box(536, 362, 614, 379), { type: 'rule', x0: 0, y0: 500, x1: 800, y1: 502 }];
+  const out = R.deoverlap(objects);
+  assert.deepEqual(out.map(o => [o.type, o.x0, o.x1]), [['box', 291, 431], ['box', 434, 528], ['box', 536, 614], ['rule', 0, 800]]);
+  assert.equal(out[0].remainder, true);
+  assert.deepEqual([out[0].y0, out[0].y1], [362, 379]);
+  // a container whose rows are only the bridged ones (shorter than its pieces) is treated the same
+  const third = [box(201, 396, 367, 413), box(201, 399, 635, 413), box(504, 399, 635, 413)];
+  assert.deepEqual(R.deoverlap(third).map(o => [o.x0, o.x1]), [[201, 367], [370, 501], [504, 635]]);
+  // nested: a piece that itself contains a piece
+  const nested = [box(502, 382, 696, 399), box(603, 382, 696, 396)];
+  assert.deepEqual(R.deoverlap(nested).map(o => [o.x0, o.x1]), [[502, 600], [603, 696]]);
+  // boxes side by side, or on other rows, are left alone
+  const apart = [box(100, 100, 200, 118), box(210, 100, 300, 118), box(100, 140, 300, 158)];
+  assert.deepEqual(R.deoverlap(apart), apart);
+  // the junction two lines' touching bars leave (35 × 34 px, two rows tall) lies
+  // inside the lower line's last bar: it is another row's ink, not a piece
+  const fourth = [box(201, 413, 713, 433), box(476, 416, 713, 433), box(306, 416, 469, 430), box(643, 399, 678, 433)];
+  assert.deepEqual(R.deoverlap(fourth).map(o => [o.x0, o.x1, o.y0, o.y1]),
+    [[201, 303, 413, 433], [476, 713, 416, 433], [306, 469, 416, 430], [643, 678, 399, 433]]);
+});
