@@ -9,7 +9,7 @@
           <h2><span class="step">1</span> Candidates</h2>
 
           <div class="cand-add-row">
-            <input type="text" id="name-input" class="tool-input" placeholder="Type name...">
+            <input type="text" id="name-input" class="tool-input" placeholder="Type names, comma-separated…">
             <button class="tool-btn cand-add-btn" onclick="addName()">Add</button>
           </div>
 
@@ -17,7 +17,7 @@
                supplies the styling, so the two don't fight. -->
           <div id="paste-area" class="paste-area" style="display:none;">
             <textarea id="paste-input" class="tool-input paste-textarea"
-              placeholder="Paste a list of names (one per line)..."></textarea>
+              placeholder="Paste a list of names (one per line, or comma-separated)…"></textarea>
             <div class="paste-actions">
               <button class="tool-btn paste-import-btn" onclick="processPaste()">Import Names</button>
               <button class="tool-btn secondary paste-cancel-btn"
@@ -29,8 +29,12 @@
             <a href="#" class="cand-link"
               onclick="document.getElementById('paste-area').style.display = document.getElementById('paste-area').style.display === 'none' ? 'block' : 'none'; return false;">
               <span class="material-symbols-outlined">content_paste</span> Paste Mode</a>
-            <a href="#" class="cand-link cand-link--danger" onclick="clearAll(); return false;">
+            <a href="#" class="cand-link cand-link--danger" onclick="clearAll(); return false;"
+              title="Drop the custom names and bring back every deleted name of the shipped list">
               <span class="material-symbols-outlined">delete_sweep</span> Clear Custom</a>
+            <a href="#" class="cand-link cand-link--danger" onclick="deleteAllNames(); return false;"
+              title="Delete every name — the shipped list included — to match against your own names only">
+              <span class="material-symbols-outlined">delete_forever</span> Delete All</a>
           </div>
 
           <!-- Name format options — collapsed by default -->

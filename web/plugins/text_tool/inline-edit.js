@@ -97,6 +97,7 @@
 
     const box = utbState.getBox(utbState.editingId);
     const group = document.querySelector(`.utb-group[data-id="${utbState.editingId}"]`);
+    const step = box ? window.utbUndo?.capture([box]) : null;
 
     // Snapshot for the optional "grow leftward when text is prepended" behavior.
     const prevText  = box ? box.text : '';
@@ -140,6 +141,7 @@
         box.x = prevRight - box.w;
         renderBox(box);
       }
+      window.utbUndo?.commit(step, 'edit text');
     }
   }
 

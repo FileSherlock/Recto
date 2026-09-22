@@ -9,7 +9,7 @@ plugin.** If you ever find a baseline document naming one, that's a leak worth f
 
 Every plugin, optional or not, is one self-contained folder under `web/plugins/`: a
 `plugin.json` manifest, its HTML fragments (`toolbar_button.html`, `options_bar.html`,
-`sidebar_tools.html`, …) next to its scripts and styles, and whatever data it ships. There
+`settings.html`, `sidebar_tools.html`, …) next to its scripts and styles, and whatever data it ships. There
 is no server side to any of them — every plugin here runs entirely in the browser.
 
 ## Installing a plugin
@@ -145,8 +145,10 @@ at call time, inside event handlers.
   behind a `typeof Shaping !== 'undefined'` guard, and `ocr_tool` reads a face's kern table
   through `FontCatalog.metrics` (→ `Shaping.fontMetrics`). Without `text_tool` nothing is
   measured and nothing throws.
-- **The Match controls** (Tolerance / Kerning / Uppercase) live in `text_tool`'s formatting
-  ribbon under shared element IDs (`#tolerance`, `#kerning`, `#force-uppercase`).
+- **The Match controls** live in `text_tool`: Kerning in its formatting ribbon (`#kerning`),
+  the width tolerance and the letter case in its section of the Settings panel
+  (`#tolerance`, `#tt-name-case` — as typed / UPPERCASE / FIRST name / LAST name; the box
+  field `uppercase` is `false | true | 'first' | 'last'`, applied through `utbApplyCase`).
   `redaction_matching` reads them if present and no-ops if not.
 
 ## The seam contract

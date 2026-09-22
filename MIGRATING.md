@@ -52,7 +52,8 @@ class TextTool(PDFTool):
 }
 ```
 
-- The slots are the same. Paths are relative to the plugin folder. `name` must equal the folder name.
+- The slots are the same, plus `settings` (a section of the Settings panel). Paths are relative to the plugin folder.
+  `name` must equal the folder name. A `toolbar_button` lands in the left tool column, not in the top toolbar.
 - `url_prefix` / `url_module` have no successor: there are no routes.
 - `order` is new. Django loaded plugins in whatever order the file system listed the app folders; now the order is
   declared (ties go by name).

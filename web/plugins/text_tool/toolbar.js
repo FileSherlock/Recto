@@ -85,17 +85,10 @@
         : "Apply the font's native kerning to this text";
     }
 
-    // Match group — redaction-only tuning (Tolerance / Uppercase). Reveal it for
-    // redaction boxes and reflect the box's values; hide it otherwise (they are
-    // meaningless on ordinary text). The shared IDs are also read by whichever
-    // matching plugin is installed.
-    const isRedaction = box.type === 'redaction';
-    el('fabric-match-group')?.classList.toggle('hidden', !isRedaction);
-    el('fabric-match-divider')?.classList.toggle('hidden', !isRedaction);
-    if (isRedaction) {
-      const tolI = el('tolerance');       if (tolI) tolI.value  = box.tolerance;
-      const upI  = el('force-uppercase'); if (upI)  upI.checked = !!box.uppercase;
-    }
+    // The matching terms (Settings panel) show the selected redaction's
+    // values; the shared ids are also read by whichever matching plugin is
+    // installed.
+    syncMatchSettings(box.type === 'redaction' ? box : null);
 
     // Formatting is contextual: reveal the Font/Style/Spacing groups whenever a
     // box becomes the active selection. Every selection path (click, add-box,
@@ -109,16 +102,32 @@
   function syncToolbarToSelection() {
     const box = getSelected();
     if (box) syncToolbarToBox(box);
+    else syncMatchSettings(null);
   }
   window.syncToolbarToSelection = syncToolbarToSelection;
+
+  // The Settings panel's matching terms: the selected redaction's, or — with
+  // none selected — the defaults a new redaction box takes.
+  function syncMatchSettings(box) {
+    if (box) {
+      const tolI = el('tolerance');    if (tolI) tolI.value = box.tolerance;
+      const caseSel = el('tt-name-case'); if (caseSel) caseSel.value = utbCaseValue(box.uppercase);
+    }
+    const scope = el('tt-match-scope');
+    if (scope) {
+      scope.textContent = box ? '· this box' : '· new boxes';
+      scope.title = box ? 'The selected redaction box' : 'No redaction box selected — the defaults for new boxes';
+    }
+  }
 
   // ── Persist toolbar → box ─────────────────────────────────────
 
   /**
    * Read current toolbar state and write to box, then re-render.
    */
-  async function persistFromToolbar(box) {
+  async function persistFromToolbar(box, key = null) {
     if (!box) return;
+    const step = window.utbUndo?.capture([box]);
 
     const newFamily = el('fabric-font-family')?.value || box.fontFamily;
     const inputSize = parseFloat(el('fabric-font-size')?.value);  // points
@@ -140,6 +149,7 @@
     } else {
       box.spaceWidth = parseFloat(el('fabric-space-width')?.value) || box.spaceWidth;
     }
+    window.utbUndo?.commit(step, 'format', key);
 
     // Always recalculate candidate widths for redactions when toolbar properties are applied
     if (box.type === 'redaction' && typeof calculateWidthsForRedaction === 'function') {
@@ -204,20 +214,27 @@
   el('fabric-font-size')  ?.addEventListener('input',  () => {
     const box = getSelected();
     if (box) {
+      const step = window.utbUndo?.capture([box]);
       const inputSize = parseFloat(el('fabric-font-size').value);  // points
       box.sizePt = inputSize > 0 ? inputSize : box.sizePt;
+      window.utbUndo?.commit(step, 'font size', `size:${box.id}`);
       renderBox(box);
       if (box.type === 'redaction' && typeof calculateWidthsForRedaction === 'function') {
         calculateWidthsForRedaction(box.id);
       }
     }
   });
-  el('fabric-font-size')  ?.addEventListener('change', () => persistFromToolbar(getSelected()));
+  el('fabric-font-size')  ?.addEventListener('change', () => { const b = getSelected(); if (b) persistFromToolbar(b, `size:${b.id}`); });
 
   el('fabric-letter-spacing')?.addEventListener('change', () => persistFromToolbar(getSelected()));
   el('fabric-color')         ?.addEventListener('input', e => {
     const box = getSelected();
-    if (box) { box.color = e.target.value; renderBox(box); }
+    if (box) {
+      const step = window.utbUndo?.capture([box]);
+      box.color = e.target.value;
+      window.utbUndo?.commit(step, 'colour', `color:${box.id}`);
+      renderBox(box);
+    }
   });
 
   // "Default" button: toggle native vs manual space width
@@ -227,6 +244,7 @@
 
     const btn = el('fabric-default-sw');
     const isDefault = btn.classList.toggle('active');
+    const step = window.utbUndo?.capture([box]);
     box.defaultSpaceWidth = isDefault;
 
     const swSlider  = el('fabric-space-width');
@@ -244,6 +262,7 @@
     } else {
       box.spaceWidth = null;
     }
+    window.utbUndo?.commit(step, 'space width');
 
     renderBox(box);
 
@@ -257,7 +276,9 @@
   el('fabric-space-width')?.addEventListener('input', e => {
     const box = getSelected();
     if (!box || box.defaultSpaceWidth) return;
+    const step = window.utbUndo?.capture([box]);
     box.spaceWidth = parseFloat(e.target.value);
+    window.utbUndo?.commit(step, 'space width', `space:${box.id}`);
     const disp = el('fabric-space-width-display');
     if (disp) disp.textContent = `${box.spaceWidth.toFixed(1)}px`;
     renderBox(box);
@@ -292,8 +313,10 @@
   el('kerning')?.addEventListener('change', () => {
     const box = getSelected();
     if (!box) return;
+    const step = window.utbUndo?.capture([box]);
     box.kerning = el('kerning')?.checked ?? box.kerning;
     box.kerningAuto = false;                       // the user chose; nothing overrides it again
+    window.utbUndo?.commit(step, 'kerning');
     syncToolbarToBox(box);
     renderBox(box);
     if (box.type === 'redaction' && typeof calculateWidthsForRedaction === 'function') {
@@ -301,14 +324,18 @@
     }
   });
 
-  // Match controls (Tolerance / Uppercase) — redaction-only tuning that drives
-  // width matching against a bar, applied to the selected redaction box. Calls
+  // Match controls (tolerance / letter case, in the Settings panel) —
+  // redaction-only tuning that drives width matching against a bar, applied
+  // to the selected redaction box. Calls
   // into a matching plugin are guarded (typeof …) so text_tool stays standalone.
   function applyMatchControls(changed) {
     const box = getSelected();
     if (!box || box.type !== 'redaction') return;
+    const step = window.utbUndo?.capture([box]);
     box.tolerance = parseFloat(el('tolerance')?.value) || 0;
-    box.uppercase = el('force-uppercase')?.checked ?? box.uppercase;
+    const caseSel = el('tt-name-case');
+    if (caseSel) box.uppercase = utbCaseMode(caseSel.value);
+    window.utbUndo?.commit(step, changed);
     if (changed === 'tolerance') {
       // Width is unchanged by tolerance — only which candidates pass.
       if (typeof updateAllMatchesView === 'function') updateAllMatchesView(box.id);
@@ -317,8 +344,8 @@
       if (typeof calculateWidthsForRedaction === 'function') calculateWidthsForRedaction(box.id);
     }
   }
-  el('tolerance')     ?.addEventListener('change', () => applyMatchControls('tolerance'));
-  el('force-uppercase')?.addEventListener('change', () => applyMatchControls('uppercase'));
+  el('tolerance')   ?.addEventListener('change', () => applyMatchControls('tolerance'));
+  el('tt-name-case')?.addEventListener('change', () => applyMatchControls('letter case'));
 
   // Space-label toggle button
   el('toggle-space-labels')?.addEventListener('click', () => {

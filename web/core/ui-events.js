@@ -1,8 +1,3 @@
-/* UTB group element lookup — used for box → text span sync */
-function getUTBGroupEl(box) {
-  return document.querySelector(`.utb-group[data-id="${box.id}"]`) || null;
-}
-
 /* Zoom Handlers */
 function updateZoomLevelText() { els.zoomInputElem.value = `${Math.round(state.currentZoom * 100)}%`; }
 

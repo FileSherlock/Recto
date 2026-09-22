@@ -19,14 +19,16 @@ const CONTROLS = {
   core: [
     'drag-overlay', 'viewer-container', 'viewer', 'document-title', 'page-count', 'page-input', 'zoom-input',
     'zoom-in', 'zoom-out', 'sidebar', 'toggle-sidebar', 'thumbnail-view', 'prev-page', 'next-page',
-    'pdf-file', 'upload-pdf-btn', 'unified-options-bar-container',
+    'pdf-file', 'upload-pdf-btn', 'unified-options-bar-container', 'ribbon-more', 'ribbon-overflow',
+    'tool-column', 'tool-column-items', 'tool-column-more', 'tool-column-customise', 'tool-column-overflow',
+    'toggle-settings', 'settings-panel', 'settings-sections', 'tool-customise', 'tool-customise-list',
   ],
   text_tool: [
-    'toggle-fmt', 'fabric-insert-bar', 'tt-add-text-btn', 'tool-add-box', 'fabric-options-bar',
+    'tt-undo', 'tt-redo', 'toggle-fmt', 'tt-add-text-btn', 'tool-add-box', 'fabric-options-bar',
     'fabric-font-family', 'fabric-font-size', 'fabric-bold', 'fabric-italic', 'fabric-underline',
     'fabric-strikethrough', 'fabric-color', 'kerning', 'fabric-nudge-mode', 'fabric-letter-spacing',
     'fabric-default-sw', 'fabric-space-width', 'fabric-space-width-display', 'toggle-space-labels',
-    'utb-delete-box', 'fabric-match-group', 'tolerance', 'force-uppercase',
+    'utb-delete-box', 'tt-settings', 'tt-match-scope', 'tolerance', 'tt-name-case',
   ],
   webgl_mask: [
     'toggle-webgl', 'webgl-options-bar', 'edge-subtract',

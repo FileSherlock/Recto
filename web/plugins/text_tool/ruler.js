@@ -20,7 +20,6 @@
   const TICK_EIGHTH = 4;     // 1/8-inch tick length
 
   // ── doc-space metrics (derived from GEO, never hardcoded) ───────
-  function inchPx()   { return window.GEO ? GEO.docPtToPx(72) : 96; }   // 1 inch
   function eighthPx() { return window.GEO ? GEO.docPtToPx(9)  : 12; }   // 1/8 inch
 
   function pageWidthPx() {

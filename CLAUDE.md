@@ -40,11 +40,14 @@ self-contained folder under `web/plugins/` that can be deleted with no dangling 
 feature. Full docs live in `guide/` (start with `guide/architecture/architecture-overview.md` and
 `guide/tool-expansion-guide.md`).
 
-- **`plugin.json` — what a plugin contributes.** Name (= folder name), `order`, `styles`, the four HTML slots
-  (`toolbar_button`, `options_bar`, `ribbon_bar`, `sidebar` — fragment files next to the scripts), and
-  `scripts_before_viewer` / `scripts_after_app`. `tools/build.mjs` scans the folders, inlines the fragments into
-  `web/core/index.template.html` at its `@plugins:*` markers and emits the script tags in the fixed order. **Never edit
-  `web/index.html`, the template or the build to add a plugin** — add a folder.
+- **`plugin.json` — what a plugin contributes.** Name (= folder name), `order`, `styles`, the five HTML slots
+  (`toolbar_button` → the left tool column, `options_bar` / `ribbon_bar` → the ribbon, `sidebar` → a right panel,
+  `settings` → a section of the Settings panel; fragment files next to the scripts), and `scripts_before_viewer` /
+  `scripts_after_app`. `tools/build.mjs` scans the folders, inlines the fragments into `web/core/index.template.html`
+  at its `@plugins:*` markers and emits the script tags in the fixed order. **Never edit `web/index.html`, the template
+  or the build to add a plugin** — add a folder. The core arranges what it finds and names no plugin: the tool column
+  is reordered and trimmed by the user (Customise tools, localStorage), ribbon groups that do not fit move under
+  "More", the Settings button appears only when some plugin contributed a section.
 - **`PDFHooks` — the event bus** (`web/core/hooks.js`, loaded before everything else): the core emits lifecycle events
   (`ui:ready`, `document:opening`, `viewer:clear`, `page:rendered`, `pages:refresh`, `document:loaded`,
   `zoom:changed`); plugins subscribe with `PDFHooks.on(...)`. The core never calls a plugin function by name. Handlers

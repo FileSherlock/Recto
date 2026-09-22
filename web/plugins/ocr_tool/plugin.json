@@ -6,6 +6,7 @@
   ],
   "toolbar_button": "toolbar_button.html",
   "options_bar": "options_bar.html",
+  "settings": "settings.html",
   "ribbon_bar": null,
   "sidebar": null,
   "scripts_before_viewer": [],

@@ -13,11 +13,6 @@
     return pt.matrixTransform(svgEl.getScreenCTM().inverse());
   }
 
-  // Get the SVG layer that owns a group element
-  function ownerSVG(el) {
-    return el.closest('svg.text-layer');
-  }
-
   // All boxes that share a lineId on the same page (for grouped vertical drag)
   function getLineBoxes(box) {
     if (!box.lineId) return [box];
@@ -44,6 +39,7 @@
     const origYs = lineBoxes.map(b => b.y);
     const linkedReds = getLinkedRedactions(box.lineId, box.page);
     const origRedYs = linkedReds.map(b => b.y);
+    const step = window.utbUndo?.capture([box, ...lineBoxes, ...linkedReds]);
 
     function onMove(e) {
       const cur = toSVGPoint(svgEl, e.clientX, e.clientY);
@@ -71,6 +67,7 @@
     function onUp() {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+      window.utbUndo?.commit(step, 'move', `move:${box.id}`);
     }
 
     window.addEventListener('mousemove', onMove);
@@ -86,6 +83,7 @@
     const start = toSVGPoint(svgEl, downEvent.clientX, downEvent.clientY);
     const origX = box.x;
     const origW = box.w;
+    const step = window.utbUndo?.capture([box]);
 
     function onMove(e) {
       const cur = toSVGPoint(svgEl, e.clientX, e.clientY);
@@ -114,6 +112,7 @@
     function onUp() {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+      window.utbUndo?.commit(step, 'resize', `resize:${box.id}`);
       if (box.type === 'redaction' && typeof calculateWidthsForRedaction === 'function') {
         calculateWidthsForRedaction(box.id);
       }
@@ -181,6 +180,8 @@
     if (e.target.closest('svg.ruler-layer')) return; // ruler marker drag must not deselect
     if (e.target.closest('#fabric-options-bar')) return;
     if (e.target.closest('#unified-options-bar-container')) return;
+    if (e.target.closest('#tool-column')) return;
+    if (e.target.closest('.floating-panel')) return;
     if (e.target.closest('#tools-sidebar')) return;
     if (e.target.closest('.utb-nudge-popover')) return;
     if (utbState.selectedId) {

@@ -226,7 +226,6 @@ body.hide-embedded-text .utb-group[data-type="embedded"] { display: none; }
 
 /* Ribbon placement. The core provides the shared bar primitives; each plugin
    declares where its own bars sit in the ribbon's reading order. */
-#fabric-insert-bar  { order: 1; }
 #fabric-options-bar { order: 2; }
 
 /* ── Pixel-renderer seam (svg-renderer.js _applyPixelRender) ────── */

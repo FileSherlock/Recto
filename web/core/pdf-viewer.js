@@ -116,11 +116,6 @@ async function announceDocument(data, file) {
   if (typeof renderAllTextLayers === 'function') renderAllTextLayers();
 }
 
-async function loadDocument(data, file) {
-  await showDocument(data);
-  await announceDocument(data, file);
-}
-
 async function handleFileUpload(e) {
   const file = els.pdfFile.files[0] || (e && e.dataTransfer && e.dataTransfer.files[0]);
   if (!file) return;

@@ -9,9 +9,9 @@
 // the raster is tinted and diffed.
 //
 // Two toggles in the Auto OCR bar:
-//   MuPDF pixels (#ocr-pixel-view)  raster instead of SVG text, tinted like
+//   MuPDF pixels (#ocr-pixel-view, Settings)  raster instead of SVG text, tinted like
 //                                   the SVG text would be, alpha = ink darkness
-//   Diff         (#ocr-pixel-diff)  matching ink pixels faint; pixels that
+//   Diff         (#ocr-pixel-diff, Settings)  matching ink pixels faint; pixels that
 //                                   DIFFER from the page solid red; page ink
 //                                   the OCR left UNEXPLAINED solid orange —
 //                                   zero red and zero orange means the line
@@ -170,10 +170,22 @@ function pvSetsForBox(box) {
     return st && st.plain && st.family === want.family && st.bold === want.bold &&
       st.italic === want.italic && Math.abs(s.sizePx - sizePx) < 0.02;
   });
-  if (hit) return { primary: hit, byName: new Map([[hit.name, hit]]), label: hit.name };
+  const asHit = () => ({ primary: hit, byName: new Map([[hit.name, hit]]), label: hit.name });
+  // The bundle carries the corpus's glyphs, not a face's whole repertoire —
+  // no diacritics ("Lajčák" in courbd16). A box whose text the bundled set
+  // cannot draw is rasterized from the installed face at the same size
+  // instead of falling back to SVG (measured 2026-09-22: a bar labelled from
+  // the candidates list lost its pixels every time the list was recomputed).
+  if (hit && !pvLacking(hit, box.text).length) return asHit();
   const dyn = pvDynamicSet(box);
-  if (!dyn.set) return dyn;
+  if (!dyn.set) return hit && !dyn.pending ? asHit() : dyn;   // no face to draw from: the set with its gap
   return { primary: dyn.set, byName: new Map([[dyn.set.name, dyn.set]]), label: dyn.set.name };
+}
+// the characters of a text a set has no record for (spaces and the unread
+// marker are never drawn)
+function pvLacking(set, text) {
+  return [...new Set([...(text || '')].filter(c => c !== ' ' && c !== '□'))]
+    .filter(c => OCRRender.advanceOf(set, c) == null);
 }
 
 function pvSpaceAdv(box, set) {
@@ -299,7 +311,7 @@ const pvLawLabel = law => !law ? '' :
   (law.assumed ? ' (assumed — nothing certified in this set on the page)' : law.words != null ? ` (${law.exact}/${law.words} words written back)` : '');
 
 function pvTint(box) {
-  const c = box.color;
+  const c = box.color || box.labelColor;
   if (typeof c === 'string') {
     let m = c.match(/^#([0-9a-f]{6})$/i);
     if (m) return [parseInt(m[1].slice(0, 2), 16), parseInt(m[1].slice(2, 4), 16), parseInt(m[1].slice(4, 6), 16)];
@@ -621,9 +633,10 @@ function pvSetOn(on) {
   pixelView.on = !!on;
   if (!pixelView.on) pixelView.diff = false;
   pvInvalidate();
-  document.getElementById('ocr-pixel-view')?.classList.toggle('active', pixelView.on);
-  const diffBtn = document.getElementById('ocr-pixel-diff');
-  if (diffBtn) { diffBtn.disabled = !pixelView.on; diffBtn.classList.toggle('active', pixelView.diff); }
+  const viewCb = document.getElementById('ocr-pixel-view');
+  if (viewCb) viewCb.checked = pixelView.on;
+  const diffCb = document.getElementById('ocr-pixel-diff');
+  if (diffCb) { diffCb.disabled = !pixelView.on; diffCb.checked = pixelView.diff; }
   if (pixelView.on && !ocrToolState.sets) pvEnsureSets();
   window.renderAllTextLayers?.();
   if (pixelView.on && ocrToolState.sets) pvSettle();
@@ -634,7 +647,8 @@ function pvSetDiff(diff) {
   if (!pixelView.on) return;
   pixelView.diff = !!diff;
   pvInvalidate();
-  document.getElementById('ocr-pixel-diff')?.classList.toggle('active', pixelView.diff);
+  const diffCb = document.getElementById('ocr-pixel-diff');
+  if (diffCb) diffCb.checked = pixelView.diff;
   window.renderAllTextLayers?.();
   pvSettle();
 }
@@ -689,8 +703,9 @@ function pvReportSelection() {
 }
 
 (function wirePixelView() {
-  document.getElementById('ocr-pixel-view')?.addEventListener('click', () => pvSetOn(!pixelView.on));
-  document.getElementById('ocr-pixel-diff')?.addEventListener('click', () => pvSetDiff(!pixelView.diff));
+  // the two switches in the Settings panel (settings.html)
+  document.getElementById('ocr-pixel-view')?.addEventListener('change', e => pvSetOn(e.target.checked));
+  document.getElementById('ocr-pixel-diff')?.addEventListener('change', e => pvSetDiff(e.target.checked));
   // selection → per-box verdict (drag-resize sets utbState.selectedId on
   // mousedown; report after the click settles)
   document.addEventListener('click', e => {

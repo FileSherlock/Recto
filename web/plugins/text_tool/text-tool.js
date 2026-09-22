@@ -6,6 +6,11 @@
 // ── Tool: add redaction box ───────────────────────────────────
 
 window.handleManualAddBox = function (pageNum, x, y) {
+  const had = new Set(utbState.boxes);
+  try { addBox(pageNum, x, y); }
+  finally { window.utbUndo?.recordAdd(utbState.boxes.filter(b => !had.has(b)), 'add box'); }
+};
+function addBox(pageNum, x, y) {
   if (typeof createNewRedaction === 'function') {
     const nearestLine = window._utbFindNearestLine?.(pageNum, y, 2.0);
     const finalY = nearestLine ? nearestLine.y : y - 10;
@@ -40,7 +45,7 @@ window.handleManualAddBox = function (pageNum, x, y) {
   utbState.selectedId = newBox.id;
   selectBoxInSVG(newBox.id);
   if (typeof syncToolbarToBox === 'function') syncToolbarToBox(newBox);
-};
+}
 
 
 // ── Tool: add editable text box ───────────────────────────────
@@ -77,6 +82,7 @@ window.handleManualAddText = function (pageNum, x, y) {
   utbState.selectedId = newBox.id;
   selectBoxInSVG(newBox.id);
   if (typeof syncToolbarToBox === 'function') syncToolbarToBox(newBox);
+  window.utbUndo?.recordAdd([newBox], 'add text');
 
   // Drop into inline edit so the placeholder is selected and ready to overwrite.
   if (typeof enterInlineEdit === 'function') enterInlineEdit(newBox);
@@ -88,13 +94,15 @@ window.handleManualAddText = function (pageNum, x, y) {
 // by the Delete / Backspace keys. Any live session on the box is torn down
 // first, so no id in utbState outlives the box it points at.
 
-window.utbDeleteBox = function (id) {
+// `silent`: the undo stack itself is taking the box out — not a step of its own.
+window.utbDeleteBox = function (id, { silent = false } = {}) {
   const box = id ? utbState.getBox(id) : null;
   if (!box) return;
 
   if (utbState.editingId === box.id && typeof cancelInlineEdit === 'function') cancelInlineEdit();
   if (utbState.microTypoId === box.id && typeof exitMicroTypo === 'function') exitMicroTypo();
 
+  if (!silent) window.utbUndo?.recordDelete(box, utbState.boxes.indexOf(box), 'delete box');
   utbState.removeBox(box.id);
   removeBoxFromSVG(box.id);
 

@@ -20,8 +20,12 @@ never generates is a bar the page pixels are never asked about), and a
 or more letters, case-insensitive, applied to the rendered candidate string). A
 refiner that finds a letter of the hidden name sticking out of the bar fills
 the filter for that box through the `redaction:refined` event, unless the user
-typed one. Custom names (typed or pasted) are shared by every box; deleting a
-row deletes the whole person from every box.
+typed one. Custom names (typed or pasted — one per line or comma-separated,
+a comma is always a separator) are shared by every box; deleting a row deletes
+the whole person from every box. **Clear Custom** drops the custom names and
+brings every deleted person back; **Delete All** removes every name, the
+shipped list included, to match against nothing but one's own names (Clear
+Custom restores the list).
 
 Widths come from HarfBuzz in the browser — `text_tool`'s
 `Shaping.widths(request)` (`web/plugins/text_tool/shaping.js`, HarfBuzz as
@@ -34,7 +38,9 @@ than on others. Names are measured in the **bar's own face, size and style** —
 connected to (`embedded_text_viewer`'s connect step prefers a reader-read
 line, whose size is measured from the glyphs, over the embedded layer's) —
 resolved through the font catalogue (`family` / `bold` / `italic`), with the
-bar's kerning, uppercase and space-width settings applied, and **without
+bar's kerning, letter case (as typed, UPPERCASE, or only the first or the
+last name in capitals — `text_tool`'s `utbApplyCase`) and space-width settings
+applied, and **without
 ligatures** (`ligatures: false`): a producer that set none — Word, by default
 — laid `Groff` at f + f, and HarfBuzz's `ff` / `tt` ligatures would put such
 a name half a pixel short of its bar, outside the pen lattice (*Lesley Groff*
@@ -86,9 +92,13 @@ If `window.ocrTestHypothesis(box, name)` exists (`ocr_tool` defines it over
 tol0's `engine/hypothesis.js`), every name a reading shows on a bar is tested
 after each width recompute and the chip carries the verdict: `✓` consistent,
 `✗` contradicted, `–` no evidence; the row counts `n of m consistent`. The
-seam draws the name where the refiner put the bar and lets the page bytes
-outside the bar's body judge it; two consistent names are a tie. Without a
-provider nothing runs. Design and limits:
+label drawn on the bar takes the same verdict's colour (`box.labelColor`, a
+`text_tool` seam the SVG text and the pixel view both honour): green when the
+page vouched for the name, amber when it left no evidence, red when it
+contradicted it; a bar without a verdict keeps the type's colour. The seam
+draws the name where the refiner put the bar and lets the page bytes outside
+the bar's body judge it; two consistent names are a tie. Without a provider
+nothing runs. Design and limits:
 [../redaction-refiner/pixel-evidence-plan.md](../redaction-refiner/pixel-evidence-plan.md).
 
 ## Two bars, one name

@@ -23,6 +23,7 @@ function normalise(html) {
     .replace(/<script src="core\/doc-service\.js[^"]*"><\/script>/, '')   // the document service (new)
     .replace(/<script src="plugins\/embedded_text_viewer\/extract\.js[^"]*"><\/script>/, '')   // the extractor port (new)
     .replace(/<script src="plugins\/text_tool\/shaping\.js[^"]*"><\/script>/, '')             // HarfBuzz measurement (new)
+    .replace(/<script src="plugins\/text_tool\/undo\.js[^"]*"><\/script>/, '')                // the undo stack (new)
     // Fabric.js (gone): the server's page loaded it from cdnjs, with a polyfill for a warning it
     // caused, long after the last call into it had been removed — the static page loads no outside script
     .replace(/<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/fabric\.js\/[^"]*"><\/script>/, '')
@@ -36,11 +37,32 @@ function normalise(html) {
 
 const scripts = html => [...html.matchAll(/<script[^>]*\bsrc="([^"]+)"/g)].map(m => m[1]);
 
-test('generated index.html matches the server-rendered page', () => {
+test('the scripts load in the order the server page loaded them', () => {
+  // The server page (tests/golden/index.html) is the record of the script
+  // order the plugins were written against; the markup itself has since moved
+  // on by design (no Fabric.js, a tool column, a settings panel) and is not
+  // compared any more.
   const golden = normalise(fs.readFileSync(path.join(HERE, 'golden', 'index.html'), 'utf8'));
   const built = normalise(build({ write: false }).html);
   assert.deepEqual(scripts(built), scripts(golden), 'script order');
-  assert.equal(built, golden);
+});
+
+test('every plugin fragment is inlined once, at its slot, in plugin order', () => {
+  const { html, plugins } = build({ write: false });
+  const squash = s => s.replace(/\s+/g, ' ').trim();
+  const page = squash(html);
+  for (const slot of ['toolbar_button', 'ribbon_bar', 'options_bar', 'sidebar', 'settings']) {
+    let last = -1;
+    for (const p of plugins) {
+      if (!p[slot]) continue;
+      const frag = squash(fs.readFileSync(path.join(WEB, 'plugins', p.name, p[slot]), 'utf8'));
+      const at = page.indexOf(frag);
+      assert.notEqual(at, -1, `${p.name}/${p[slot]} is not on the page`);
+      assert.equal(page.indexOf(frag, at + 1), -1, `${p.name}/${p[slot]} is on the page twice`);
+      assert.ok(at > last, `${p.name}/${p[slot]} is out of plugin order`);
+      last = at;
+    }
+  }
 });
 
 test('the page loads no script from another origin', () => {

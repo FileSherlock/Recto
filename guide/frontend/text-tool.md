@@ -4,7 +4,7 @@
 
 `text-tool.js` handles manual box creation and deletion.
 
-Both are scripts of the `text_tool` plugin (`web/plugins/text_tool/`), listed in its `plugin.json` under `scripts_after_app`. The controls live in the plugin's own fragments: `toolbar_button.html` (the **Text formatting** toggle, `#toggle-fmt`) and `options_bar.html`, which holds a persistent **Insert** group (`#fabric-insert-bar`) and the contextual formatting bar (`#fabric-options-bar`), revealed while a box is selected.
+Both are scripts of the `text_tool` plugin (`web/plugins/text_tool/`), listed in its `plugin.json` under `scripts_after_app`. The controls live in the plugin's own fragments: `toolbar_button.html` (the tools in the left column — **Add New Text**, **Add Redaction Box**, **Undo**, **Redo** and the **Text formatting** toggle `#toggle-fmt`), `options_bar.html` (the contextual formatting bar `#fabric-options-bar`, revealed while a box is selected) and `settings.html` (the **Redaction match** section of the Settings panel: width tolerance and letter case).
 
 ---
 
@@ -24,9 +24,9 @@ Both are scripts of the `text_tool` plugin (`web/plugins/text_tool/`), listed in
 | `#fabric-letter-spacing` | `box.letterSpacing` | em units |
 | `#fabric-default-sw` | `box.defaultSpaceWidth` | Toggle button labelled **Default** (`.active` = on); when on, the font's native space width is used. Turn it off for manual slider control. |
 | `#fabric-space-width` | `box.spaceWidth` | Slider; applies only while `#fabric-default-sw` is off. `#fabric-space-width-display` shows the value |
-| `#toggle-space-labels` | — | Toggle button; shows the numeric width above each space (`setShowSpaceWidthLabels`) |
+| `#toggle-space-labels` | — | Toggle button; shows the numeric width above each space (`setShowSpaceWidthLabels`) and, beside a redaction box, its gap to the text on either side in that line's spaces and px (`utbBarGaps` in `svg-renderer.js`; no badge where the bar touches the text) |
 | `#utb-delete-box` | — | Deletes the selected box (`utbDeleteBox`); Delete / Backspace do the same outside a text field |
-| `#tolerance`, `#force-uppercase` | `box.tolerance`, `box.uppercase` | The **Match** group (`#fabric-match-group`), revealed only for `redaction` boxes. The values are read by whichever matching plugin is installed and are inert when none is |
+| `#tolerance`, `#tt-name-case` | `box.tolerance`, `box.uppercase` | The **Redaction match** section of the Settings panel (`settings.html`): the selected redaction's values, or the defaults for new boxes when none is selected (`#tt-match-scope` says which). Letter case is `false` (as typed), `true` (UPPERCASE), `'first'` or `'last'` (that name in capitals) — `utbApplyCase(text, mode)` in `unified-text-box.js` applies it. The values are read by whichever matching plugin is installed and are inert when none is |
 
 ---
 
@@ -143,7 +143,7 @@ Double-click is a different gesture: it starts inline text editing (see `inline-
 | `click` | `#fabric-default-sw` | Toggle native vs manual space width; measure the natural width via `Shaping.widths` when turning it off |
 | `input` | `#fabric-space-width` | Live `box.spaceWidth = value`, `renderBox`, update display label |
 | `click` | `#fabric-nudge-mode` | Toggle micro-typography mode on selected span |
-| `change` | `#tolerance`, `#force-uppercase` | Write `box.tolerance` / `box.uppercase` on a `redaction` box; guarded calls into a matching plugin |
+| `change` | `#tolerance`, `#tt-name-case` | Write `box.tolerance` / `box.uppercase` on the selected `redaction` box (`applyMatchControls`); guarded calls into a matching plugin |
 | `click` | `#toggle-space-labels` | `setShowSpaceWidthLabels(active)` |
 | `click` | `#toggle-fmt` | Open / close `#fabric-options-bar` through `openSubtoolbar` |
 | `click` | `#tt-add-text-btn` | Arm `state.activeTool = 'text'` (mutually exclusive with the add-box tool) |
@@ -167,7 +167,18 @@ The click itself is caught by the core (`app.js`, a `mousedown` on the viewer), 
 
 ### Deleting a box
 
-`window.utbDeleteBox(id)` is the one removal path for every box type — the toolbar's Delete button and the Delete / Backspace keys both use it. A live inline-edit or micro-typo session on the box is torn down first, so no id in `utbState` outlives the box it points at. The keys are ignored while the caret is in a field, where they mean "erase a character".
+`window.utbDeleteBox(id)` is the one removal path for every box type — the toolbar's Delete button and the Delete / Backspace keys both use it. A live inline-edit or micro-typo session on the box is torn down first, so no id in `utbState` outlives the box it points at. The keys are ignored while the caret is in a field, where they mean "erase a character". `utbDeleteBox(id, { silent: true })` is the undo stack taking a box out again — not a step of its own.
+
+## Undo — `undo.js`
+
+One stack (`window.utbUndo`) for what the user does to boxes: add, delete, move, resize, edit the text, change the formatting, nudge a character. What a plugin puts on the page by itself — an OCR read, the embedded text, a matcher's label — is regenerated, never undone, and a new document empties the stack (`document:opening`).
+
+- `utbUndo.capture(boxes)` → token, then `utbUndo.commit(token, label, key)`: records the fields that changed between the two calls (nothing is pushed when nothing changed). A box's derived data — candidate widths, verdicts, the refiner's findings, the pixel raster — is not part of a step; it is derived again after a restore (a redaction whose typography changed has its widths measured again).
+- `utbUndo.recordAdd(boxes, label)` / `utbUndo.recordDelete(box, index, label)`: an add or a delete, put back at the same index.
+- **Collapsing.** Steps with the same `key` collapse while they follow each other: every drag of one box (`move:<id>`), every tick of one slider (`size:<id>`, `space:<id>`, `color:<id>`), every nudge of one character (`nudge:<id>:<i>`) is one step, as Word collapses repeated typing. Any other action in between starts a new step; a collapsed step that ends where it began is dropped.
+- `undo()` / `redo()` / `canUndo()` / `canRedo()` / `peek()` / `clear()` / `onChange(fn)`.
+
+The buttons are `#tt-undo` / `#tt-redo` (the fragment `toolbar_button.html`); the keys are Ctrl/⌘+Z and Ctrl/⌘+Shift+Z or Ctrl/⌘+Y — ignored while a field has the caret or an inline edit is open, where they are the field's own.
 
 ---
 

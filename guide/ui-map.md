@@ -16,10 +16,8 @@ row says otherwise. Core chrome ids are unprefixed.
 
 ## Top toolbar
 
-Core chrome renders first, then each plugin's `toolbar_button.html` in the order
-of the plugins' `order` values (`plugin.json`). Core controls live in `web/core/index.template.html` and are
-wired in `web/core/app.js`. In the tables, `core/<file>` is `web/core/<file>` and
-`<plugin>/<file>` is `web/plugins/<plugin>/<file>`.
+Core chrome only: `web/core/index.template.html`, wired in `web/core/app.js`. In the tables,
+`core/<file>` is `web/core/<file>` and `<plugin>/<file>` is `web/plugins/<plugin>/<file>`.
 
 | Label / tooltip | id | Template (owner) | Wired in |
 |---|---|---|---|
@@ -27,24 +25,42 @@ wired in `web/core/app.js`. In the tables, `core/<file>` is `web/core/<file>` an
 | Previous / Next Page, page number | `prev-page`, `next-page`, `page-input` | `core/index.template.html` | `core/app.js` |
 | Zoom out / in, zoom % (also Ctrl+wheel) | `zoom-out`, `zoom-in`, `zoom-input` | `core/index.template.html` | `core/app.js` |
 | Upload PDF (and drag-and-drop) | `upload-pdf-btn` + hidden `pdf-file` input | `core/index.template.html` | inline onclick + `core/app.js` |
-| Text formatting | `toggle-fmt` | `text_tool/toolbar_button.html` | `text_tool/toolbar.js` — opens/closes `#fabric-options-bar` via `openSubtoolbar` |
+| Settings | `toggle-settings` | `core/index.template.html` | `core/app.js` — opens `#settings-panel`; hidden when no plugin contributes a section |
+
+## Tool column (`#tool-column`, left of the page)
+
+Every plugin's `toolbar_button.html` lands in `#tool-column-items`, in the order of the
+plugins' `order` values. The user reorders and hides tools in the **Customise tools** panel
+(`tool-column-customise` → `#tool-customise`, `core/app.js`; kept in `localStorage` under
+`recto.toolColumn`); a hidden tool moves into `#tool-column-overflow`, the **More tools**
+popover (`tool-column-more`), and keeps working there.
+
+| Label / tooltip | id | Template (owner) | Wired in |
+|---|---|---|---|
 | Toggle Embedded Text | `toggle-embedded-text` | `embedded_text_viewer/toolbar_button.html` | `text_tool/toolbar.js` (guarded `?.`) — toggles body class `hide-embedded-text`. embedded_text_viewer contributes no bar; this toggle is its only UI |
 | Toggle WebGL Mask | `toggle-webgl` | `webgl_mask/toolbar_button.html` | `webgl_mask/webgl-mask.js` — opens `#webgl-options-bar` |
+| Add New Text (click on page) | `tt-add-text-btn` | `text_tool/toolbar_button.html` | arm the tool: `text_tool/toolbar.js`; placement on page click: `core/app.js` → `handleManualAddText` (`text_tool/text-tool.js`) or `addEmbeddedTextSpan` (`embedded_text_viewer/etv-fetch.js`) |
+| Add Redaction Box (click on page) | `tool-add-box` | `text_tool/toolbar_button.html` | arm the tool: `core/app.js`; placement: `handleManualAddBox` (`text_tool/text-tool.js`) |
+| Undo / Redo (Ctrl+Z, Ctrl+Shift+Z) | `tt-undo`, `tt-redo` | `text_tool/toolbar_button.html` | `text_tool/undo.js` — the tooltip names the step |
+| Text formatting | `toggle-fmt` | `text_tool/toolbar_button.html` | `text_tool/toolbar.js` — opens/closes `#fabric-options-bar` via `openSubtoolbar` |
+| Customise tools… | `tool-column-customise` | `core/index.template.html` | `core/app.js` |
+| More tools | `tool-column-more` | `core/index.template.html` | `core/app.js` — shown only while some tool is hidden |
+
+## Settings panel (`#settings-panel`)
+
+One panel; each plugin's `settings` fragment is a section of it (`#settings-sections`).
+
+| Section | Controls (id) | Template (owner) | Wired in |
+|---|---|---|---|
+| Redaction match (`tt-settings`; `tt-match-scope` says whether the fields are the selected box's or the defaults for new boxes) | `tolerance` (width tolerance, px), `tt-name-case` (letter case: as typed / UPPERCASE / FIRST name / LAST name) | `text_tool/settings.html` | `text_tool/toolbar.js` (`applyMatchControls`, `syncMatchSettings`); the ids are also read by whichever matching plugin is installed — inert when none is |
 
 ## Ribbon row (`#unified-options-bar-container`, below the toolbar)
 
 The core hosts this row (`index.html`); plugins inject bars into it. A
 `.ribbon-bar` is persistent; an `.options-bar` is contextual — one visible at a
-time, coordinated by `openSubtoolbar` in `core/app.js`.
-
-### Insert group — `#fabric-insert-bar` (text_tool, persistent)
-
-Template: `web/plugins/text_tool/options_bar.html`
-
-| Label / tooltip | id | Wired in |
-|---|---|---|
-| Add New Text (click on page) | `tt-add-text-btn` | arm the tool: `text_tool/toolbar.js`; placement on page click: `core/app.js` → `handleManualAddText` (`text_tool/text-tool.js`) or `addEmbeddedTextSpan` (`embedded_text_viewer/etv-fetch.js`) |
-| Add Redaction Box (click on page) | `tool-add-box` | arm the tool: `core/app.js`; placement: `handleManualAddBox` (`text_tool/text-tool.js`) |
+time, coordinated by `openSubtoolbar` in `core/app.js`. The row never scrolls:
+groups that do not fit move under **More options** (`ribbon-more` →
+`#ribbon-overflow`, `core/app.js`) and come back when there is room.
 
 ### Formatting bar — `#fabric-options-bar` (text_tool, contextual)
 
@@ -58,7 +74,8 @@ or toggled manually via `toggle-fmt`.
 | Style | `fabric-bold` / `fabric-italic` / `fabric-underline` / `fabric-strikethrough`, `fabric-color`, `kerning`, `fabric-nudge-mode` | `text_tool/toolbar.js` (nudge mode itself lives in `micro-typo.js`) |
 | Spacing | `fabric-letter-spacing`, `fabric-default-sw`, `fabric-space-width` (+ `-display`), `toggle-space-labels` | `text_tool/toolbar.js` |
 | Box | `utb-delete-box` — removes the selected box of any type (also bound to Delete / Backspace, ignored while a field has the caret) | `utbDeleteBox` in `text_tool/text-tool.js` |
-| Match (visible only while a redaction box is selected) | `tolerance`, `force-uppercase` | `text_tool/toolbar.js`; ids are also read by whichever matching plugin is installed — inert when none is |
+
+The redaction-only match terms (tolerance, letter case) are in the Settings panel above.
 
 ### WebGL Masks bar — `#webgl-options-bar` (webgl_mask, contextual)
 

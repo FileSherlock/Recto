@@ -49,7 +49,7 @@
       // Absent when text_tool isn't installed; every read/write guards for that.
       tol:   document.getElementById('tolerance'),
       kern:  document.getElementById('kerning'),
-      upper: document.getElementById('force-uppercase'),
+      upper: document.getElementById('tt-name-case'),   // '' | 'all' | 'first' | 'last' (text_tool's utbCaseMode)
 
       // This plugin's own sidebar (templates/redaction_matching/sidebar_tools.html)
       nameInput:  document.getElementById('name-input'),
@@ -63,6 +63,13 @@
     });
 
     // ── Helpers ─────────────────────────────────────────────────
+
+    // A name as the bar writes it: box.uppercase is false, true, 'first' or
+    // 'last' (text_tool's utbApplyCase; without it, capitals or as typed)
+    const caseName = (box, s) => (typeof utbApplyCase === 'function' ? utbApplyCase(String(s), box?.uppercase)
+      : box?.uppercase ? String(s).toUpperCase() : String(s));
+    const caseMode = value => (typeof utbCaseMode === 'function' ? utbCaseMode(value) : value === 'all');
+    const caseValue = mode => (typeof utbCaseValue === 'function' ? utbCaseValue(mode) : mode ? 'all' : '');
 
     /** Get all redaction-type UTB boxes. */
     function getRedactionBoxes() {
@@ -415,32 +422,34 @@
 
     // ── Candidate management ──────────────────────────────────
 
-    function addName() {
-      const v = els.nameInput.value.trim();
-      if (v && !state.customCandidates.includes(v)) {
-        state.customCandidates.push(v);
-        els.nameInput.value = '';
+    // Names come one per line or comma-separated ("Jane Doe, John Smith"), in
+    // the Add field and in Paste Mode alike. A comma is a separator, never
+    // part of a name: "Smith, John" is two names here.
+    const splitNames = text => text.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+
+    function addCustomNames(names) {
+      let added = 0;
+      for (const n of names) {
+        if (state.customCandidates.includes(n)) continue;
+        state.customCandidates.push(n);
+        added++;
+      }
+      if (added) {
         rebuildTemplateUnion();
         rebuildAllBoxCandidates();
         updateNameSettingsCount();
         calculateAllWidths();
       }
+      return added;
+    }
+    function addName() {
+      const names = splitNames(els.nameInput.value);
+      if (!names.length) return;
+      addCustomNames(names);
+      els.nameInput.value = '';
     }
     function processPaste() {
-      const lines = els.pasteInput.value.split('\n').map(l => l.trim()).filter(l => l);
-      let added = 0;
-      lines.forEach(l => {
-        if (!state.customCandidates.includes(l)) {
-          state.customCandidates.push(l);
-          added++;
-        }
-      });
-      if (added > 0) {
-        rebuildTemplateUnion();
-        rebuildAllBoxCandidates();
-        updateNameSettingsCount();
-        calculateAllWidths();
-      }
+      addCustomNames(splitNames(els.pasteInput.value));
       els.pasteInput.value = '';
       document.getElementById('paste-area').style.display = 'none';
     }
@@ -451,6 +460,15 @@
         state.excludedPersons.clear();
         rebuildCandidates();
       }
+    }
+    // Every name goes — the shipped list's people as well as the custom ones —
+    // so a document can be matched against nothing but the names typed in.
+    // "Clear Custom" brings the shipped list back.
+    function deleteAllNames() {
+      if (!confirm('Delete every name, the shipped list included? "Clear Custom" restores the list.')) return;
+      state.customCandidates = [];
+      state.excludedPersons = new Set(state.namesData.map((_, i) => i));
+      rebuildCandidates();
     }
 
     // Delete a candidate globally. Clicking a row (which may show just a first or
@@ -595,14 +613,14 @@
       // letter-spacing (rare on redactions) adds a fixed advance between
       // every pair of glyphs; the shaper doesn't model it, so fold it in.
       const lsPx = box.letterSpacing ? box.letterSpacing * GEO.docPtToPx(box.sizePt) : 0;
-      const spaced = (c, w) => lsPx ? w + lsPx * Math.max(0, (box.uppercase ? c.toUpperCase() : c).length - 1) : w;
+      const spaced = (c, w) => lsPx ? w + lsPx * Math.max(0, caseName(box, c).length - 1) : w;
 
       box.widths = {};
       box.widthFace = null;
       try {
         // text_tool's shaper (HarfBuzz in the browser); without it nothing is measured
         const data = typeof Shaping !== 'undefined' ? await Shaping.widths({
-          strings,
+          strings: strings.map(c => caseName(box, c)),     // as the bar writes them
           // The bar's face is its text line's (adopted when the bar was
           // connected to the line), resolved through the font catalogue.
           family: box.fontFamily,
@@ -615,7 +633,6 @@
           // would put such a name half a pixel short of its bar — outside
           // the pen lattice. The reader's set (below) is plain too.
           ligatures: false,
-          force_uppercase: box.uppercase,
           space_width: manualSpace ? box.spaceWidth : null,
         }) : null;
         if (data) {
@@ -677,7 +694,6 @@
 
       const box = getSelectedRedaction();
       const candidates = box ? getBoxCandidates(box) : state.candidates;
-      const isUpper = box ? box.uppercase : false;
 
       const sorted = [...candidates].sort((a, b) => {
         let va = state.sortBy === 'width' && box ? (box.widths[a] || 0) : a.toLowerCase();
@@ -707,7 +723,7 @@
         const w = box ? box.widths[n] : undefined;
         const isMatch = matches.includes(n);
         const esc = n.replace(/'/g, "&apos;");
-        const disp = isUpper ? n.toUpperCase() : n;
+        const disp = caseName(box, n);
         const rowClass = isMatch ? (n === shown ? 'best-match shown-match' : 'best-match') : '';
         const fontStyle = box ? ` style="font-family:${box.fontFamily || 'inherit'};"` : '';
         const pick = isMatch ? ` data-name="${escAttr(n)}" title="Fits this bar — click to show it on the bar"` : '';
@@ -744,7 +760,7 @@
       // still works standalone. Reads elsewhere already guard with ?..
       if (els.tol) els.tol.value = box.tolerance;
       if (els.kern) els.kern.checked = !!box.kerning;
-      if (els.upper) els.upper.checked = !!box.uppercase;
+      if (els.upper) els.upper.value = caseValue(box.uppercase);
 
       // Reflect this box's per-box name-format settings in the sidebar panel.
       syncNameSettingsUI();
@@ -1135,6 +1151,10 @@
     // ── All Matches summary view ──────────────────────────────
 
     const VERDICT_MARK = { consistent: '✓', contradicted: '✗', 'no-evidence': '–' };
+    // The label's colour on the page (text_tool's box.labelColor): the page
+    // pixels vouched for the name, left no evidence, or contradicted it. A bar
+    // without a verdict keeps the type's colour.
+    const VERDICT_COLOR = { consistent: '#3ddc84', 'no-evidence': '#fdd663', contradicted: '#f28b82' };
     const LINK_TITLE = 'Two bars can be one name — a space apart, or split over a line break. '
       + 'A pair reading (dashed chip) takes a first name that fits this bar and a last name that fits the other bar, from one person; '
       + 'each half is judged on its own bar. Click it to label both bars.';
@@ -1184,24 +1204,26 @@
       let matchCount = 0;
 
       els.allMatchesBody.innerHTML = redactionBoxes.map(box => {
-        const isUpper = box.uppercase;
-        const fontStyle = `font-family: ${box.fontFamily || 'inherit'}; font-feature-settings: "kern" ${box.kerning ? 1 : 0}; text-transform: ${isUpper ? 'uppercase' : 'none'};`;
+        const fontStyle = `font-family: ${box.fontFamily || 'inherit'}; font-feature-settings: "kern" ${box.kerning ? 1 : 0};`;
 
         const { entries, tol, loose, link } = getBoxMatchInfo(box);
         const { name: shown, index } = shownMatch(box, entries);
 
         if (entries.length && !loose) matchCount++;
 
-        // The bar's label is the shown reading (picked, else best)
+        // The bar's label is the shown reading (picked, else best), in the
+        // colour of its verdict
         if (onlyId === null || onlyId === box.id) {
-          const newLabel = shown ? (isUpper ? shown.toUpperCase() : shown) : '';
+          const newLabel = shown ? caseName(box, shown) : '';
           box.text = newLabel;
           box.labelText = newLabel;
+          const v = index >= 0 && entries[index] ? entryVerdict(box, entries[index]) : null;
+          box.labelColor = (v && VERDICT_COLOR[v]) || null;
           if (typeof renderBox === 'function') renderBox(box);
         }
 
         const chips = entries.map((e, i) => {
-          const disp = isUpper ? e.name.toUpperCase() : e.name;
+          const disp = caseName(box, e.name);
           const v = entryVerdict(box, e);
           const mark = v ? `<span class="match-verdict">${VERDICT_MARK[v]}</span>` : '';
           const cls = `match-chip${i === index ? ' active' : ''}${v ? ' verdict-' + v : ''}${e.kind === 'pair' ? ' pair' : ''}${e.near && !loose ? ' near' : ''}`;
@@ -1283,7 +1305,7 @@
         fontFamily:   fontFamily,
         sizePt:       sizePt,
         kerning:      els.kern?.checked ?? true,
-        uppercase:    els.upper?.checked ?? false,
+        uppercase:    caseMode(els.upper?.value),
         tolerance:    parseFloat(els.tol?.value) || 0,
         widths:       {},
         labelText:    '',

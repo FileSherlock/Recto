@@ -29,7 +29,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const WEB = path.join(ROOT, 'web');
 
-const SLOTS_ONE = ['toolbar_button', 'options_bar', 'ribbon_bar', 'sidebar'];
+const SLOTS_ONE = ['toolbar_button', 'options_bar', 'ribbon_bar', 'sidebar', 'settings'];
 const SLOTS_MANY = ['styles', 'scripts_before_viewer', 'scripts_after_app'];
 const FALLBACK_FAMILY = 'Times New Roman';
 
@@ -159,6 +159,8 @@ function render(template, plugins, assets) {
     // Per plugin: its persistent ribbon bar, then its options bar.
     bars: plugins.flatMap(p => [p.ribbon_bar, p.options_bar].filter(Boolean).map(f => fragment(p, f))),
     sidebars: plugins.filter(p => p.sidebar).map(p => fragment(p, p.sidebar)),
+    // A section of the Settings panel per plugin that has one.
+    settings: plugins.filter(p => p.settings).map(p => fragment(p, p.settings)),
     scripts_before_viewer: plugins.flatMap(p => lines(p, 'scripts_before_viewer', u => `<script src="${u}"></script>`)),
     scripts_after_app: plugins.flatMap(p => lines(p, 'scripts_after_app', u => `<script src="${u}"></script>`)),
   };

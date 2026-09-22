@@ -10,7 +10,6 @@ const state = {
   currentZoom: 1.0,
   minZoom: 0.5,
   maxZoom: 8.0,
-  renderQueue: [],
 
   // Document
   hasPdf: false,
@@ -45,7 +44,6 @@ const els = {
   loader: document.getElementById('analysis-loader'),
 
   toolAddBoxBtn: document.getElementById('tool-add-box'),
-  toolTextBtn: document.getElementById('tool-text'),
   // Plugin-owned controls (including the right-panel "tools sidebar" and its
   // toggle) are looked up by the plugins themselves — the core never
   // references a plugin's DOM.

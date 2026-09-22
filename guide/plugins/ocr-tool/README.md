@@ -81,7 +81,7 @@ A miss in both tiers falls back to the live engine read.
   `node tools/recto-cache.mjs` does the same headless: it serves this site,
   waits for the read and writes the file. Stale files of old documents can
   be deleted.
-- `version` (`OCR_CACHE_VERSION`, currently 2: per-page `spaceAdv`, per-line
+- `version` (`OCR_CACHE_VERSION`, currently 3 — only black boxes are kept; 2: per-page `spaceAdv`, per-line
   `phy`, per-entry `src`) guards the payload shape; a file or a stored read
   with another version is ignored.
 - A fresh browser profile has no second tier, so tol0's `npm run recto-test`
@@ -160,8 +160,18 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
 - Non-byte-clean lines render in orange (`box.color` override); unreadable
   bands become red `□` marker boxes. `box.ocr = {clean, tol, quant, union,
   font, baseline, fails}` rides on every box for downstream tooling.
-- Detected redaction rectangles become `redaction` boxes and are snapped to
-  their text lines via the guarded `utbConnectRedactionsToLines?.()` seam.
+- Detected redaction rectangles become `redaction` boxes — when they are
+  black. The engine's `detectObjects` calls any long near-solid dark run a
+  box, and a grey table cell, a logo's plate or a photograph pass as well; a
+  redaction is solid black ink. `ocrKeepBlackBoxes` (ocr-tool.js) checks each
+  box's interior, one pixel in from every side, against the pixels the reader
+  read: at least 90 % of it must be ≤ 48/255, or the box is dropped before the
+  read is slimmed (so the cache, payload version 3, holds only what stays).
+  `OCRTool.dropped(page)` lists what went, with each region's black fraction.
+  The survivors are snapped to their text lines via the guarded
+  `utbConnectRedactionsToLines?.()` seam, and keep the face of that line (an
+  OCR line's face is measured from the glyphs; the embedded layer's most used
+  face is only for a bar on no line).
 
 ## Dependencies and seams
 
@@ -218,12 +228,12 @@ then synced.
 
 ## MuPDF pixel view
 
-Two toggles in the **MuPDF view** group of the OCR bar (`pixel-view.js`):
+Two switches in the **MuPDF pixels** section of the Settings panel (`settings.html`, wired in `pixel-view.js`):
 
-| Tooltip | id | What it does |
+| Switch | id | What it does |
 |---|---|---|
-| Show text as MuPDF pixels | `ocr-pixel-view` | Every text box is drawn from the reader's own glyph bitmaps on mupdf's ¼-px pen lattice and whole-pixel baseline, instead of SVG text — the raster mupdf would have produced. Tinted like the SVG text (alpha = ink darkness); pixelated when zoomed. |
-| Highlight pixels that differ from the page | `ocr-pixel-diff` | Matching ink pixels go faint, pixels whose predicted byte differs from the page turn solid red, and page ink inside the line's band that no drawn glyph explains turns solid orange (the reader's residual — a quote mark it never transcribed). The status line reports `OCR lines n/m exact` (reader-certified lines, which must all be exact — within the reader's own ±tol when a line was read on a tolerant rung) and `other boxes n/m exact` (embedded / hand-added text, compared but not expected to match) for the page and, on selection, the box's ink-pixel and differing-pixel counts. |
+| Draw text as MuPDF pixels | `ocr-pixel-view` | Every text box is drawn from the reader's own glyph bitmaps on mupdf's ¼-px pen lattice and whole-pixel baseline, instead of SVG text — the raster mupdf would have produced. Tinted like the SVG text (alpha = ink darkness); pixelated when zoomed. |
+| Diff: highlight the pixels that differ from the page | `ocr-pixel-diff` | Matching ink pixels go faint, pixels whose predicted byte differs from the page turn solid red, and page ink inside the line's band that no drawn glyph explains turns solid orange (the reader's residual — a quote mark it never transcribed). The status line reports `OCR lines n/m exact` (reader-certified lines, which must all be exact — within the reader's own ±tol when a line was read on a tolerant rung) and `other boxes n/m exact` (embedded / hand-added text, compared but not expected to match) for the page and, on selection, the box's ink-pixel and differing-pixel counts. |
 
 - **Which glyph set draws a box.** OCR lines: the set the reader picked
   (`box.ocr.font`; a union name resolves per glyph through

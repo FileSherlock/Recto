@@ -37,7 +37,7 @@ const OCR_UNREAD_COLOR = 'rgba(217, 48, 37, 0.85)';    // □ marker boxes
 const OCR_CACHE_DIR = 'plugins/ocr_tool/cache/';       // shipped caches: <document sha256>.json
 const OCR_CACHE_DB = 'recto-ocr-cache';                // IndexedDB: this browser's own reads
 const OCR_CACHE_KEEP = 8;                              // documents kept there, most recent first
-const OCR_CACHE_VERSION = 2;   // bump when the slim payload shape changes (2: spaceAdv + entry src)
+const OCR_CACHE_VERSION = 3;   // bump when the slim payload shape changes (2: spaceAdv + entry src; 3: only black boxes are kept)
 
 function setOcrStatus(msg) {
   const el = document.getElementById('ocr-status');
@@ -590,6 +590,48 @@ function ocrApplyCached(cached) {
     ' · precomputed');
 }
 
+// ── Only black boxes are redactions ───────────────────────────
+// The reader's detectObjects calls any long near-solid dark run a box, and a
+// grey table cell, a logo's dark plate or a scanned photograph pass as well.
+// A redaction is solid black ink. Each box is checked against the pixels the
+// reader read: its interior, one pixel in from every side (past the AA rim),
+// must be at least OCR_BOX_BLACK_FRACTION black (≤ OCR_BOX_BLACK_MAX, a level
+// scan noise stays under); anything else is dropped here, before the read is
+// slimmed, so the cache (version 3) holds only what stays. A box too thin to
+// have an interior keeps the reader's word.
+const OCR_BOX_BLACK_MAX = 48;
+const OCR_BOX_BLACK_FRACTION = 0.9;
+
+// the black fraction of a box's interior, 1 for a box too thin to have one
+function ocrBoxBlackness(page, ob) {
+  const x0 = Math.max(0, ob.x0 + 1), x1 = Math.min(page.w - 1, ob.x1 - 1);
+  const y0 = Math.max(0, ob.y0 + 1), y1 = Math.min(page.h - 1, ob.y1 - 1);
+  if (x1 < x0 || y1 < y0) return 1;
+  let black = 0, n = 0;
+  for (let y = y0; y <= y1; y++) {
+    const row = y * page.w;
+    for (let x = x0; x <= x1; x++, n++) if (page.gray[row + x] <= OCR_BOX_BLACK_MAX) black++;
+  }
+  return black / n;
+}
+
+// The regions dropped on each page stay inspectable: OCRTool.dropped(page) →
+// [{ x0, y0, x1, y1, black }] (raster px; black = the interior's black fraction).
+const ocrDropped = new Map();
+function ocrKeepBlackBoxes(page, pageNum, res) {
+  if (!res?.objects?.length) return 0;
+  const dropped = [];
+  res.objects = res.objects.filter(o => {
+    if (o.type !== 'box') return true;
+    const black = ocrBoxBlackness(page, o);
+    if (black >= OCR_BOX_BLACK_FRACTION) return true;
+    dropped.push({ x0: o.x0, y0: o.y0, x1: o.x1, y1: o.y1, black: +black.toFixed(3) });
+    return false;
+  });
+  ocrDropped.set(`${state.docHash}|${pageNum}`, dropped);
+  return dropped.length;
+}
+
 // one page: { img, res, pass } — res slim when it came through the worker
 // (ocrAddBoxes reads the same fields either way) — or null when the page has
 // no raster or the read was cancelled. carry: null for a single page, the
@@ -619,6 +661,8 @@ async function ocrReadOnePage(pageNum, label, carry) {
     out = await BlindOCR.readPageAuto(page, sets, { passHint: ocrToolState.passHint, carry, progress });
   }
   ocrToolState.passHint = out.pass;
+  const dropped = ocrKeepBlackBoxes(page, pageNum, out.res);
+  if (dropped) console.info(`OCR: page ${pageNum}: ${dropped} dark region(s) not black enough to be a redaction`);
   return { img, res: out.res, pass: out.pass };
 }
 
@@ -698,7 +742,7 @@ async function ocrRun(allPages) {
 
 // ── Auto OCR on load + layer choice ───────────────────────────
 // Every loaded document is read automatically (all pages, fire-and-forget so
-// loadDocument is not blocked). Afterwards the display shows exactly one text
+// openDocument is not blocked). Afterwards the display shows exactly one text
 // layer: when the OCR volume is similar to the embedded layer's — or the
 // document has no embedded text at all (scanned pages) — the OCR layer wins
 // (its per-glyph measured pens beat PDF extraction); otherwise the OCR
@@ -825,4 +869,5 @@ PDFHooks.on('document:loaded', (e) => {
 });
 
 // Programmatic entry point (used by the headless smoke test).
-window.OCRTool = { run: ocrRun, autoRead: ocrAutoRead, chooseLayer: ocrChooseLayer, cancel: ocrCancel, state: ocrToolState };
+window.OCRTool = { run: ocrRun, autoRead: ocrAutoRead, chooseLayer: ocrChooseLayer, cancel: ocrCancel, state: ocrToolState,
+  dropped: pageNum => ocrDropped.get(`${state.docHash}|${pageNum}`) || [] };

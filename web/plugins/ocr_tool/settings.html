@@ -1,0 +1,15 @@
+<!-- ocr_tool's section of the Settings panel: the MuPDF pixel view
+     (pixel-view.js) — draw every text box from the reader's glyph bitmaps on
+     mupdf's ¼-px lattice instead of SVG text; Diff keeps only the pixels that
+     differ from the page, in red. -->
+<section class="settings-section" id="ocr-settings">
+  <h3>MuPDF pixels</h3>
+  <label class="settings-check">
+    <input type="checkbox" id="ocr-pixel-view">
+    <span>Draw text as MuPDF pixels — the reader's glyph bitmaps on the ¼-px lattice, the raster mupdf would have produced</span>
+  </label>
+  <label class="settings-check">
+    <input type="checkbox" id="ocr-pixel-diff" disabled>
+    <span>Diff: highlight the pixels that differ from the page (red)</span>
+  </label>
+</section>

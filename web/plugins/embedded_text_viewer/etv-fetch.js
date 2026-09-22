@@ -98,8 +98,13 @@ function etvNormalize(spans) {
     }
   }
 
+  // A bar that sits on no line takes the document's body face and size; a
+  // bar on a line already has its line's (utbConnectRedactionsToLines — an
+  // OCR line's face is the page's own, measured from the glyphs, and must not
+  // be overwritten by the text layer's most used face: on the reference
+  // document every bar on a Times header was re-fonted to the Courier body).
   if (typeof utbState === 'undefined') return;
-  utbState.boxes.filter(b => b.type === 'redaction').forEach(box => {
+  utbState.boxes.filter(b => b.type === 'redaction' && !b.lineId).forEach(box => {
     const pt = box.sizePt;
     const normalizedPt = Math.abs(pt - documentBasePt) <= 1.0 ? documentBasePt : Math.round(pt);
 
@@ -372,8 +377,8 @@ window.etvSpanCache = {
 
 // ── Lifecycle hooks ───────────────────────────────────────────
 // Subscribe to the core's document lifecycle instead of monkey-patching
-// window.loadDocument. The core already resets utbState and the SVG layers at
-// the top of loadDocument, so these handlers only manage the span cache.
+// window.openDocument. The core already resets utbState and the SVG layers
+// when it shows a document, so these handlers only manage the span cache.
 if (window.PDFHooks) {
   PDFHooks.on('document:loaded', () => {
     // Boxes were reset by the core, so every page needs hydrating again; the
@@ -389,7 +394,7 @@ if (window.PDFHooks) {
       _utbFetchState.anyText = false;
     }
     // Kick the background lean loop and hydrate whatever is on screen.
-    // Deliberately not awaited — loadDocument must not block on text.
+    // Deliberately not awaited — openDocument must not block on text.
     utbFetchSpans();
     document.querySelectorAll('.page-container').forEach(c => {
       etvHydratePage(parseInt(c.id.replace('pageContainer', '')));

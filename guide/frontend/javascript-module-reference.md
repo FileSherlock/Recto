@@ -26,7 +26,7 @@ the order of their manifest's `order` (`embedded_text_viewer` 10, `webgl_mask` 2
 | 3 | `core/state.js` | `state`, `els` | — | `GEO`, DOM elements |
 | 4 | `core/doc-service.js` | `Doc` — the document service | — | `assetURL`, `GEO` |
 | 5 | `webgl_mask/webgl-mask.js` *(slot `scripts_before_viewer`)* | `setupWebGLOverlay`, `clearWebGLContexts`, `updateWebGLUniforms`, `refreshWebGLCanvases` | **on:** `ui:ready`, `viewer:clear`, `page:rendered`, `pages:refresh` | `state`, `Doc`, `assetURL` |
-| 6 | `core/pdf-viewer.js` | `openDocument`, `showDocument`, `announceDocument`, `loadDocument`, `handleFileUpload`, `goToPage` | **emit:** `document:opening`, `viewer:clear`, `page:rendered`, `pages:refresh`, `document:loaded` | `state`, `els`, `Doc` |
+| 6 | `core/pdf-viewer.js` | `openDocument`, `showDocument`, `announceDocument`, `showNoDocument`, `handleFileUpload`, `goToPage` | **emit:** `document:opening`, `viewer:clear`, `page:rendered`, `pages:refresh`, `document:loaded` | `state`, `els`, `Doc` |
 | 7 | `core/ui-events.js` | `updateZoomLevelText`, `updateCSSZoom`, `processZoomFromText`, `renderThumbnails` | **emit:** `zoom:changed` | `state`, `els`, `Doc` |
 | 8 | `core/app.js` | IIFE — wires core listeners; `openSubtoolbar`, `registerSubtoolbar`; opens the startup document | **emit:** `ui:ready` | All above |
 | 9 | `embedded_text_viewer/extract.js` | `EtvExtract` (`extractSpans`, `leanSpan`, …) | — | — |

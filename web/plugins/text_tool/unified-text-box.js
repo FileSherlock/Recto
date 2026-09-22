@@ -65,6 +65,10 @@ class UnifiedTextBox {
     this.strikethrough = data.strikethrough || false;
     this.letterSpacing = data.letterSpacing || 0;
     this.color = data.color || null;  // null = per-type default
+    // A colour for the label chosen by a plugin that judged it (a matcher's
+    // page-pixel verdict on a redaction's name), null = the type's colour;
+    // the user's own `color` always wins over it.
+    this.labelColor = data.labelColor || null;
 
     // Kerning. `kerning` is always the EFFECTIVE boolean every reader uses
     // (SVG fontKerning, width requests, a pixel renderer). `kerningAuto` says
@@ -94,7 +98,9 @@ class UnifiedTextBox {
     this.labelText = data.labelText || '';
     this.tolerance = data.tolerance ?? 3;
     this.manualLabel = data.manualLabel || false;
-    this.uppercase = data.uppercase || false;  // force-uppercase display
+    // How the hidden name was written: false as typed, true in capitals,
+    // 'first' / 'last' with only that name in capitals (utbApplyCase)
+    this.uppercase = data.uppercase || false;
 
     // Per-box name-format settings + derived candidate list. Populated by
     // whichever plugin owns matching; null when none is installed (nothing in
@@ -222,6 +228,27 @@ function normUtbFont(name) {
   if (lc.includes('segoe')) return 'Segoe UI';
   return n;
 }
+
+// ── Letter case ───────────────────────────────────────────────
+// box.uppercase: false | true | 'first' | 'last'. A name is one or more
+// whitespace-separated words; 'first' capitalises the first word, 'last' the
+// last one ("Jane DOE"), true every word. The Settings panel's select speaks
+// in '' | 'all' | 'first' | 'last'.
+function utbApplyCase(text, mode) {
+  if (!mode || typeof text !== 'string') return text;
+  if (mode === true || mode === 'all') return text.toUpperCase();
+  const parts = text.split(/(\s+)/);                      // words and the gaps between them
+  const words = parts.map((p, i) => (i % 2 === 0 && p ? i : -1)).filter(i => i >= 0);
+  if (!words.length) return text;
+  const at = mode === 'first' ? words[0] : words[words.length - 1];
+  parts[at] = parts[at].toUpperCase();
+  return parts.join('');
+}
+const utbCaseValue = mode => (mode === true ? 'all' : mode === 'first' || mode === 'last' ? mode : '');
+const utbCaseMode = value => (value === 'all' ? true : value === 'first' || value === 'last' ? value : false);
+window.utbApplyCase = utbApplyCase;
+window.utbCaseValue = utbCaseValue;
+window.utbCaseMode = utbCaseMode;
 
 // Expose globals
 window.UnifiedTextBox = UnifiedTextBox;

@@ -2,11 +2,15 @@
 
 A reference for adding new plugins to Recto. Read the architecture section first — it explains the conventions every plugin relies on.
 
-> **The two ribbon slots.** `options_bar` is a *contextual* bar: `openSubtoolbar()` shows one
-> at a time and hides the rest. `ribbon_bar` is *persistent* — always visible, never hidden.
-> Set where your bar sits in the ribbon's reading order with `order:` in your own stylesheet;
-> the core deliberately never names a plugin's bar in its CSS. No *baseline* plugin fills the
-> `ribbon_bar` slot — see [Optional Plugins](./plugins/) for a worked example.
+> **Where a fragment lands.** `toolbar_button` goes into the left **tool column** (the user
+> can reorder and hide tools there — a hidden tool moves under "More tools" and keeps
+> working). The two ribbon slots: `options_bar` is a *contextual* bar — `openSubtoolbar()`
+> shows one at a time and hides the rest; `ribbon_bar` is *persistent* — always visible, never
+> hidden. Set where your bar sits in the ribbon's reading order with `order:` in your own
+> stylesheet; the core deliberately never names a plugin's bar in its CSS, and ribbon groups
+> that do not fit the width move under the ribbon's "More" button by themselves. `settings`
+> is a section of the **Settings** panel (the gear in the top toolbar). No *baseline* plugin
+> fills the `ribbon_bar` slot — see [Optional Plugins](./plugins/) for a worked example.
 
 ---
 
@@ -63,7 +67,8 @@ All fields, with their defaults (read by `readPlugins()` in `tools/build.mjs`):
 
   "styles": [],                   // Stylesheets, linked in <head>
 
-  "toolbar_button": null,         // HTML fragment inlined into #toolbar-right
+  "toolbar_button": null,         // HTML fragment inlined into the tool column
+                                  //   (#tool-column-items): one or more <button id>
   "options_bar": null,            // Contextual ribbon bar — one at a time,
                                   //   switched by openSubtoolbar()
   "ribbon_bar": null,             // Persistent ribbon bar — always visible
@@ -71,6 +76,8 @@ All fields, with their defaults (read by `readPlugins()` in `tools/build.mjs`):
                                   //   fragment provides its own container +
                                   //   toggle button + wiring; the core hosts
                                   //   no right panel of its own
+  "settings": null,               // A <section class="settings-section"> of the
+                                  //   Settings panel (#settings-sections)
 
   "scripts_before_viewer": [],    // Scripts loaded before pdf-viewer.js
   "scripts_after_app": []         // Scripts loaded after app.js
@@ -88,10 +95,13 @@ manifest lists only the slots it fills. The build stops with a clear message whe
 - a fragment contains a server-side template tag (`{%` or `{{`) — fragments are plain HTML.
 
 The orders of the baseline plugins are `embedded_text_viewer` 10, `webgl_mask` 20 and
-`text_tool` 70. Pick an `order` by where your toolbar button should sit and by which plugins'
-scripts yours must follow within a bucket.
+`text_tool` 70. Pick an `order` by where your tool should sit in the column by default and by
+which plugins' scripts yours must follow within a bucket.
 
 Both bars of a plugin land in `#text-toolbar-row`, its `ribbon_bar` before its `options_bar`.
+A `settings` fragment is a `<section class="settings-section">` with an `<h3>` and
+`.settings-row` / `.settings-check` rows (the core's classes); it lands in `#settings-sections`
+and the gear button (`#toggle-settings`) shows up as soon as one plugin has a section.
 
 ### Global JavaScript Objects
 
@@ -216,8 +226,8 @@ There are two distinct plugin UI patterns. Choose one based on what your tool ne
 
 | Pattern | Used by | Adds |
 |---|---|---|
-| **Subtoolbar** | `webgl_mask`, `text_tool` | A toolbar button that swaps the options bar row |
-| **Right Panel** | (e.g. a matching sidebar) | A toolbar button that opens a full-height side panel |
+| **Subtoolbar** | `webgl_mask`, `text_tool` | A tool-column button that swaps the options bar row |
+| **Right Panel** | (e.g. a matching sidebar) | A tool-column button that opens a full-height side panel |
 
 ---
 
@@ -232,7 +242,7 @@ The subtoolbar row is mutually exclusive — only one bar is visible at a time. 
 ```
 web/plugins/my_tool/
   plugin.json              ← the manifest
-  toolbar_button.html      ← button inlined into #toolbar-right
+  toolbar_button.html      ← button inlined into the tool column
   options_bar.html         ← bar inlined into #text-toolbar-row
   my-tool.js               ← toggle logic + tool behaviour
   styles.css
@@ -319,7 +329,7 @@ Use this when your tool needs a persistent, scrollable side panel.
 ```
 web/plugins/my_panel/
   plugin.json              ← the manifest
-  toolbar_button.html      ← button inlined into #toolbar-right
+  toolbar_button.html      ← button inlined into the tool column
   panel.html               ← <aside> inlined after the viewer
   my-panel.js              ← open/close logic + panel behaviour
   styles.css               ← the panel's own container styles
@@ -572,7 +582,7 @@ confirm the console is clean and the rest of the app works.
 
 | Folder | Type | `order` | Toggle Button ID | Bar / Panel ID |
 |---|---|---|---|---|
-| `web/plugins/text_tool` | Subtoolbar | 70 | `toggle-fmt` | `fabric-options-bar` (+ the persistent `fabric-insert-bar`) |
+| `web/plugins/text_tool` | Subtoolbar | 70 | `toggle-fmt` (+ the Insert, Undo and Redo tools) | `fabric-options-bar`; a Settings section (`tt-settings`) |
 | `web/plugins/webgl_mask` | Subtoolbar | 20 | `toggle-webgl` | `webgl-options-bar` |
 | `web/plugins/embedded_text_viewer` | Toolbar toggle only | 10 | `toggle-embedded-text` | — |
 | `web/core` | Core (always on) | — | — | `unified-options-bar-container` (bar host) |
@@ -583,7 +593,7 @@ confirm the console is clean and the rest of the app works.
 
 1. **Create the plugin folder** (`web/plugins/my_tool/`)
 2. **Write `plugin.json`** — `name` equal to the folder name, an `order`, and only the slots you fill
-3. **Create the fragments** — `toolbar_button.html`, `options_bar.html`, and/or a sidebar fragment; plain HTML, no template tags
+3. **Create the fragments** — `toolbar_button.html`, `options_bar.html`, a settings section and/or a sidebar fragment; plain HTML, no template tags
 4. **Create scripts and styles** — every file the manifest names must exist, or the build fails with a message saying which
 5. **Wire runtime behaviour through `PDFHooks`** — subscribe to lifecycle events (`page:rendered`, `document:loaded`, …); reset per-document state in `document:opening`; for a subtoolbar in `scripts_after_app`, call `registerSubtoolbar(btn)` and add your click handlers at module scope (NOT inside `ui:ready` — it has already fired)
 6. **Read the document through `Doc`**, load your own files through `assetURL()`, and put heavy loops in a worker

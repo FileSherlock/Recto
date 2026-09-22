@@ -17,7 +17,6 @@ const state = {
   currentZoom: 1.0,
   minZoom: 0.5,
   maxZoom: 8.0,
-  renderQueue: [],
 
   // Document
   hasPdf: false,          // the open document is a PDF (not an image)
@@ -85,12 +84,11 @@ Core DOM elements are cached at load time to avoid repeated `getElementById` cal
 | Group | Elements |
 |-------|----------|
 | **Viewer** | `dragOverlay`, `viewerContainer`, `viewer`, `titleElem`, `pageCountElem`, `pageInputElem`, `zoomInputElem`, `zoomInBtn`, `zoomOutBtn`, `sidebar`, `toggleSidebarBtn`, `thumbnailView`, `prevPageBtn`, `nextPageBtn` |
-| **Tools** | `toolAddBoxBtn`, `toolTextBtn` |
+| **Tools** | `toolAddBoxBtn` |
 | **Data** | `pdfFile` |
 
-The two **Tools** entries are looked up by id (`#tool-add-box`, `#tool-text`) and are `null`
-when no plugin's fragment supplies the element — `#tool-add-box` comes from `text_tool`'s
-bar, and no baseline fragment supplies `#tool-text`. `app.js` checks before wiring them.
+The **Tools** entry is looked up by id (`#tool-add-box`) and is `null` when no plugin's
+fragment supplies the element — it comes from `text_tool`'s bar. `app.js` checks before wiring it.
 
 > **Plugin-owned controls are not in `els`.** The core cache holds no plugin elements — not the
 > webgl mask toggle (`#toggle-webgl`), the reveal-strength slider (`#edge-subtract`), nor the

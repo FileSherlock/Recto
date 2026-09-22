@@ -68,8 +68,6 @@ That is the whole sequence. The viewer creates no boxes and calculates no widths
 anything that appears on top of the page was put there by a plugin subscribing to
 `document:loaded` or `page:rendered`.
 
-`loadDocument(info, file)` runs `showDocument` and `announceDocument` back to back, for a caller that already holds `Doc.open()`'s result.
-
 ### `handleFileUpload()`
 
 Triggered when a file is selected or dropped (`app.js` accepts PDFs and PNG, JPEG, TIFF, BMP, WebP images). Sets `state.currentFile`, `state.hasPdf` (is it a `.pdf`) and the title, shows the loader in `#viewer-placeholder`, and calls `openDocument(file, file.name, file)`. A failure that is not `superseded` goes to `showNoDocument(message)`.

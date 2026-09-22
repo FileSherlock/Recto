@@ -253,6 +253,173 @@ html {
   position: relative;
 }
 
+/* ----------------- Tool column (Left) -----------------
+   Every plugin's toolbar buttons, stacked. app.js orders and hides them as the
+   user chose (Customise tools); hidden ones live in #tool-column-overflow, a
+   popover next to the column, so every tool stays reachable. */
+#tool-column {
+  width: 44px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+  background-color: #323639;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 95;
+}
+
+#tool-column-items {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+#tool-column-items::-webkit-scrollbar { display: none; }
+
+#tool-column-items,
+#tool-column-foot,
+#tool-column-overflow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+#tool-column-foot {
+  padding-top: 6px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#tool-column .icon-button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+
+#tool-column-overflow {
+  position: absolute;
+  left: 100%;
+  bottom: 6px;
+  margin-left: 6px;
+  padding: 6px;
+  background: #292a2d;
+  border: 1px solid #3c4043;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 200;
+}
+
+/* ----------------- Floating panels (Settings, Customise tools) ----------------- */
+.floating-panel {
+  position: fixed;
+  top: 52px;
+  right: 12px;
+  width: 340px;
+  max-height: calc(100% - 64px);
+  overflow-y: auto;
+  background: #202124;
+  border: 1px solid #3c4043;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  color: #e8eaed;
+  font-size: 13px;
+  z-index: 500;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 8px 14px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-section {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.settings-section:last-child { border-bottom: none; }
+
+.settings-section h3 {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #80868b;
+  margin-bottom: 8px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 6px 0;
+}
+.settings-row > label:first-child { color: #bdc1c6; }
+.settings-row .settings-value { display: flex; align-items: center; gap: 6px; }
+
+.settings-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 6px 0;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.settings-check input { accent-color: #8ab4f8; margin-top: 3px; flex-shrink: 0; }
+
+.settings-hint {
+  font-size: 11px;
+  color: #9aa0a6;
+  line-height: 1.4;
+  margin: 4px 0;
+}
+
+.panel-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+
+.panel-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid #3c4043;
+  color: #e8eaed;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.panel-btn:hover { background: rgba(255, 255, 255, 0.1); }
+
+#tool-customise-list {
+  list-style: none;
+  margin: 8px 0 0;
+}
+#tool-customise-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+#tool-customise-list li input { accent-color: #8ab4f8; }
+#tool-customise-list .tc-icon { display: inline-flex; width: 24px; justify-content: center; color: #bdc1c6; }
+#tool-customise-list .tc-icon .material-symbols-outlined { font-size: 18px; }
+#tool-customise-list .tc-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tool-customise-list .tc-move {
+  background: transparent;
+  border: none;
+  color: #9aa0a6;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+#tool-customise-list .tc-move:hover { background: rgba(255, 255, 255, 0.08); color: #e8eaed; }
+#tool-customise-list .tc-move:disabled { opacity: 0.3; cursor: default; }
+
 /* ----------------- Thumbnails Sidebar (Left) ----------------- */
 #sidebar {
   width: 200px;
@@ -379,31 +546,46 @@ html {
 /* ----------------- Sub-Toolbar (Ribbon) ----------------- */
 #unified-options-bar-container {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  position: relative;
   background-color: #292a2d;
   border-bottom: 1px solid rgba(0, 0, 0, 0.2);
   z-index: 90;
-  padding: 6px 0;
+  padding: 6px 8px 6px 0;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
+/* One Word-style ribbon line. It never scrolls and never wraps: the groups
+   that do not fit are moved under #ribbon-more by app.js (ribbonOverflow). */
 #text-toolbar-row {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;        /* single Word-style ribbon line — never stack onto a 2nd level */
-  overflow-x: auto;         /* if it can't fit, scroll horizontally instead of wrapping */
-  overflow-y: hidden;
+  flex-wrap: nowrap;
+  overflow: hidden;
   min-height: 44px;
-  scrollbar-width: thin;
 }
 
-#text-toolbar-row::-webkit-scrollbar { height: 6px; }
-#text-toolbar-row::-webkit-scrollbar-track { background: transparent; }
-#text-toolbar-row::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border: none;
-  border-radius: 3px;
+#ribbon-more { flex-shrink: 0; }
+
+#ribbon-overflow {
+  position: absolute;
+  top: 100%;
+  right: 8px;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #292a2d;
+  border: 1px solid #3c4043;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
+#ribbon-overflow .options-divider { display: none; }
 
 /* The ribbon is built from "bars". Every bar shares the same flex layout via
    `.ribbon-bar`. A bar that ALSO carries `.options-bar` is one that
@@ -533,77 +715,6 @@ html {
   height: 14px;
 }
 
-/* ----------------- Disclaimer Modal ----------------- */
-#disclaimer-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  z-index: 10000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-#disclaimer-overlay.hidden {
-  display: none;
-}
-
-#disclaimer {
-  background: #202124;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  padding: 28px 32px;
-  max-width: 540px;
-  width: 90%;
-  color: #e8eaed;
-  font-size: 13px;
-  line-height: 1.6;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-}
-
-#disclaimer h3 {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 14px;
-  color: #f28b82;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-#disclaimer h3::before {
-  content: "⚠";
-  font-size: 18px;
-}
-
-#disclaimer p {
-  margin-bottom: 10px;
-  color: #bdc1c6;
-}
-
-#disclaimer p strong {
-  color: #e8eaed;
-}
-
-#disclaimer-accept {
-  margin-top: 18px;
-  width: 100%;
-  padding: 10px;
-  background: #1A73E8;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s;
-}
-
-#disclaimer-accept:hover {
-  background: #1557b0;
-}
-
 /* ----------------- Mobile Specific Styles (Portrait) ----------------- */
 @media (max-width: 768px) {
   #toolbar {
@@ -662,36 +773,14 @@ html {
     pointer-events: none;
   }
 
-  #sidebar-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    z-index: 999;
-    backdrop-filter: blur(2px);
-    transition: opacity 0.3s;
-  }
-
-  #sidebar-backdrop.hidden {
-    display: none;
-  }
-
-  /* Sub-toolbar (Ribbon) refinements */
-  #unified-options-bar-container {
-    height: auto;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
   .options-group-controls {
     gap: 12px; /* More finger spacing */
   }
 
-  /* Ribbon scrolling - ensure scrollbar is less obtrusive but present if needed */
-  #text-toolbar-row::-webkit-scrollbar {
-    height: 4px;
-  }
-  #text-toolbar-row::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+  .floating-panel {
+    left: 8px;
+    right: 8px;
+    width: auto;
   }
 }
 

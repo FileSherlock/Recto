@@ -151,7 +151,7 @@ async function ocrTestHypothesis(box, name) {
   const line = { baseline: span.ocr.baseline, phy: span.ocr.phy || 0, tol: span.ocr.tol || 0,
     spaceLine: spaceLine / sx, penLeft, penRight, gapLeft, gapRight, top: span.ocr.top, bot: span.ocr.bot,
     metrics: hvKernTable(box.page, span.ocr.spaceAdv || spaceLine / sx) };
-  const text = box.uppercase ? name.toUpperCase() : name;
+  const text = typeof utbApplyCase === 'function' ? utbApplyCase(name, box.uppercase) : box.uppercase ? name.toUpperCase() : name;
   const v = OCRHypothesis.testHypothesis(info.page, info.det, set, line, boxObj, text,
     { quant: span.ocr.quant ? pvQuant(info) : null, explained });
   hypothesisView.reasons.delete(box.id);
@@ -198,7 +198,7 @@ async function ocrMeasureWidths(box, strings) {
   const ri = box.refineInfo;
   const space = ri?.left?.space ?? ri?.right?.space ?? ((span.ocr.spaceAdv ?? pvSpaceAdv(span, set)) * sx);
   const widths = strings.map(s => {
-    const text = box.uppercase ? String(s).toUpperCase() : String(s);
+    const text = typeof utbApplyCase === 'function' ? utbApplyCase(String(s), box.uppercase) : box.uppercase ? String(s).toUpperCase() : String(s);
     const lay = OCRRender.layoutLine(set, text, 0, { spaceAdv: space / sx });
     return lay.missing.length ? null : lay.advanceW * sx;
   });

@@ -43,7 +43,7 @@ if (!PUPPETEER || !CHROME) {
 const { default: puppeteer } = await import(pathToFileURL(PUPPETEER).href);
 
 const SWITCHES = ['fabric-bold', 'fabric-italic', 'fabric-underline', 'fabric-strikethrough', 'kerning', 'fabric-nudge-mode',
-                  'fabric-default-sw', 'toggle-space-labels', 'force-uppercase', 'edge-subtract'];
+                  'fabric-default-sw', 'toggle-space-labels', 'edge-subtract'];
 
 // the smoke steps of the plugins that are installed and bring some
 async function pluginSteps() {
@@ -110,7 +110,7 @@ async function main() {
 
       // every toolbar toggle twice (open, close), every formatting switch twice (on, off)
       const clicked = await page.evaluate((ids) => {
-        const toolbar = [...document.querySelectorAll('header button[id^="toggle-"]')].map(b => b.id);
+        const toolbar = [...document.querySelectorAll('#tool-column button[id^="toggle-"], header button[id^="toggle-"]')].map(b => b.id);
         let n = 0;
         for (const id of [...toolbar, ...ids]) for (let k = 0; k < 2; k++) { const el = document.getElementById(id); if (el) { el.click(); n++; } }
         return n;

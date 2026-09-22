@@ -121,6 +121,7 @@
   // ── Apply nudge ───────────────────────────────────────────────
 
   function applyNudge(box, charIdx, delta) {
+    const step = window.utbUndo?.capture([box]);
     if (Math.abs(delta) < 0.01) {
       delete box.charAdvances[charIdx];
     } else {
@@ -146,6 +147,7 @@
         r.setAttribute('x', xs[i]);
       }
     });
+    window.utbUndo?.commit(step, 'nudge', `nudge:${box.id}:${charIdx}`);
   }
 
   // ── Event wiring ──────────────────────────────────────────────

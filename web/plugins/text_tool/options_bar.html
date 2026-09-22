@@ -1,20 +1,6 @@
-<!-- Unified Text Box Formatting Toolbar (text_tool) -->
-
-<!-- Persistent "Insert" group — always available so you can drop a new text/box
-     without first selecting one. `.ribbon-bar` only (openSubtoolbar never hides it). -->
-<div id="fabric-insert-bar" class="ribbon-bar">
-  <div class="options-group">
-    <div class="options-group-controls">
-      <button id="tt-add-text-btn" class="icon-button" title="Add New Text (click on page)">
-        <span class="material-symbols-outlined">text_fields</span>
-      </button>
-      <button id="tool-add-box" class="icon-button" title="Add Redaction Box (click on page)">
-        <span class="material-symbols-outlined">add_box</span>
-      </button>
-    </div>
-    <div class="options-group-header">Insert</div>
-  </div>
-</div>
+<!-- Unified Text Box Formatting Toolbar (text_tool). The Insert tools are in
+     the tool column (toolbar_button.html); the matching terms of a redaction
+     (tolerance, letter case) are in the Settings panel (settings.html). -->
 
 <!-- Contextual formatting groups — revealed only while a text/redaction box is
      selected (see syncToolbarToBox / deselect in drag-resize.js). -->
@@ -92,25 +78,6 @@
       </button>
     </div>
     <div class="options-group-header">Box</div>
-  </div>
-
-  <!-- Match group — tuning that drives width matching against a detected bar.
-       Revealed only while a redaction box is selected (see syncToolbarToBox in
-       toolbar.js). The #tolerance / #force-uppercase IDs are read by whichever
-       matching plugin is installed; they are inert when none is. (Kerning is a
-       general text property and lives in the Style group above.) -->
-  <div class="options-divider hidden" id="fabric-match-divider"></div>
-
-  <div class="options-group hidden" id="fabric-match-group">
-    <div class="options-group-controls">
-      <span class="options-label">Tolerance</span>
-      <input type="number" id="tolerance" value="0.7" step="0.1" class="toolbar-input-small"
-             style="width: 44px; text-align: center;">
-      <span class="options-label">px</span>
-      <span class="options-divider options-divider--inline"></span>
-      <label class="checkbox-lbl"><input type="checkbox" id="force-uppercase"> Uppercase</label>
-    </div>
-    <div class="options-group-header">Match</div>
   </div>
 
 </div>

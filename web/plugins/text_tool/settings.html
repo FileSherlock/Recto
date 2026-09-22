@@ -1,0 +1,25 @@
+<!-- text_tool's section of the Settings panel: the matching terms of a
+     redaction box. They show the selected redaction's values and change it;
+     with none selected they are the defaults a new redaction box takes. The
+     ids are read by whichever matching plugin is installed — inert when none
+     is. -->
+<section class="settings-section" id="tt-settings">
+  <h3>Redaction match <span id="tt-match-scope" class="settings-hint" title="Whose values these are">· new boxes</span></h3>
+  <div class="settings-row">
+    <label for="tolerance">Width tolerance</label>
+    <span class="settings-value">
+      <input type="number" id="tolerance" value="0.7" step="0.1" min="0" class="toolbar-input-small"
+             style="width: 56px; text-align: center;" title="How far a name's width may miss the bar's (px). A bar rebuilt from OCR pens matches to ¼ px regardless.">
+      <span class="options-label">px</span>
+    </span>
+  </div>
+  <div class="settings-row">
+    <label for="tt-name-case">Letter case</label>
+    <select id="tt-name-case" class="toolbar-select" title="How the hidden name was written: as typed, ALL CAPITALS, or only the first or the last name in capitals">
+      <option value="">As typed</option>
+      <option value="all">UPPERCASE</option>
+      <option value="first">FIRST name uppercase</option>
+      <option value="last">LAST name uppercase</option>
+    </select>
+  </div>
+</section>

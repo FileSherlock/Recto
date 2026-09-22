@@ -600,7 +600,7 @@ td[data-name] { cursor: pointer; }
 /* Page-pixel verdicts on chips (optional hypothesis tester), tolerance note */
 .match-verdict { display: inline-block; width: 11px; margin-right: 2px; font-family: system-ui, sans-serif; }
 .match-chip.verdict-consistent { color: #81c995; }
-.match-chip.verdict-no-evidence { color: #9aa0a6; }
+.match-chip.verdict-no-evidence { color: #fdd663; }
 .match-chip.verdict-contradicted { color: #5f6368; text-decoration: line-through; }
 .match-chip.verdict-contradicted:hover { text-decoration: none; }
 .match-tol { display: block; margin-top: 3px; font-size: 10px; color: #5f6368; }

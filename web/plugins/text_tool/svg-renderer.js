@@ -46,11 +46,6 @@ function getOrCreateSVGLayer(pageContainer, pageNum) {
   return svg;
 }
 
-/** Remove the SVG layer for a page entirely. */
-function removeSVGLayer(pageNum) {
-  document.querySelectorAll(`.text-layer[data-page="${pageNum}"]`).forEach(el => el.remove());
-}
-
 /** Remove all SVG text layers. */
 function clearAllSVGLayers() {
   document.querySelectorAll('.text-layer').forEach(el => el.remove());
@@ -213,7 +208,7 @@ function _updateText(g, box) {
   text.setAttribute('font-family', _svgFontFamily(box));
 
   // Use inline style to ensure it overrides the CSS stylesheet colors
-  text.style.fill = box.color || UTB_TYPE_COLORS[box.type] || 'rgba(0,0,255,0.8)';
+  text.style.fill = box.color || box.labelColor || UTB_TYPE_COLORS[box.type] || 'rgba(0,0,255,0.8)';
 
   if (box.bold) text.setAttribute('font-weight', 'bold');
   else text.removeAttribute('font-weight');
@@ -352,14 +347,60 @@ function _spacebadge(g, midX, topY, label, color) {
   g.appendChild(labelG);
 }
 
+// ── A bar's gaps to the text on either side ──────────────────
+// The distance from the last glyph before a redaction box to its left edge,
+// and from its right edge to the first glyph after it, in that neighbour's
+// own space (the space its line was set with) and in px. The neighbour is
+// any text box on the same line — an OCR line, the embedded text, typed
+// text — on a layer that is shown; its glyphs' extent comes from its
+// measured character positions when it has them (a span's own box may run
+// on past its last glyph). The neighbour's space is the median of its
+// measured space characters, else its face's natural space, else what a
+// reader calibrated for its line (box.ocr.spaceAdv), else a quarter em.
+// Returns { left, right }, each { gap, space } or null when nothing is there.
+function utbBarGaps(box) {
+  if (typeof utbState === 'undefined') return { left: null, right: null };
+  const cl = document.body.classList;
+  const shown = b => !(b.type === 'embedded' && cl.contains('hide-embedded-text')) &&
+                     !(b.type === 'ocr' && cl.contains('hide-ocr-text'));
+  const extent = b => {
+    const cps = (b.baseCharPositions || []).filter(cp => cp.c !== ' ' && cp.w > 0);
+    if (!cps.length) return { x0: b.x, x1: b.x + b.w };
+    return { x0: b.x + Math.min(...cps.map(cp => cp.x)), x1: b.x + Math.max(...cps.map(cp => cp.x + cp.w)) };
+  };
+  const spaceOf = b => {
+    const ws = (b.baseCharPositions || []).filter(cp => cp.c === ' ' && cp.w > 0).map(cp => cp.w).sort((p, q) => p - q);
+    if (ws.length) return ws[ws.length >> 1];
+    if (b.nativeSpaceWidth > 0) return b.nativeSpaceWidth;
+    if (b.ocr?.spaceAdv > 0) return b.ocr.spaceAdv;
+    return GEO.docPtToPx(b.sizePt || 12) * 0.25;
+  };
+  const sameLine = b => (box.lineId && b.lineId === box.lineId) ||
+    Math.min(box.y + box.h, b.y + b.h) - Math.max(box.y, b.y) >= Math.min(box.h, b.h) * 0.5;
+  let left = null, right = null, lx = -Infinity, rx = Infinity;
+  for (const b of utbState.boxes) {
+    if (b === box || b.page !== box.page || !b.text || !sameLine(b) || !shown(b)) continue;
+    if (b.type !== 'ocr' && b.type !== 'embedded' && b.type !== 'harfbuzz') continue;
+    const { x0, x1 } = extent(b);
+    if (x1 <= box.x + 1 && x1 > lx) { lx = x1; left = b; }
+    if (x0 >= box.x + box.w - 1 && x0 < rx) { rx = x0; right = b; }
+  }
+  return {
+    left: left ? { gap: box.x - lx, space: spaceOf(left) } : null,
+    right: right ? { gap: rx - (box.x + box.w), space: spaceOf(right) } : null,
+  };
+}
+window.utbBarGaps = utbBarGaps;
+
 /**
  * Show or hide numeric space-width labels for a single box.
  *
  * Embedded/harfbuzz boxes: yellow badge above each space character.
- * Redaction boxes: two cyan badges showing the current Space W. value
- *   (box.spaceWidth) — the gap inserted between words when measuring
- *   multi-word candidates. Drawn at the left edge (box.x) and right edge
- *   (box.x + box.w) as a value indicator.
+ * Redaction boxes: a cyan badge in the gap on either side, with the gap in
+ *   that line's spaces and in px (utbBarGaps) — live, so a bar being moved
+ *   or resized shows where it stands. A bar touching the text (under half a
+ *   space) shows no badge on that side: a gap the redactor did not leave is
+ *   not a space.
  */
 function _updateSpaceLabels(g, box) {
   g.querySelectorAll('.utb-space-label').forEach(el => el.remove());
@@ -371,12 +412,13 @@ function _updateSpaceLabels(g, box) {
 
   // ── Redaction boxes ───────────────────────────────────────────
   if (box.type === 'redaction') {
-    if (box.spaceWidth != null && !box.defaultSpaceWidth) {
-      const label = box.spaceWidth.toFixed(1);
-      // Both badges show the Space W. value used between multi-word candidate words
-      _spacebadge(g, box.x, labelTopY, label, 'rgba(80,200,255,0.92)');
-      _spacebadge(g, box.x + box.w, labelTopY, label, 'rgba(80,200,255,0.92)');
-    }
+    const gaps = utbBarGaps(box);
+    const badge = (side, atX) => {
+      if (!side || !(side.space > 0) || side.gap < side.space * 0.5) return;
+      _spacebadge(g, atX, labelTopY, `${(side.gap / side.space).toFixed(1)} sp · ${side.gap.toFixed(1)} px`, 'rgba(80,200,255,0.92)');
+    };
+    badge(gaps.left, box.x - gaps.left?.gap / 2);
+    badge(gaps.right, box.x + box.w + gaps.right?.gap / 2);
   }
 
   // ── All boxes with text positions ─────────────────────────────────

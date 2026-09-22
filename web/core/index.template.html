@@ -17,17 +17,6 @@
 </head>
 
 <body>
-  <!-- Disclaimer Modal -->
-<!--  <div id="disclaimer-overlay">
-    <div id="disclaimer">
-      <h3>Work in Progress</h3>
-      <p>Recto is <strong>unfinished</strong> and actively being developed. Features may be incomplete, broken, or produce incorrect results.</p>
-      <p>Recto is provided as-is, with no claim of accuracy, completeness, or fitness for any particular purpose, and no liability for any consequences arising from its use.</p>
-      <p>Analysis plugins produce <strong>estimates, not facts</strong>. Results may be incomplete or wrong, and should be independently verified before you rely on them. Do not use Recto to circumvent lawful redactions or to violate anyone's privacy. You are solely responsible for how you use this software.</p>
-      <button id="disclaimer-accept">I Understand &amp; Accept</button>
-    </div>
-  </div>-->
-
   <!-- Drag and drop overlay -->
   <div id="drag-overlay" class="hidden">
     <div class="drag-text">Drop a PDF or image to open</div>
@@ -79,20 +68,52 @@
           <span class="material-symbols-outlined">upload_file</span>
         </button>
 
-        <!-- @plugins:toolbar_buttons -->
+        <div class="divider"></div>
 
+        <!-- Settings: one panel, a section per plugin (its `settings` fragment).
+             app.js hides the button when no plugin contributes a section. -->
+        <button id="toggle-settings" class="icon-button" title="Settings">
+          <span class="material-symbols-outlined">settings</span>
+        </button>
       </div>
     </header>
 
+    <!-- The ribbon: every plugin's contextual and persistent bars. Groups that
+         do not fit the width move under the "More" button (app.js) — nothing
+         is ever off-screen. -->
     <div id="unified-options-bar-container">
       <div id="text-toolbar-row">
         <!-- @plugins:bars -->
       </div>
+      <button id="ribbon-more" class="icon-button hidden" title="More options">
+        <span class="material-symbols-outlined">more_horiz</span>
+      </button>
+      <div id="ribbon-overflow" class="hidden"></div>
     </div>
 
 
     <!-- Main Content Area -->
     <div id="main-content">
+
+      <!-- The tool column: every plugin's toolbar buttons, in plugin order.
+           The user chooses which are shown and in what order (the Customise
+           panel, kept in localStorage); a tool taken out of the column stays
+           reachable under "More tools". app.js owns the column and names no
+           plugin — it only moves the buttons it finds here. -->
+      <nav id="tool-column" aria-label="Tools">
+        <div id="tool-column-items">
+          <!-- @plugins:toolbar_buttons -->
+        </div>
+        <div id="tool-column-foot">
+          <button id="tool-column-more" class="icon-button hidden" title="More tools">
+            <span class="material-symbols-outlined">more_horiz</span>
+          </button>
+          <button id="tool-column-customise" class="icon-button" title="Customise tools…">
+            <span class="material-symbols-outlined">tune</span>
+          </button>
+        </div>
+        <div id="tool-column-overflow" class="hidden"></div>
+      </nav>
 
       <!-- Thumbnails Sidebar (Left) -->
       <aside id="sidebar" class="hidden">
@@ -125,7 +146,31 @@
     </div>
   </div>
 
-  <div id="sidebar-backdrop" class="hidden"></div>
+  <!-- Settings panel: the sections come from the plugins' `settings` fragments -->
+  <div id="settings-panel" class="floating-panel hidden" role="dialog" aria-label="Settings">
+    <div class="panel-head">
+      <span>Settings</span>
+      <button id="settings-close" class="icon-button" title="Close"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div id="settings-sections">
+      <!-- @plugins:settings -->
+    </div>
+  </div>
+
+  <!-- Customise the tool column (app.js fills the list from the column's buttons) -->
+  <div id="tool-customise" class="floating-panel hidden" role="dialog" aria-label="Customise tools">
+    <div class="panel-head">
+      <span>Tools</span>
+      <button id="tool-customise-close" class="icon-button" title="Close"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="settings-section">
+      <p class="settings-hint">Tick the tools to show in the column and order them with the arrows. A tool taken out stays under “More tools” at the foot of the column.</p>
+      <ul id="tool-customise-list"></ul>
+      <div class="panel-actions">
+        <button id="tool-customise-reset" class="panel-btn">Reset to default</button>
+      </div>
+    </div>
+  </div>
 
   <!-- @assets -->
   <script src="core/hooks.js"></script>
@@ -141,13 +186,6 @@
 
   <!-- @plugins:scripts_after_app -->
 
-  <!--
-  <script>
-    document.getElementById('disclaimer-accept').addEventListener('click', function () {
-      document.getElementById('disclaimer-overlay').classList.add('hidden');
-    });
-  </script>
-  -->
 </body>
 
 </html>
