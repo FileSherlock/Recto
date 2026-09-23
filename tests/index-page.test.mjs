@@ -1,7 +1,6 @@
-// The generated index.html against the page the server-based version rendered
-// (tests/golden/index.html): same markup, same script order, once URLs are
-// normalised. Also the drag-out property of the scan: a plugin that is not
-// there leaves no trace.
+// The generated index.html against the recorded page (tests/golden/index.html):
+// the same script order, once URLs are normalised. Also the drag-out property
+// of the scan: a plugin that is not there leaves no trace.
 //
 //   node --test tests/*.test.mjs
 
@@ -14,19 +13,19 @@ import { build, WEB } from '../tools/build.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
-// The server's /static/<app>/… and the build's relative, content-hashed URLs name
-// the same files; bring both to the static layout without a version.
+// The recorded page's /static/<app>/… URLs and the build's relative,
+// content-hashed URLs name the same files; bring both to one form without a version.
 function normalise(html) {
   return html
     .replace(/<!--[\s\S]*?-->/g, '')                                      // comments are not DOM
     .replace(/<script>window\.RECTO_ASSETS = .*?<\/script>/, '')          // the build's asset map (new)
     .replace(/<script src="core\/doc-service\.js[^"]*"><\/script>/, '')   // the document service (new)
-    .replace(/<script src="plugins\/embedded_text_viewer\/extract\.js[^"]*"><\/script>/, '')   // the extractor port (new)
+    .replace(/<script src="plugins\/embedded_text_viewer\/extract\.js[^"]*"><\/script>/, '')   // the extractor (new)
     .replace(/<script src="plugins\/text_tool\/shaping\.js[^"]*"><\/script>/, '')             // HarfBuzz measurement (new)
     .replace(/<script src="plugins\/text_tool\/undo\.js[^"]*"><\/script>/, '')                // the undo stack (new)
     .replace(/<script src="plugins\/ocr_tool\/box-rules\.js[^"]*"><\/script>/, '')             // which boxes are redactions (new)
-    // Fabric.js (gone): the server's page loaded it from cdnjs, with a polyfill for a warning it
-    // caused, long after the last call into it had been removed — the static page loads no outside script
+    // Fabric.js (gone): the recorded page loaded it from cdnjs, with a polyfill for a warning it
+    // caused, long after the last call into it had been removed — the page loads no outside script
     .replace(/<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/fabric\.js\/[^"]*"><\/script>/, '')
     .replace(/<script>\s*const originalTextBaseline =[\s\S]*?<\/script>/, '')
     .replace(/\/static\/text_tool\/geometry\.js/g, 'core/geometry.js')    // geometry.js moved into the core
@@ -38,8 +37,8 @@ function normalise(html) {
 
 const scripts = html => [...html.matchAll(/<script[^>]*\bsrc="([^"]+)"/g)].map(m => m[1]);
 
-test('the scripts load in the order the server page loaded them', () => {
-  // The server page (tests/golden/index.html) is the record of the script
+test('the scripts load in the recorded order', () => {
+  // The recorded page (tests/golden/index.html) is the record of the script
   // order the plugins were written against; the markup itself has since moved
   // on by design (no Fabric.js, a tool column, a settings panel) and is not
   // compared any more.

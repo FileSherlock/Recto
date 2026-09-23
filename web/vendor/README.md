@@ -21,9 +21,10 @@ harfbuzzjs is a *minimal* HarfBuzz: it has GSUB and GPOS but not the legacy
 `kern` table, which is all the kerning the older Windows faces carry.
 `web/plugins/text_tool/shaping.js` applies that table itself, under HarfBuzz's
 own rule (kerning requested, and GPOS has no `kern` feature for the text's
-script). HarfBuzz 14.4.0 is also what the goldens were recorded with
-(uharfbuzz 0.56.1); `tests/shaping.test.mjs` requires equality to the last
-digit and checks the version, so an upgrade that changes a number shows.
+script). HarfBuzz 14.4.0 is also the version the reference outputs in
+`tests/golden/` were recorded with; `tests/shaping.test.mjs` requires equality
+to the last digit and checks the version, so an upgrade that changes a number
+shows.
 
 Cache note (the same holds for `harfbuzz/index.mjs` → `./harfbuzz.js` and its
 `.wasm`): the page asks for `mupdf.js` and the `.wasm` with content-hashed

@@ -2,13 +2,13 @@
 web/index.html
 web/generated/
 
-# Python, for the two development scripts under tools/dev/ and old checkouts
+# Python, for the two development scripts under tools/dev/
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 
-# Left behind by the server-based version (it lives on `main`): local state, never committed
+# Local files that must never be committed: databases, secrets, media, logs
 db.sqlite3
 *.sqlite3
 .secret_key

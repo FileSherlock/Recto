@@ -92,7 +92,7 @@ manifest lists only the slots it fills. The build stops with a clear message whe
 - `name` differs from the folder name,
 - a list field is not a list,
 - the manifest names a file that does not exist,
-- a fragment contains a server-side template tag (`{%` or `{{`) — fragments are plain HTML.
+- a fragment contains a template tag (`{%` or `{{`) — fragments are plain HTML, inlined as they are.
 
 The orders of the baseline plugins are `embedded_text_viewer` 10, `webgl_mask` 20 and
 `text_tool` 70. Pick an `order` by where your tool should sit in the column by default and by
@@ -545,7 +545,7 @@ test('every control is on the page', { skip }, () => {
 ```
 
 `tests/page-controls.test.mjs` does this for the core and the baseline plugins, and checks
-that no script, style or fragment under `web/` addresses a server endpoint. A plugin outside
+that no script, style or fragment under `web/` addresses an HTTP endpoint — the site is static. A plugin outside
 the baseline brings its own page checks rather than adding itself to that file — the same
 contract as in the code: the baseline never names an optional plugin.
 

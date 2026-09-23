@@ -1,12 +1,12 @@
 // mask-core.js — the redaction mask of one page raster.
 //
-// Two halves. DETECTION is the port of the server's webgl_mask/logic/masking.py:
-// the blacked-out regions of the page's gray pixels. The EDGES are this
-// plugin's own: every box is drawn with a soft rim through which the page
-// shows, and transmission() reads off the page how much of it each rim pixel
-// lets through. The mask is 255 inside a region, 0 where the page is clear,
-// and 255 · (1 − t) on the rims, which the shader divides out again — so that
-// text under a rim comes back with the paper. null when the page has no region.
+// Two halves. DETECTION (regions) finds the blacked-out regions of the page's
+// gray pixels. The EDGES (transmission): every box is drawn with a soft rim
+// through which the page shows, and transmission() reads off the page how much
+// of it each rim pixel lets through. The mask is 255 inside a region, 0 where
+// the page is clear, and 255 · (1 − t) on the rims, which the shader divides
+// out again — so that text under a rim comes back with the paper. null when
+// the page has no region.
 //
 //   MaskCore.buildMask(gray: Uint8Array, width, height) → Uint8Array | null
 //   MaskCore.regions(gray, width, height)               → Uint8Array | null   1 inside a region
@@ -14,22 +14,22 @@
 //   MaskCore.grayOf(rgba)                               → Uint8Array          gray of a decoded image document
 //
 // Pure loops, no DOM: mask-worker.js runs it off the main thread, and
-// tests/masks.test.mjs holds the regions to the recorded server masks pixel
+// tests/masks.test.mjs holds the regions to the recorded reference masks pixel
 // for pixel and the edges to pages built with known rims and known ink.
-// Where the server used OpenCV the same arithmetic is written out:
+// The morphology and the contour measures are written out with OpenCV's
+// arithmetic (the reference masks were computed with it):
 //   MORPH_OPEN 5×5            erode then dilate, the outside never eroding
 //   findContours EXTERNAL     8-connected components that no other encloses,
 //                             their outer border followed as Suzuki's does
 //   contourArea / arcLength   shoelace over the border, float32 segment lengths
-// One rule is dropped: the server drew each contour FILLED, so whatever a
-// region enclosed became mask too — where the bars of adjacent lines touch,
-// the white gaps between them and the punctuation standing there. The mask is
-// the black component itself; nothing is filled (no corpus page has such a
-// gap, so the goldens hold).
-// And one rule is replaced: the server ran a Hough circle transform to drop
-// punched holes and bullet discs (radius 8–20 px). Here a black component is a
-// disc when its bounding box is square and it fills π/4 of it — no OpenCV, and
-// the goldens agree (the transform finds no circle on any corpus page).
+// Regions are not filled: whatever a component encloses stays page — where the
+// bars of adjacent lines touch, the white gaps between them and the punctuation
+// standing there. The mask is the black component itself. (The reference masks
+// were filled; no corpus page has such a gap, so they agree.)
+// Discs — punched holes and bullet discs — are dropped by shape: a black
+// component whose bounding box is square, 16–44 px across, and filled to about
+// π/4 of it. (A Hough circle transform finds no circle on any corpus page, so
+// the reference masks agree here too.)
 (function () {
   const FROUND = Math.fround;
 

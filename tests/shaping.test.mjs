@@ -1,5 +1,5 @@
-// web/plugins/text_tool/shaping.js against the recorded server answers: every
-// /widths case and every /font-metrics table is replayed and must come out
+// web/plugins/text_tool/shaping.js against the recorded reference outputs:
+// every widths case and every font-metrics table is replayed and must come out
 // EQUAL — same HarfBuzz (14.4.0) on both sides, so equal to the last digit.
 //
 //   node --test tests/*.test.mjs
@@ -40,7 +40,7 @@ test('the vendored HarfBuzz is the version the goldens were recorded with', () =
   assert.equal(hb.versionString(), readJSON(path.join(GOLDEN, 'versions.json')).harfbuzz);
 });
 
-test('the generated font catalogue equals /fonts-list', () => {
+test('the generated font catalogue equals the recorded one (fonts-list.json)', () => {
   const golden = readJSON(path.join(GOLDEN, 'fonts-list.json'));
   assert.equal(catalogue.default, golden.default);
   assert.deepEqual(catalogue.families.map(({ hashes, ...f }) => f), golden.families);

@@ -1,7 +1,7 @@
 // pdf-document.js — a PDF, described and rasterized with MuPDF (WebAssembly).
 //
-// What the core knows about a PDF (a port of the server-based version's
-// document_loader.py, held to its recorded outputs in tests/golden/): page count, declared
+// What the core knows about a PDF (held to the recorded reference outputs in
+// tests/golden/): page count, declared
 // fonts, the suggested scale and body size, and any single page's raster —
 // the embedded scan cropped to the 8.5x11 ratio, or a 96-dpi render when the
 // page has none. Plus the two primitives the text plugins build on: the RAW
@@ -25,7 +25,7 @@
 // collector they hold hundreds of MB of wasm heap.
 //
 // Pixel exactness: a page raster is the embedded image's own samples (never
-// resampled), cropped with the same integer arithmetic the server used.
+// resampled), cropped with exact integer arithmetic (the reference rasters depend on it).
 // Coordinates follow geometry.js: image px at 96 DPI, font sizes in points.
 
 export const GEO = {
@@ -53,7 +53,7 @@ export const STEXT = {
 };
 
 // Python's round(): half to even. Coordinates depend on the crop height and
-// the scale being the very integers the server computed.
+// the scale being exactly these integers (the recorded outputs hold to them).
 export function pyRound(x) {
   const f = Math.floor(x), d = x - f;
   if (d < 0.5) return f;
@@ -349,8 +349,8 @@ export function openPdf(mupdf, Module, bytes) {
     } finally { grayPix?.destroy(); pix.destroy(); }
   }
 
-  // _thumbnail: 180 px wide, height round(h * 180 / w). The server used
-  // Pillow's LANCZOS; this is an area average — same size, not the same bytes.
+  // Thumbnail: 180 px wide, height round(h * 180 / w). The recorded thumbnails
+  // are LANCZOS downscales; this is an area average — same size, not the same bytes.
   function thumbnail(raster) {
     if (raster.width <= THUMB_WIDTH) return raster;
     const { width: w, height: h, components: n, samples } = raster;

@@ -186,6 +186,19 @@ Design points that shape everything built on it:
 page nor the MuPDF worker waits for it. It is the stable identity plugins key per-document
 caches off. "A document is open" is `state.numPages > 0`.
 
+### What it costs
+
+Measured on a desktop Chromium (September 2026) with the plugins parked, so the numbers are
+the core's:
+
+| | |
+|---|---|
+| Starting the worker | MuPDF initialises in about 50 ms and holds 22 MB of heap |
+| Opening a 340-page, 66 MB scan | page 1 can be shown about 200 ms after `Doc.open()` — the floor is hashing the 66 MB, in a parallel worker; `document:loaded` follows at about 350 ms, of which the typography pass is 135 ms. The 5-page startup document takes about 180 ms in all |
+| One page | decoding an embedded scan 2.6–2.9 ms; rendering a born-digital page at 96 DPI 5–25 ms, dense pages up to about 190 ms; the structured text of a page with per-character positions 1.3–5.5 ms |
+| A whole document | the rasters and text of all 340 pages in 2.7 s; `embedded_text_viewer`'s whole-document span scan in 4.8 s, with the longest main-thread stall at 45 ms |
+| Memory | the heap is the file size plus 22 MB after opening and stays near the file size plus 280 MB while browsing (MuPDF's store is capped at 256 MB). `Doc.close()` ends the worker and returns all of it. A 943-page, 23 MB bundle rendered page by page peaks at 315 MB |
+
 ## Data Flow
 
 The core's pass ends the moment the document is on screen. Analysis is a *second*, plugin-owned

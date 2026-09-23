@@ -1,8 +1,6 @@
 // shaping.js — text measurement with HarfBuzz, in the browser.
 //
-// What the server's /widths and /font-metrics did (text_tool/logic/
-// width_calculator.py, font_metrics.py, fonts.py), with the same request
-// objects in and the same response objects out:
+// Two calls, a request object in and a response object out:
 //
 //   await Shaping.widths({ strings, family, bold, italic, size, scale, kerning,
 //                          ligatures, force_uppercase, space_width })
@@ -13,8 +11,8 @@
 //       → { family, bold, italic, file, sizePx, upem, space, adv, kern, missing } | null
 //
 // `size` is in POINTS and `scale` is px-per-pt as a percentage (GEO.docScale());
-// `family` is resolved through the font catalogue with the same fallbacks the
-// server had (bold italic → bold → italic → regular → Times New Roman), and the
+// `family` is resolved through the font catalogue with fixed fallbacks
+// (bold italic → bold → italic → regular → Times New Roman), and the
 // legacy `font: 'times.ttf'` file form still works.
 //
 // HarfBuzz is vendor/harfbuzz (harfbuzzjs 1.6.1 = HarfBuzz 14.4.0, the version
@@ -23,7 +21,7 @@
 // through nothing else. applyKernTable() below does what HarfBuzz's kern
 // machine does with that table, under HarfBuzz's own condition (kerning asked
 // for, and no `kern` feature in GPOS for the text's script); tests/shaping.test.mjs holds the result
-// to the recorded server numbers, digit for digit.
+// to the recorded reference numbers, digit for digit.
 //
 // A classic script. The measuring core (ShapingCore) has no DOM in it, so the
 // node tests load this very file; the browser glue at the bottom adds

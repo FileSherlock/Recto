@@ -160,7 +160,8 @@ font's name with a subset prefix (`ABCDEF+`) removed; `flags` carries the style 
 superscript `1`, italic `2`, serifed `4`, monospaced `8`, bold `16`; `color` is `0xRRGGBB`
 and `alpha` `0..255`; `ascender` / `descender` are the face's own, read from MuPDF's font
 struct in the wasm heap because the JavaScript binding exposes neither (see
-`web/vendor/README.md`).
+`web/vendor/README.md`). The text is the page's own content; what annotations draw is not
+part of it.
 
 | Option | Default | Description |
 |--------|---------|-------------|

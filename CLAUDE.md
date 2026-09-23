@@ -2,21 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Where this came from
-
-Recto is a static website: everything runs in the browser (JavaScript, MuPDF and HarfBuzz as WebAssembly). It was a
-Django application once; the move is finished, and `main` here is the static site. `guide/migration/client-side-rewrite.md`
-is the record of that move — the plan, and in its Progress notes every measurement and every deviation made on the
-way; read it when a design decision looks odd. `MIGRATING.md` tells a plugin author how to bring a server-based plugin
-over. The site needs no Python: `tools/dev/*.py` are standalone maintenance scripts (font files, the refiner's word
-list), run by hand when their inputs change.
-
 ## What this is
 
-Recto is an extensible PDF editor: open a PDF or scanned image, edit/add text with true font metrics (HarfBuzz
-shaping), mask regions, inspect embedded text. Vanilla JS + SVG + WebGL, MuPDF and HarfBuzz as WebAssembly. No
-server code, no build step beyond one scan script, no bundler, no JS package manager. A user's document never leaves
-the browser.
+Recto is an extensible PDF editor that runs entirely in the browser: open a PDF or scanned image, edit/add text with
+true font metrics (HarfBuzz shaping), mask regions, inspect embedded text. Vanilla JS + SVG + WebGL, MuPDF and
+HarfBuzz as WebAssembly. It is a static website — no server code, no build step beyond one scan script, no bundler,
+no JS package manager — and a user's document never leaves the browser. The site needs no Python: `tools/dev/*.py`
+are standalone maintenance scripts (font files, the refiner's word list), run by hand when their inputs change.
 
 ## Commands
 
@@ -83,11 +75,12 @@ plugin may use a baseline plugin's global, guarded (`typeof Shaping !== 'undefin
 
 ## Goldens and exactness
 
-`tests/golden/` holds what the original server returned (open metadata, decoded-pixel hashes of page rasters, spans,
-masks, font lists and metrics, widths — see its README). The suites hold every port to them: rasters and masks pixel
-for pixel, spans within 1e-6, HarfBuzz numbers to the last digit. **A port is done when its goldens pass, not when it
-looks right.** Page rasters are the embedded scan's own samples, cropped with the server's exact integer arithmetic —
-plugins that read or redraw a page certify their result against those bytes.
+`tests/golden/` holds recorded reference outputs (open metadata, decoded-pixel hashes of page rasters, spans, masks,
+font lists and metrics, widths — see its README). The suites hold the code to them: rasters and masks pixel for
+pixel, spans within 1e-6, HarfBuzz numbers to the last digit. **A change to anything the goldens cover is done when
+they pass, not when it looks right**; where a golden cannot be met, the page, the difference and the cause are
+written down. Page rasters are the embedded scan's own samples, cropped with exact integer arithmetic — plugins that
+read or redraw a page certify their result against those bytes.
 
 `web/vendor/` holds the pinned WebAssembly builds (MuPDF 1.28.0, harfbuzzjs 1.6.1 = HarfBuzz 14.4.0); read
 `web/vendor/README.md` before upgrading either — the core reads two MuPDF structs from the wasm heap, and the shaper
@@ -107,7 +100,7 @@ boundary. Use the named constants; never re-derive `0.75`, `133`, `816`, etc.
   `pdf-viewer.js` → `ui-events.js` → `app.js` → plugin `scripts_after_app`. Scripts in `scripts_before_viewer` can't
   call `app.js` globals (`openSubtoolbar`, `registerSubtoolbar`) at module scope — defer to a
   `PDFHooks.on('ui:ready', …)` handler.
-- Plain classic scripts. Code that must also run under node (a port checked against goldens) is written without DOM
+- Plain classic scripts. Code that must also run under node (anything the suites hold to the goldens) is written without DOM
   access and publishes itself on `globalThis` (`EtvExtract`, `MaskCore`, `ShapingCore`); the tests import the very file
   the page loads.
 - `state` and `els` (in `state.js`) hold **core-only** state and DOM refs. "A document is open" is `state.numPages > 0`.

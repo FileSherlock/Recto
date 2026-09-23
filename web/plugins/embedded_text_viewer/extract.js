@@ -1,7 +1,6 @@
 // extract.js — embedded text spans from a page's raw structured text.
 //
-// The port of the server's extracted_text/logic/extract.py, line for line: it
-// takes what the core hands out — Doc.structuredText(n) (MuPDF's structured
+// It takes what the core hands out — Doc.structuredText(n) (MuPDF's structured
 // text in PyMuPDF's "rawdict" shape) and the placement of the page image — and
 // turns it into the spans the viewer draws, in image pixels:
 //
@@ -12,7 +11,7 @@
 //     chars: [{ c, x, w }] }           per-character offsets and advances, relative to x
 //
 // Pure functions, no DOM and no document service in here: etv-fetch.js feeds
-// it, tests/spans.test.mjs checks it against the recorded server answers
+// it, tests/spans.test.mjs checks it against the recorded reference spans
 // (tests/golden/*/spans-*.json). Numbers are rounded the way Python rounds
 // them (half to even on the exact binary value) — the goldens hold to the
 // last printed digit.

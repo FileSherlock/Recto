@@ -1,6 +1,6 @@
-// web/plugins/embedded_text_viewer/extract.js against the recorded server
-// answers: for every golden PDF page the spans — full (per-character
-// positions) and lean — equal /extract-spans' to within 1e-6.
+// web/plugins/embedded_text_viewer/extract.js against the recorded reference
+// spans: for every golden PDF page the spans — full (per-character positions)
+// and lean — equal the recording's to within 1e-6.
 //
 //   node --test tests/*.test.mjs
 

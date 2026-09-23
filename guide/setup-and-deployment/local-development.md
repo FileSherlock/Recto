@@ -47,8 +47,8 @@ for a long time, because every URL carries a content hash — see
 
 Three development-only mounts map folders outside `web/` into the server, for checks and
 smoke tests in the browser: `/_dev/golden/` → `tests/golden/`, `/_dev/samples/` →
-`demo/samples/`, `/_dev/lab/` → `lab/`. They are not part of the site; nothing under
-`web/` refers to them.
+`tests/samples/`, `/_dev/lab/` → `lab/` (a local folder, when present). They are not part
+of the site; nothing under `web/` refers to them.
 
 ## The build
 

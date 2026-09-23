@@ -1,5 +1,5 @@
 // etv-fetch.js — Embedded Text Viewer: chunked span extraction and lifecycle hooks.
-// Spans come from extract.js (this plugin's port of the server's extractor)
+// Spans come from extract.js (this plugin's extractor)
 // over the core's raw primitive, Doc.structuredText — nothing is fetched.
 // Cross-module calls into text_tool (utbState, spanToUnified, renderAllTextLayers, etc.)
 // only happen inside event handlers and async continuations, so the fact that

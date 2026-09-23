@@ -149,7 +149,7 @@ flattens into plateaus. A darker plateau is therefore a box's only when it reach
 of the side (a corner of the outline) or is longer than any stroke, and only when its
 next line outward is lighter, as a rim's is. A level that no second pixel vouches for is
 no level, and one pixel is never evidence. The full rule set and what it costs and buys:
-[frontend/webgl-mask.md](../frontend/webgl-mask.md#edges--maskcoretransmission-this-plugins-own).
+[frontend/webgl-mask.md](../frontend/webgl-mask.md#edges--maskcoretransmission).
 
 ```js
 mask[p] = T[p] === 0 ? 255 : Math.min(254, 255 - Math.round(255 * T[p]));

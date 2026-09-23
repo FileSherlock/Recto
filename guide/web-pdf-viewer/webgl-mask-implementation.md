@@ -28,7 +28,7 @@ The input is the page's gray pixels from the core's document service:
   - Interior pixels → `255` (fully masked, shown white)
   - Every box has a soft rim of 1–3 px through which the page shows as `page × t`. The region's outline is cut into straight sides; per side and rim line the level is read off the page as the brightest vouched-for pixel (text only darkens), per *piece* of the side where two boxes end in one pixel column; convex corners get `1 − (1 − tx)(1 − ty)`, crossing rims multiply
   - Rim pixels → `255 · (1 − t)`, which the shader divides out again; a pixel darker than its line's level is text and stays that much darker
-  - The rules, their text-safety and the measurements behind them: [frontend/webgl-mask.md](../frontend/webgl-mask.md#edges--maskcoretransmission-this-plugins-own)
+  - The rules, their text-safety and the measurements behind them: [frontend/webgl-mask.md](../frontend/webgl-mask.md#edges--maskcoretransmission)
 - **Sparse optimization:** Pages with no masked regions return `null` — no PNG is encoded and no GL context is created.
 
 The algorithm is described step by step in [Artifact Visualizer](artifact-visualizer.md).

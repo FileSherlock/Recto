@@ -1,16 +1,16 @@
 // web/plugins/webgl_mask/mask-core.js, in two halves.
 //
-// DETECTION is the port of the server's: for every golden PDF page the
-// blacked-out regions (or their absence) must equal the recorded /webgl/mask's
-// 255 pixels. One page differs by design — scan-tall, whose raster is taller
-// than 8.5x11: the server masked the UNCROPPED embedded image (1000x1320) while
-// the viewer shows the cropped raster (1000x1294); the port masks the pixels
-// the viewer shows, so its regions must equal the golden's top 1294 rows.
+// DETECTION: for every golden PDF page the blacked-out regions (or their
+// absence) must equal the recorded mask's 255 pixels. One page differs by
+// design — scan-tall, whose raster is taller than 8.5x11: the recorded mask
+// covers the UNCROPPED embedded image (1000x1320) while the viewer shows the
+// cropped raster (1000x1294); mask-core masks the pixels the viewer shows, so
+// its regions must equal the golden's top 1294 rows.
 //
-// The EDGES are not the server's (its two rings left corners, overlapping rims
-// and flush boxes behind — guide/frontend/webgl-mask.md). They are held to
-// pages built here, where the truth is known: a box's rim must come off, and
-// whatever could be text under or beside it must stay.
+// The EDGES are not held to the recordings (their two rings left corners,
+// overlapping rims and flush boxes behind — guide/frontend/webgl-mask.md).
+// They are held to pages built here, where the truth is known: a box's rim
+// must come off, and whatever could be text under or beside it must stay.
 //
 //   node --test tests/*.test.mjs
 
@@ -60,7 +60,7 @@ for (const d of documents) {
         const g = pages[n].mask;
         const raster = pdf.pageRaster(n, { gray: true });
         assert.equal(raster.components, 1);
-        // The server masked pages that carry an image; a page shown as a render has none.
+        // A page that carries a scan has a mask; a page shown as a render has none.
         const map = raster.source === 'embedded' ? regions(raster.samples, raster.width, raster.height) : null;
         assert.equal(map ? 200 : 204, g.status, `page ${n}: has a mask`);
         if (!map) continue;
@@ -71,7 +71,7 @@ for (const d of documents) {
           assert.equal(d.name, 'scan-tall', `page ${n}: only the tall scan may differ in height`);
           assert.ok(raster.height < golden.height);
         }
-        // Region ⇔ 255 in the recording. The server's rings could reach 255 as well, where a ring ran over
+        // Region ⇔ 255 in the recording. The recording's rings could reach 255 as well, where a ring ran over
         // black page pixels only: those are not region, and black.
         let strays = 0;
         for (let p = 0; p < raster.width * raster.height; p++) {

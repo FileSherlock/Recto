@@ -15,9 +15,7 @@ For every file the catalogue names:
     lookup, e.g. CENSCBK.TTF → censcbk.ttf).
 
 Files already present are left alone (delete one to rebuild it). --check
-only reports what is missing and exits 1 if anything is. The Windows faces
-are proprietary: the script copies them for local use the way the repo has
-always shipped them; do not redistribute beyond that.
+only reports what is missing and exits 1 if anything is.
 """
 import argparse
 import io

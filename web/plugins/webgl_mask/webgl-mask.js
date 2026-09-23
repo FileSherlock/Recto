@@ -52,9 +52,9 @@ function destroyWebGLOverlay(pageNum) {
 }
 
 // ── The mask worker ────────────────────────────────────────────
-// mask-worker.js runs mask-core.js (the port of the server's masking) off the
-// main thread. Only pages that carry a scan are masked — a born-digital page
-// (shown as a render) has none, as on the server. An image document is its own
+// mask-worker.js runs mask-core.js off the main thread. Only pages that carry
+// a scan are masked — a born-digital page (shown as a render) has none. An
+// image document is its own
 // scan: Doc has no pixels for it, so the worker decodes the page image itself.
 let maskWorker = null, maskJobId = 0;
 const maskJobs = new Map();   // id -> resolve

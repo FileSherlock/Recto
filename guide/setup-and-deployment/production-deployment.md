@@ -170,8 +170,7 @@ node tools/build.mjs
 Upload `index.html` **last**: once it is replaced, every URL in it points at a file that is
 already there. The hash is a query string, not part of the file name, so files are replaced
 in place — a visitor who loads the page in the middle of an upload can get a mix of old and
-new scripts for that one load, and a reload fixes it. There is nothing to restart and
-nothing to migrate.
+new scripts for that one load, and a reload fixes it. There is nothing to restart.
 
 ### The scripted version (rsync over SSH)
 

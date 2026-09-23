@@ -134,11 +134,13 @@ sources and upgrade notes are in [`web/vendor/README.md`](web/vendor/README.md).
 The licences above are those of the vendored components as their upstreams state them; each
 folder carries the full text.
 
-`web/assets/fonts/` holds the free URW and DejaVu faces beside Windows faces (Times New
-Roman, Arial, Courier New and others), which are proprietary. The font catalogue records per
-family which files are present, and the font menu marks a family without its files as not
-installed, so the app still works in a checkout without them (`tests/shaping.test.mjs` needs
-the faces its goldens name).
+`web/assets/fonts/` holds the face files the catalogue (`fonts.json`) names: the URW faces
+MuPDF itself draws the base-14 fonts with (Nimbus Roman, Nimbus Sans, Nimbus Mono PS),
+DejaVu Serif, and the Windows faces documents are commonly set in (Times New Roman, Arial,
+Courier New, Calibri, Cambria, Georgia, Tahoma, Segoe UI, Verdana, Century Schoolbook). The
+build records which files are present; a family whose files are missing stays in the font
+menu marked *(not installed)*, and measurement falls back to the nearest installed style
+(`tests/shaping.test.mjs` needs the faces its goldens name).
 
 ## Licence
 
