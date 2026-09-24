@@ -419,7 +419,6 @@
 	{ "first": ["Nassim"], "last": ["Nicholas", "Taleb"], "prefix": null, "nickname": null, "suffix": null },
 	{ "first": ["Natalia"], "last": ["Dubinina"], "prefix": null, "nickname": null, "suffix": null },
 	{ "first": ["Natalya", "Natasha", "Natalie"], "last": ["Malyshev", "Alexandrova"], "prefix": null, "nickname": null, "suffix": null },
-	{ "first": ["Natalya"], "last": ["Malyshev"], "prefix": null, "nickname": null, "suffix": null },
 	{ "first": ["Nathan"], "last": ["Myhrvold"], "prefix": null, "nickname": null, "suffix": null },
 	{ "first": ["Neil"], "last": ["Serebryany"], "prefix": null, "nickname": null, "suffix": null },
 	{ "first": ["Nelson"], "last": ["Goubeaux"], "prefix": null, "nickname": null, "suffix": null },
@@ -614,7 +613,6 @@
 	{ "first": ["Zack"], "last": ["Bryan"], "prefix": null, "nickname": null, "suffix": null },
 	{ "first": ["Zinta"], "last": ["Braukis"], "prefix": null, "nickname": null, "suffix": null },
 	{ "first": [], "last": ["Cecchi"], "prefix": "Mr.", "nickname": null, "suffix": null },
-	{ "first": [], "last": ["Cecchi"], "prefix": null, "nickname": null, "suffix": null },
 	{ "first": [], "last": ["Colgan"], "prefix": null, "nickname": null, "suffix": null },
 	{ "first": [], "last": ["Conway"], "prefix": null, "nickname": null, "suffix": null },
 	{ "first": [], "last": ["Sant"], "prefix": "Mr.", "nickname": null, "suffix": null }
