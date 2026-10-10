@@ -38,7 +38,7 @@ const OCR_WORKER_URL = assetURL('plugins/ocr_tool/ocr-worker.js');
 const OCR_CACHE_DIR = 'plugins/ocr_tool/cache/';       // shipped caches: <document sha256>.json
 const OCR_CACHE_DB = 'recto-ocr-cache';                // IndexedDB: this browser's own reads
 const OCR_CACHE_KEEP = 8;                              // documents kept there, most recent first
-const OCR_CACHE_VERSION = 3;   // bump when the slim payload shape changes (2: spaceAdv + entry src; 3: only black boxes are kept)
+const OCR_CACHE_VERSION = 4;   // bump when the slim payload shape changes (2: spaceAdv + entry src; 3: only black boxes are kept; 4: rules kept, entry ink)
 
 function setOcrStatus(msg) {
   const el = document.getElementById('ocr-status');
@@ -435,8 +435,8 @@ async function ocrReadOnePage(pageNum, label, carry) {
   const img = await ocrLoadPageImage(pageNum);
   if (!img) return null;
   ocrToolState.engine ??= new PageEngine();
-  const page = BlindOCR.whitenColored(ocrToolState.engine._pageFor(img),
-    ocrToolState.engine.pageRGBA(img));
+  const rgba = ocrToolState.engine.pageRGBA(img);
+  const page = BlindOCR.whitenColored(ocrToolState.engine._pageFor(img), rgba);
   const progress = (p, d, t) => setOcrStatus(`${label}${BlindOCR.passLabel(p)}: ${d}/${t} bands…`);
   const w = await ocrWorker().catch(e => {
     console.warn('OCR: no worker, reading on the main thread —', e?.message || e);
@@ -456,6 +456,8 @@ async function ocrReadOnePage(pageNum, label, carry) {
   }
   ocrToolState.passHint = out.pass;
   const dropped = ocrKeepRedactionBoxes(page, pageNum, out.res);
+  // the ink of each glyph, from the raster read here (the worker has only the grays)
+  OCRLineBoxes.inkColours(out.res, page, rgba);
   if (dropped) console.info(`OCR: page ${pageNum}: ${dropped} dark region(s) are not redactions —`, ocrDropped.get(`${state.docHash}|${pageNum}`).map(d => d.why).join(', '));
   return { img, res: out.res, pass: out.pass, dropped };
 }

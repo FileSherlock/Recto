@@ -501,15 +501,27 @@ function utbPixelRender(box, xs, baseline) {
 
   const yb = OCRRender.snapY(baseline);
   // underline / strikethrough: filled rectangles from the face's own metrics,
-  // under mupdf's path rasterizer (engine/ftraster.js rectCoverage)
+  // under mupdf's path rasterizer (engine/ftraster.js rectCoverage) — except
+  // a read line's own underline, the rule the read found under it
+  // (box.ocr.underline). Unedited, the line draws none: the page's rule is
+  // there, and the reader's object mask keeps its pixels out of every
+  // verdict (a rectangle can only approximate a rule's anti-aliased ends —
+  // 2–3 px differed on the memo). Edited, the new text is underlined at the
+  // rule's rows: the producer's underline need not be the face's (Calibri's
+  // sits a row higher than the memo's three-row rule).
   const rects = [];
-  if ((box.underline || box.strikethrough) && runX1 > runX0 && typeof FTRaster !== 'undefined') {
+  const pageRule = box.underline && pvAsRead(box) && box.ocr?.underline;
+  if (pageRule && !measured && runX1 > runX0 && typeof FTRaster !== 'undefined') {
+    const cov = FTRaster.rectCoverage(runX0, pageRule.y0, runX1, pageRule.y1 + 1);
+    if (cov) rects.push(cov);
+  }
+  if ((box.underline && !pageRule || box.strikethrough) && runX1 > runX0 && typeof FTRaster !== 'undefined') {
     const face = pvFaceOfSet(primary);
     if (!face) {
       // the face is on its way (drawn again when it arrives) — or the set has none
       if (!pvSetStyle(primary.name) && !primary.dynamic) pvNote(box, `set ${primary.name} has no face to take an underline from`);
     } else for (const kind of ['underline', 'strikethrough']) {
-      if (!box[kind]) continue;
+      if (!box[kind] || (kind === 'underline' && pageRule)) continue;
       const q = FTRaster.decoration(face, primary.sizePx, kind, runX0, runX1, yb);
       const cov = q && FTRaster.rectCoverage(q.x0, q.y0, q.x1, q.y1);
       if (cov) rects.push(cov);

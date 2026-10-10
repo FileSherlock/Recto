@@ -137,3 +137,51 @@ test('a weak read names no face', { skip }, () => {
   assert.equal(X.dominantTypography([box('a', true), box('b', true), box('c', true), ...['d', 'e', 'f', 'g'].map(l => box(l, false))]), null);
   assert.deepEqual(X.dominantTypography([box('a', true), box('b', true), box('c', true), box('d', false)]), { fontFamily: 'Cambria', sizePt: 12 });
 });
+
+test('an underline is a rule from the baseline to the descent: the line splits where it starts and stops', { skip }, () => {
+  // "see the link here": "the link" underlined by a rule 2 px under the baseline
+  const L = line('see the link here', [{ ch: 's' }, { ch: 'e' }, { ch: 'e' }, { ch: 't', pen: 136 }, { ch: 'h' }, { ch: 'e' },
+    { ch: 'l', pen: 168 }, { ch: 'i' }, { ch: 'n' }, { ch: 'k' }, { ch: 'h', pen: 208 }, { ch: 'e' }, { ch: 'r' }, { ch: 'e' }]);
+  const rule = { type: 'rule', x0: 136, y0: 202, x1: 199, y1: 202 };
+  const below = { type: 'rule', x0: 100, y0: 212, x1: 240, y1: 212 };           // a separator under the line: not an underline
+  const { boxes } = X.pageBoxes(1, { lines: [L], objects: [rule, below] }, { tol: 0 }, opts());
+  assert.deepEqual(boxes.map(b => [b.data.text, !!b.data.underline]), [['see', false], ['the link', true], ['here', false]]);
+  // the page's rule rides on the box for the pixel view
+  assert.deepEqual(boxes[1].ocr.underline, { x0: 136, x1: 200, y0: 202, y1: 202 });
+  // a thin slice of a redaction box is the box's, not an underline
+  const bar = { type: 'box', x0: 136, y0: 188, x1: 199, y1: 201 };
+  const slice = { type: 'rule', x0: 136, y0: 202, x1: 199, y1: 203 };
+  assert.equal(X.underlinedEntries(L, [bar, slice]).size, 0);
+  // the glyphs' own feet along the baseline row ('ZzZE') are a rule to detectObjects, not an underline
+  assert.equal(X.underlinedEntries(L, [{ type: 'rule', x0: 136, y0: 199, x1: 199, y1: 200 }]).size, 0);
+  // a rule running on across the column under a heading is a separator
+  assert.equal(X.underlinedEntries(L, [{ type: 'rule', x0: 100, y0: 202, x1: 700, y1: 202 }]).size, 0);
+});
+
+test('ink: a glyph read through a pen takes the pen\'s colour; one pen\'s run is one colour', { skip }, () => {
+  // a 40 × 10 page: glyphs at 0, 8, 16 (red, the third only a lighter stroke) and 24 (black)
+  const w = 40, h = 10, rgba = new Uint8ClampedArray(w * h * 4).fill(255), converted = new Uint8Array(w * h);
+  const ink = (x, y, c, conv) => { const i = y * w + x; rgba.set(c, i * 4); converted[i] = conv ? 1 : 0; };
+  for (let y = 2; y < 8; y++) {
+    ink(2, y, [192, 0, 0], 1); ink(3, y, [192, 0, 0], 1);           // fully covered red
+    ink(10, y, [192, 0, 0], 1);
+    ink(18, y, [208, 64, 64], 1);                                   // the red pen at three quarters coverage
+    ink(26, y, [0, 0, 0], 0); ink(27, y, [0, 0, 0], 0);            // black: never converted
+  }
+  ink(24, 5, [220, 120, 120], 1);                                   // a red overhang into the black glyph's cell
+  const L = { text: 'abcd', baseline: 7, top: 0, bot: 9, clean: true, entries: [0, 8, 16, 24].map((pen, i) => ({ i, ch: 'abcd'[i], pen, adv: 8 })) };
+  const res = { lines: [L], objects: [] };
+  assert.equal(X.inkColours(res, { w, h, converted }, rgba), 3);
+  assert.deepEqual(L.entries.map(e => e.ink ?? null), ['#c00000', '#c00000', '#c00000', null]);
+  // a black page (nothing converted) inks nothing
+  assert.equal(X.inkColours({ lines: [{ ...L, entries: L.entries.map(e => ({ ...e, ink: undefined })) }] }, { w, h, converted: null }, rgba), 0);
+});
+
+test('a coloured run is its own box, in its colour; an uncertified line keeps the reader\'s orange', { skip }, () => {
+  const L = line('a red word', [{ ch: 'a' }, { ch: 'r', pen: 116 }, { ch: 'e' }, { ch: 'd' }, { ch: 'w', pen: 148 }, { ch: 'o' }, { ch: 'r' }, { ch: 'd' }]);
+  for (const e of L.entries.slice(1, 4)) e.ink = '#c00000';
+  const { boxes } = X.pageBoxes(1, { lines: [L], objects: [] }, { tol: 0 }, opts());
+  assert.deepEqual(boxes.map(b => [b.data.text, b.data.color]), [['a', null], ['red', '#c00000'], ['word', null]]);
+  const unclean = X.pageBoxes(1, { lines: [{ ...L, clean: false }], objects: [] }, { tol: 0 }, opts()).boxes;
+  assert.ok(unclean.every(b => b.data.color === X.UNCLEAN_COLOR));
+});

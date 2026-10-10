@@ -81,9 +81,10 @@ A miss in both tiers falls back to the live engine read.
   `node tools/recto-cache.mjs` does the same headless: it serves this site,
   waits for the read and writes the file. Stale files of old documents can
   be deleted.
-- `version` (`OCR_CACHE_VERSION`, currently 3 — only black boxes are kept; 2: per-page `spaceAdv`, per-line
-  `phy`, per-entry `src`) guards the payload shape; a file or a stored read
-  with another version is ignored.
+- `version` (`OCR_CACHE_VERSION`, currently 4 — the rules are kept beside the
+  bars, and an entry carries its glyph's `ink`; 3: only black boxes are kept;
+  2: per-page `spaceAdv`, per-line `phy`, per-entry `src`) guards the payload
+  shape; a file or a stored read with another version is ignored.
 - A fresh browser profile has no second tier, so tol0's `npm run recto-test`
   (which uploads its certified document in a fresh browser profile and waits
   for the auto cycle) always exercises the real engine.
@@ -165,6 +166,33 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
   what `new UnifiedTextBox(data)` takes — and `lawInputs`, `readIsWeak`,
   `dominantTypography` answer the adapter's other questions of a read.
   `ocrAddBoxes` only makes the boxes and starts the law learning.
+- **Underline and colour** (since 2026-10-10). A box carries one underline and
+  one colour, so a line is split where either changes, as it is at a bar (a
+  blue underlined link inside a black sentence: three boxes). The underline
+  is a rule the read found — `detectObjects`' thin `'rule'` objects, which the
+  slim read keeps since cache version 4 — starting below the baseline row and
+  no deeper than the line's descent, under the glyph's middle
+  (`underlinedEntries`). Not the glyphs' own feet: a run of bottom strokes
+  along the baseline row (`ZzZE` in base64, the serifs of "Summary") is a rule
+  to `detectObjects` one row up; not a separator that runs on more than an em
+  past the line's text (a heading's rule across the column); not a slice of a
+  redaction box (the engine types a bar's thin rows `'rule'` too). The rule
+  rides on the box (`box.ocr.underline`): an unedited read line draws no
+  underline in the pixel view (the page's rule is there, masked from every
+  verdict — a rectangle only approximates its anti-aliased ends), an edited
+  one draws it at the rule's rows (Calibri's own underline sits a row higher
+  than the memo's three-row rule). The colour is the glyph's ink: the colour law
+  reads coloured text as coverage through its pen (`Engine.colourInk`), so
+  right after a read, on the main thread where the raster is, `inkColours`
+  gives every glyph whose dark pixels the law converted the colour of its
+  most covered pixel, a run of glyphs on one pen's ramp the run's darkest —
+  stamped on the entry as `ink` (the slim read keeps it; black glyphs carry
+  none). An uncertified line keeps the reader's orange instead. Measured
+  (recto-eval, full tier): underline 0 → 23 of 23 synthetic words, none where
+  the page has none; colour on every certified coloured line (the rest of the
+  colour page's lines are not certified — the colour law's reading, an engine
+  question); every segment as read is still the page, and the startup
+  document's boxes are unchanged (its one rule is a separator).
 - Line font/bold/italic/size come from the winning glyph set
   (`timesbd16` → Times New Roman bold 12 pt, `cour13` → Courier New 9.75 pt).
 - Non-byte-clean lines render in orange (`box.color` override); unreadable
@@ -298,8 +326,9 @@ change where it belongs, `node run.mjs --against latest`; its
 segments 66.4 % → 77.1 %, 3,267 better, 3 worse and explained) and
 `render.js lineLayout`'s set change inside a word (re-laid lines 112 better,
 0 worse; the Calibri page 17 → 46 of 49); the matcher's seams' space and gaps
-(*The hypothesis seam*, above; 16 better, 0 worse). Still open there: underline, colour
-and paragraphs are not detected; the shipped Times New Roman, Courier New and
+(*The hypothesis seam*, above; 16 better, 0 worse); underline and colour on the
+boxes (above). Still open there: paragraphs are not detected; coloured lines
+the colour law leaves uncertified; the shipped Times New Roman, Courier New and
 Segoe UI files are another build than the bundle's sets in a few characters
 each (the report lists them); editing a Times 16 px e-mail line moves its pens
 on ~12 % of segments, where the learned law cannot write a word.

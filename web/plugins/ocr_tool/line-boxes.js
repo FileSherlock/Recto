@@ -12,8 +12,9 @@
 //
 // The other questions the adapter asks of a read live here too, as pure
 // functions of the boxes: whether a read is too weak to name the page's face
-// (readIsWeak), the face and size it names (dominantTypography), and which
-// certified glyphs teach each set's producer law (lawInputs).
+// (readIsWeak), the face and size it names (dominantTypography), which
+// certified glyphs teach each set's producer law (lawInputs) — and the ink
+// of every glyph, from the page's RGB right after a read (inkColours).
 (function (root) {
   'use strict';
 
@@ -40,6 +41,106 @@
     let best = null, n = 0;
     for (const [s, c] of votes) if (c > n) { best = s; n = c; }
     return best || fallback;
+  }
+
+  // ── Underline and ink ─────────────────────────────────────
+  // A line's underlined glyphs: under each, a rule the read found (a thin
+  // object detectObjects typed 'rule' — the slim read keeps them since cache
+  // version 4) starting below the baseline row and no deeper than the line's
+  // descent, under the glyph's middle. Not the glyphs' own feet: a run of
+  // bottom strokes along the baseline row ('ZzZE' in base64, the serifs of
+  // "Summary") is a rule to detectObjects, one row up. Not a separator: a
+  // rule that runs on more than an em past the line's text (a heading's rule
+  // across the column), or sits deeper. Not a slice of a redaction box (the
+  // engine types a bar's thin rows 'rule' too). Returns Map entry -> the rule
+  // under it; an unread □ takes the state of the glyph before it.
+  function underlinedEntries(L, objects) {
+    const out = new Map();
+    const em = L.set?.sizePx ?? 16;
+    const desc = L.set?.maxDesc ?? Math.max(2, (L.bot ?? L.baseline) - L.baseline);
+    const first = L.entries[0], last = L.entries[L.entries.length - 1];
+    const tx0 = first.pen, tx1 = last.pen + last.adv;
+    const boxes = objects.filter(o => o.type === 'box');
+    const rules = objects.filter(o => o.type === 'rule' && o.y0 >= L.baseline + 1 && o.y0 <= L.baseline + desc &&
+      o.x0 >= tx0 - em && o.x1 <= tx1 + em &&
+      !boxes.some(b => b.x1 >= o.x0 - 2 && b.x0 <= o.x1 + 2 && o.y1 >= b.y0 - 3 && o.y0 <= b.y1 + 3));
+    if (!rules.length) return out;
+    let prev = null;
+    for (const e of L.entries) {
+      const mid = e.pen + e.adv / 2;
+      const r = e.ch === '□' ? prev : rules.find(q => mid >= q.x0 - 1 && mid <= q.x1 + 1) || null;
+      if (r) out.set(e, r);
+      prev = r;
+    }
+    return out;
+  }
+
+  // The ink of every glyph of a read, from the page's own RGB: the colour
+  // law read coloured text as the coverage it is, through its pen
+  // (Engine.colourInk; page.converted marks those pixels), so a glyph whose
+  // dark pixels are mostly converted is in a pen's colour. One glyph's most
+  // covered pixel need not reach the pen (a thin stroke, a period: #c30f0f
+  // for a #c00000 pen), so consecutive inked glyphs whose colours lie on one
+  // pen's ramp from white are one run, and the run takes its darkest colour.
+  // Stamped on the entry as e.ink ('#rrggbb') — black text gets none, nor
+  // does a glyph whose cell only catches a coloured neighbour's overhang.
+  // Run on the main thread after a read, where the raster is (ocr-tool.js
+  // ocrReadOnePage); the slim read keeps e.ink. page: the whitened page
+  // (w, h, converted), rgba: its RGBA bytes. Returns the glyphs inked.
+  const INK_DARK = 3 * 191;                          // a pixel at least a quarter covered
+  // b is on the ramp of the darker a when every channel with contrast keeps
+  // one coverage: (255 − b) / (255 − a) alike, at most full
+  function sameRamp(a, b) {
+    let lo = Infinity, hi = -Infinity;
+    for (let k = 0; k < 3; k++) {
+      const da = 255 - a[k], db = 255 - b[k];
+      if (da < 32) { if (db > 40) return false; continue; }
+      const e = db / da;
+      if (e < lo) lo = e;
+      if (e > hi) hi = e;
+    }
+    return hi <= 1.05 && hi - lo <= 0.1;
+  }
+  function inkColours(res, page, rgba) {
+    const conv = page?.converted;
+    if (!conv || !rgba) return 0;
+    const { w, h } = page;
+    const hex = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+    let n = 0;
+    for (const L of res.lines || []) {
+      if (!L.entries?.length || L.top == null || L.bot == null) continue;
+      // each glyph's most covered converted pixel, when its dark pixels are mostly converted
+      const own = L.entries.map(e => {
+        if (e.ch === '□') return null;
+        const x0 = Math.max(0, Math.floor(e.pen)), x1 = Math.min(w, Math.ceil(e.pen + e.adv));
+        let dark = 0, colour = 0, best = -1, bestSum = 766;
+        for (let y = Math.max(0, L.top); y <= Math.min(h - 1, L.bot); y++)
+          for (let x = x0; x < x1; x++) {
+            const i = y * w + x, o = i * 4, sum = rgba[o] + rgba[o + 1] + rgba[o + 2];
+            if (sum > INK_DARK) continue;
+            dark++;
+            if (!conv[i]) continue;
+            colour++;
+            if (sum < bestSum) { bestSum = sum; best = o; }
+          }
+        return best >= 0 && colour * 2 > dark ? [rgba[best], rgba[best + 1], rgba[best + 2]] : null;
+      });
+      // runs of one pen: consecutive inked glyphs on one ramp, in the run's darkest colour
+      for (let i = 0; i < own.length;) {
+        if (!own[i]) { i++; continue; }
+        let j = i + 1, dark = own[i];
+        while (j < own.length && own[j]) {
+          const [a, b] = own[j][0] + own[j][1] + own[j][2] < dark[0] + dark[1] + dark[2] ? [own[j], dark] : [dark, own[j]];
+          if (!sameRamp(a, b)) break;
+          dark = a;
+          j++;
+        }
+        const ink = hex(dark);
+        for (let k = i; k < j; k++) { L.entries[k].ink = ink; n++; }
+        i = j;
+      }
+    }
+    return n;
   }
 
   // Rebuild per-char positions from a line's entries + transcription, walking
@@ -143,11 +244,21 @@
       // trailing chars of the segment before it). The predicate is the
       // engine's boxBetween — the one that put the single separator space into
       // L.text — so the two views can never disagree about where a bar is.
+      // A box carries one underline and one colour, so the line is split
+      // where the page's underline starts or stops and where its ink changes
+      // too (a blue underlined link inside a black sentence: three boxes).
       const rects = L.boxes ?? [];
+      const under = underlinedEntries(L, res.objects || []);
+      const inkOf = [];
+      for (let i = 0; i < L.entries.length; i++) {
+        const e = L.entries[i];
+        inkOf.push(e.ch === '□' && i ? inkOf[i - 1] : (e.ink || null));
+      }
       const segs = [[L.entries[0]]];
       for (let i = 1; i < L.entries.length; i++) {
-        if (boxBetween(rects, L.entries[i - 1], L.entries[i])) segs.push([]);
-        segs[segs.length - 1].push(L.entries[i]);
+        const a = L.entries[i - 1], b = L.entries[i];
+        if (boxBetween(rects, a, b) || under.has(a) !== under.has(b) || inkOf[i - 1] !== inkOf[i]) segs.push([]);
+        segs[segs.length - 1].push(b);
       }
 
       for (const seg of segs) {
@@ -168,8 +279,14 @@
           fontFamily: family, bold, italic,
           sizePt: set.sizePx * 0.75 * sx,
           baseCharPositions: chars,
-          color: L.clean ? null : UNCLEAN_COLOR,
-        }, ocr: { clean: !!L.clean, trusted, tol: pass.tol || 0, quant: !!pass.quant,
+          // the page's ink (black: none) — an uncertified line keeps the
+          // reader's orange instead: its letters are not proven
+          color: L.clean ? (inkOf[L.entries.indexOf(first)] ?? null) : UNCLEAN_COLOR,
+          ...(under.has(first) ? { underline: true } : {}),
+        }, ocr: {
+          // the page's own underline under the segment: its rule (x viewBox px,
+          // rows raster px), where the pixel view draws a read line's underline
+          ...(under.has(first) ? { underline: (r => ({ x0: r.x0 * sx, x1: (r.x1 + 1) * sx, y0: r.y0, y1: r.y1 }))(under.get(first)) } : {}), clean: !!L.clean, trusted, tol: pass.tol || 0, quant: !!pass.quant,
           // the reader's entries for this segment (offset, glyph, pen, advance,
           // drawing set) — what the pixel view re-lays an EDITED line from: the
           // unchanged part keeps its pens, the rest follows the producer's law
@@ -263,6 +380,6 @@
     return { fontFamily, sizePt: +sizePt };
   }
 
-  root.OCRLineBoxes = { fontFromSetName, majoritySet, charPositions, pageBoxes, lawInputs, readIsWeak, dominantTypography,
+  root.OCRLineBoxes = { fontFromSetName, majoritySet, underlinedEntries, inkColours, charPositions, pageBoxes, lawInputs, readIsWeak, dominantTypography,
     UNCLEAN_COLOR, UNREAD_COLOR };
 })(globalThis);

@@ -38,14 +38,18 @@ function ocrSlimResult(res) {
       // ocrAddBoxes ever sees the line, and a union line whose entries lost
       // their src draws every glyph from the pool's first set (measured:
       // 303 of 1253 px wrong on an email header).
+      // ink: the glyph's colour, stamped on the main thread after a read
+      // (line-boxes.js inkColours) — black glyphs carry none
       entries: (L.entries || []).map(e => {
         const s = e.src ?? src.get(e.pen);
-        return { i: e.i, pen: e.pen, adv: e.adv, ch: e.ch, ...(s ? { src: s } : {}) };
+        return { i: e.i, pen: e.pen, adv: e.adv, ch: e.ch, ...(s ? { src: s } : {}), ...(e.ink ? { ink: e.ink } : {}) };
       }),
     }; }),
     spaceAdv: res.spaceAdv ?? null,                    // page-calibrated space (the fallback for a line without its own)
     ...(res.spaceAdvBySet ? { spaceAdvBySet: res.spaceAdvBySet } : {}),
-    objects: (res.objects || []).filter(o => o.type === 'box')
+    // the bars, and the rules (thin horizontal strokes): a rule under a
+    // line's glyphs is its underline (line-boxes.js underlinedEntries)
+    objects: (res.objects || []).filter(o => o.type === 'box' || o.type === 'rule')
       .map(o => ({ type: o.type, x0: o.x0, y0: o.y0, x1: o.x1, y1: o.y1 })),
   };
 }
