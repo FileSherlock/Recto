@@ -247,12 +247,24 @@
       // A box carries one underline and one colour, so the line is split
       // where the page's underline starts or stops and where its ink changes
       // too (a blue underlined link inside a black sentence: three boxes).
+      // Both are a WORD's — its glyphs' majority — and a line splits between
+      // words only: inside a word two glyphs can share an anti-aliased pixel,
+      // which two boxes would draw apart (a link read "htt" + "p://…" missed a
+      // pixel each), and a change there is far likelier a detection's noise.
       const rects = L.boxes ?? [];
-      const under = underlinedEntries(L, res.objects || []);
-      const inkOf = [];
-      for (let i = 0; i < L.entries.length; i++) {
-        const e = L.entries[i];
-        inkOf.push(e.ch === '□' && i ? inkOf[i - 1] : (e.ink || null));
+      const ruleOf = underlinedEntries(L, res.objects || []);
+      const under = new Map(), inkOf = [];
+      for (let i = 0; i < L.entries.length;) {
+        let j = i + 1;
+        while (j < L.entries.length && L.entries[j].i - L.entries[j - 1].i - txLen(L.entries[j - 1].ch) === 0) j++;
+        const word = L.entries.slice(i, j);
+        const ruled = word.filter(e => ruleOf.has(e));
+        const rule = ruled.length * 2 > word.length ? ruleOf.get(ruled[0]) : null;
+        const inks = new Map();
+        for (const e of word) inks.set(e.ink || null, (inks.get(e.ink || null) || 0) + 1);
+        const ink = [...inks.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        for (const e of word) { if (rule) under.set(e, rule); inkOf.push(ink); }
+        i = j;
       }
       const segs = [[L.entries[0]]];
       for (let i = 1; i < L.entries.length; i++) {
