@@ -28,7 +28,7 @@ serves files.
 
 | Script | What it does |
 |--------|--------------|
-| `node tools/serve.mjs [port]` | Development server on `http://localhost:5000` (or the given port). Serves `web/` with correct MIME types and rebuilds the page on every request for it. |
+| `node tools/serve.mjs [port]` | Development server on `http://localhost:5000` (or the given port). Serves `web/` with correct MIME types and rebuilds the page on every request for it. `--plugin <folder>` runs a plugin from outside `web/plugins/` in place of its copy there ([Local Development](local-development.md#a-plugin-developed-in-a-repository-of-its-own)). |
 | `node tools/build.mjs` | The build: scans `web/plugins/*/plugin.json` and writes `web/index.html` and `web/generated/*.json`. A deploy runs it once; the dev server runs it for you. |
 
 Nothing is transpiled or bundled. The build only assembles the page from the core template

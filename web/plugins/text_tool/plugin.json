@@ -8,19 +8,25 @@
   "options_bar": "options_bar.html",
   "settings": "settings.html",
   "ribbon_bar": null,
-  "sidebar": null,
+  "sidebar": "studio.html",
   "scripts_before_viewer": [],
   "scripts_after_app": [
     "shaping.js",
     "fonts.js",
+    "story-core.js",
     "unified-text-box.js",
     "undo.js",
     "svg-renderer.js",
+    "story-render.js",
     "drag-resize.js",
     "ruler.js",
+    "story-edit.js",
     "toolbar.js",
     "micro-typo.js",
     "inline-edit.js",
-    "text-tool.js"
+    "text-tool.js",
+    "frame-tool.js",
+    "artistic-tool.js",
+    "text-studio.js"
   ]
 }

@@ -8,6 +8,18 @@ the per-box *Name format* settings, and the matches table. It does **not**
 detect bars — it matches against whatever `redaction` boxes exist (from
 `ocr_tool`, or the Add-Box tool).
 
+## Where it is developed
+
+In a repository of its own, **`redaction-matching`** (`Desktop/redaction-matching`,
+beside Recto — the arrangement tol0's engine has). Recto's
+`web/plugins/redaction_matching/`, `tests/plugins/redaction_matching/` and
+`guide/plugins/redaction-matching/` are verbatim copies of that repository's
+folders at the same paths, synced in by its `npm run sync:recto`: change them
+there, never in Recto — the sync refuses to overwrite a copy that was changed
+in Recto. In `redaction-matching`, `npm run serve` is this site with the
+working copy in place of Recto's (`tools/serve.mjs --plugin <folder>`), and
+`npm test` runs the suites below against it.
+
 ## Candidates
 
 Each redaction box carries its own `nameSettings` (a copy of the template

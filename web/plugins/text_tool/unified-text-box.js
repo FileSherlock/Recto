@@ -65,6 +65,9 @@ class UnifiedTextBox {
     this.strikethrough = data.strikethrough || false;
     this.letterSpacing = data.letterSpacing || 0;
     this.color = data.color || null;  // null = per-type default
+    // The text colour's opacity, % (100 = solid). A story box keeps it per
+    // character instead (StoryCore's `opacity`).
+    this.opacity = data.opacity ?? 100;
     // A colour for the label chosen by a plugin that judged it (a matcher's
     // page-pixel verdict on a redaction's name), null = the type's colour;
     // the user's own `color` always wins over it.
@@ -120,6 +123,18 @@ class UnifiedTextBox {
     // every render and draws no manual resize handles (used by manually-added
     // text boxes). Extracted spans keep their real width (false).
     this.autoWidth = data.autoWidth || false;
+
+    // Artistic and Frame text (Affinity's two kinds of text object): a box
+    // with a textMode carries its text as a story — paragraphs of runs, each
+    // with its own character and paragraph attributes (story-core.js) — and
+    // is drawn and edited by story-render.js / story-edit.js. 'artistic' sizes
+    // itself to its text; 'frame' wraps its text inside x/y/w/h, in
+    // `frame`'s columns and insets. null = a plain one-line box. The plain
+    // fields above (text, fontFamily, sizePt, …) follow the story's first
+    // character for every reader that does not know stories (storySync).
+    this.textMode = data.textMode || null;      // null | 'artistic' | 'frame'
+    this.story = data.story || null;
+    this.frame = data.frame || null;            // overrides of StoryCore.FRAME_DEFAULTS
   }
 }
 

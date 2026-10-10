@@ -18,6 +18,7 @@ Open [http://localhost:5000](http://localhost:5000) in your browser.
 ```bash
 node tools/serve.mjs 8080          # another port
 node tools/serve.mjs --no-isolate  # without the COOP/COEP headers (see below)
+node tools/serve.mjs --plugin <folder>   # a plugin from outside web/plugins/ (see below)
 ```
 
 The server listens on `127.0.0.1` only, so it is not reachable from other machines.
@@ -49,6 +50,18 @@ Three development-only mounts map folders outside `web/` into the server, for ch
 smoke tests in the browser: `/_dev/golden/` → `tests/golden/`, `/_dev/samples/` →
 `tests/samples/`, `/_dev/lab/` → `lab/` (a local folder, when present). They are not part
 of the site; nothing under `web/` refers to them.
+
+### A plugin developed in a repository of its own
+
+`--plugin <folder>` (repeatable) puts a plugin folder from elsewhere in place of
+`web/plugins/<folder name>/`: the build reads its manifest, fragments and file hashes from
+that folder (`build({ overlay: { name: folder } })`), and the server serves the folder at
+`plugins/<name>/`. Everything else is this site, so the page is exactly the one the plugin
+will run in once its folder is synced in. Nothing is written into `web/` — `index.html` and
+`generated/*` are answered from memory — so the server can run beside a plain one. Such a
+repository wraps this as its own dev server; the plugin's README under `guide/plugins/`
+says which plugins are developed that way. `tests/smoke/smoke.mjs --plugin <folder>` runs
+the smoke test the same way.
 
 ## The build
 
@@ -132,7 +145,7 @@ right".
 ### Browser smoke test
 
 ```bash
-node tests/smoke/smoke.mjs [--chrome <exe>] [--only <golden name>]
+node tests/smoke/smoke.mjs [--chrome <exe>] [--only <golden name>] [--plugin <folder>]
 ```
 
 starts the dev server on a free port, opens the app in headless Chrome and, for every

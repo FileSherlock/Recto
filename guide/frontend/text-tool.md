@@ -19,6 +19,7 @@ Both are scripts of the `text_tool` plugin (`web/plugins/text_tool/`), listed in
 | `#fabric-underline` | `box.underline` | Toggle button |
 | `#fabric-strikethrough` | `box.strikethrough` | Toggle button |
 | `#fabric-color` | `box.color` | Hex color; `null` = per-type default |
+| `#fabric-opacity`, `#fabric-opacity-value` | `box.opacity` | The text colour's opacity, 0–100 % (slider and number show one value; double-click the slider for 100 %). The glyphs only (`fill-opacity`); on Artistic / Frame text the selected characters' `opacity` (the fill colour's alpha) |
 | `#kerning` | `box.kerning` (+ clears `box.kerningAuto`) | Checkbox. `box.kerning` is always the effective boolean; until the user touches the box it **follows the page** (`kerningAuto`, see below) and the label's tooltip says so |
 | `#fabric-nudge-mode` | — | Toggle button; enters/exits micro-typography nudge mode on the selected span. Disabled unless the span's measured positions still apply (`utbCharsValid(box)`). |
 | `#fabric-letter-spacing` | `box.letterSpacing` | em units |
@@ -29,6 +30,17 @@ Both are scripts of the `text_tool` plugin (`web/plugins/text_tool/`), listed in
 | `#tolerance`, `#tt-name-case` | `box.tolerance`, `box.uppercase` | The **Redaction match** section of the Settings panel (`settings.html`): the selected redaction's values, or the defaults for new boxes when none is selected (`#tt-match-scope` says which). Letter case is `false` (as typed), `true` (UPPERCASE), `'first'` or `'last'` (that name in capitals) — `utbApplyCase(text, mode)` in `unified-text-box.js` applies it. The values are read by whichever matching plugin is installed and are inert when none is |
 
 ---
+
+### Artistic and Frame text
+
+While the selected box carries a story (`box.textMode`), the Font and Style controls do not
+write the box: they apply to the story — to the selected characters while it is edited, to all
+of its text otherwise — through `storyApplyChar` (`story-edit.js`), and `syncToolbarToBox` shows
+the selection's attributes (blank where they are mixed). The ribbon's story groups (Text,
+Paragraph, Columns, Panels) show for story boxes and typed (`harfbuzz`) boxes; using one on a
+typed box makes it Artistic text first (`ensureStory`). Everything about stories — the tools,
+the keys, every setting and how it is computed — is in
+[Artistic and Frame Text](artistic-and-frame-text.md).
 
 ## Font Size Units
 
@@ -139,6 +151,7 @@ Double-click is a different gesture: it starts inline text editing (see `inline-
 | `click` | bold/italic/underline/strikethrough buttons | Toggle `.active`, `persistFromToolbar` |
 | `change` | `#fabric-letter-spacing` | `persistFromToolbar` |
 | `input` | `#fabric-color` | `box.color = value`, `renderBox` |
+| `input` / `change` | `#fabric-opacity` / `#fabric-opacity-value` | `box.opacity = value` (one undo step per drag), `renderBox`; a story box: `storyApplyChar({ opacity })` |
 | `change` | `#kerning` | `box.kerning = checked`, `box.kerningAuto = false`, `renderBox` |
 | `click` | `#fabric-default-sw` | Toggle native vs manual space width; measure the natural width via `Shaping.widths` when turning it off |
 | `input` | `#fabric-space-width` | Live `box.spaceWidth = value`, `renderBox`, update display label |
@@ -164,6 +177,12 @@ The click itself is caught by the core (`app.js`, a `mousedown` on the viewer), 
 
 - `window.handleManualAddBox(pageNum, x, y)`: delegates to `createNewRedaction()` if a plugin supplies it, otherwise creates a `type='redaction'` box directly. Calls `window._utbFindNearestLine?.()` — defined by `etv-fetch.js` (optional: gracefully absent if the `embedded_text_viewer` plugin is not installed). Both are optional seams; the tool works either way.
 - `window.handleManualAddText(pageNum, x, y)`: creates a `type='harfbuzz'` box with `autoWidth: true` at the click, on the nearest shown line when there is one (`utbFindNearestLine`), and drops straight into inline edit. The type matters for visibility: extracted layers are shown and hidden wholesale by their toggles, and text the user just typed must never vanish with them.
+
+### Artistic and Frame text
+
+`frame-tool.js` (the Frame Text Tool) and `artistic-tool.js` (the Artistic Text Tool) place
+story boxes; `storyConvert(box, 'frame' | 'artistic')` converts between them. See
+[Artistic and Frame Text](artistic-and-frame-text.md).
 
 ### Deleting a box
 

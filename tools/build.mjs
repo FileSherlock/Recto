@@ -15,6 +15,12 @@
 // so in development the scan is always current. Nothing is transpiled or
 // bundled.
 //
+// A plugin developed in a repository of its own is built from its folder
+// there, in place of web/plugins/<name>/: build({ overlay: { name: folder } }),
+// or `node tools/serve.mjs --plugin <folder>`. Its URLs stay plugins/<name>/…;
+// whoever serves the page serves that folder there. Such a page is never
+// written into web/.
+//
 // Outputs:
 //   web/index.html                      GENERATED — never edited by hand
 //   web/generated/plugins.json          the plugins found, in load order
@@ -60,35 +66,48 @@ function walk(dir, out = []) {
 
 // ── plugins ────────────────────────────────────────────────────────────────
 
-function readPlugins(absent = []) {
+// The folder each plugin's files are read from — web/plugins/<name>/, or an
+// overlay's. Kept off the plugin object, which is written to plugins.json.
+const folderOf = new WeakMap();
+
+function readPlugins(absent = [], overlay = {}) {
   const dir = path.join(WEB, 'plugins');
+  const folders = new Map();
+  if (fs.existsSync(dir))
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true }))
+      if (entry.isDirectory() && !entry.name.startsWith('.')) folders.set(entry.name, path.join(dir, entry.name));
+  for (const [name, folder] of Object.entries(overlay)) {
+    if (!fs.existsSync(path.join(folder, 'plugin.json'))) throw new Error(`overlay ${name}: no plugin.json in ${folder}`);
+    folders.set(name, path.resolve(folder));
+  }
   const plugins = [];
-  if (!fs.existsSync(dir)) return plugins;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (!entry.isDirectory() || entry.name.startsWith('.') || absent.includes(entry.name)) continue;
-    const manifest = path.join(dir, entry.name, 'plugin.json');
+  for (const [name, folder] of folders) {
+    if (absent.includes(name)) continue;
+    const at = Object.hasOwn(overlay, name) ? folder : `plugins/${name}`;   // how errors name it
+    const manifest = path.join(folder, 'plugin.json');
     if (!fs.existsSync(manifest)) continue;
     let p;
     try { p = JSON.parse(fs.readFileSync(manifest, 'utf8')); }
-    catch (e) { throw new Error(`${posix(path.relative(ROOT, manifest))}: ${e.message}`); }
-    if (p.name !== entry.name)
-      throw new Error(`plugins/${entry.name}/plugin.json: "name" is ${JSON.stringify(p.name)}, the folder is "${entry.name}"`);
+    catch (e) { throw new Error(`${at === folder ? manifest : posix(path.relative(ROOT, manifest))}: ${e.message}`); }
+    if (p.name !== name)
+      throw new Error(`${at}/plugin.json: "name" is ${JSON.stringify(p.name)}, the folder is "${name}"`);
     for (const slot of SLOTS_MANY) {
       p[slot] = p[slot] ?? [];
-      if (!Array.isArray(p[slot])) throw new Error(`plugins/${p.name}/plugin.json: "${slot}" must be a list`);
+      if (!Array.isArray(p[slot])) throw new Error(`${at}/plugin.json: "${slot}" must be a list`);
     }
     for (const slot of SLOTS_ONE) p[slot] = p[slot] ?? null;
     for (const file of [...SLOTS_MANY.flatMap(s => p[s]), ...SLOTS_ONE.map(s => p[s]).filter(Boolean)])
-      if (!fs.existsSync(path.join(dir, p.name, file)))
-        throw new Error(`plugins/${p.name}/plugin.json names "${file}", which does not exist`);
+      if (!fs.existsSync(path.join(folder, file)))
+        throw new Error(`${at}/plugin.json names "${file}", which does not exist`);
     p.order = Number.isFinite(p.order) ? p.order : 1000;
+    folderOf.set(p, folder);
     plugins.push(p);
   }
   return plugins.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
 function fragment(plugin, file) {
-  const text = fs.readFileSync(path.join(WEB, 'plugins', plugin.name, file), 'utf8');
+  const text = fs.readFileSync(path.join(folderOf.get(plugin), file), 'utf8');
   if (/\{%|\{\{/.test(text))
     throw new Error(`plugins/${plugin.name}/${file} contains a template tag ({% … %} or {{ … }}) — fragments are plain HTML`);
   return text.replace(/\s+$/, '');
@@ -136,10 +155,11 @@ function defaultDocument() {
 // assetURL() for a content-hashed URL instead of hand-bumping a version.
 function assetMap(plugins) {
   const map = {};
-  const roots = [path.join(WEB, 'core'), path.join(WEB, 'vendor'), ...plugins.map(p => path.join(WEB, 'plugins', p.name))];
-  for (const root of roots.filter(r => fs.existsSync(r)))
+  const roots = [['core', path.join(WEB, 'core')], ['vendor', path.join(WEB, 'vendor')],
+                 ...plugins.map(p => [`plugins/${p.name}`, folderOf.get(p)])];
+  for (const [prefix, root] of roots.filter(([, r]) => fs.existsSync(r)))
     for (const file of walk(root)) {
-      const rel = posix(path.relative(WEB, file));
+      const rel = `${prefix}/${posix(path.relative(root, file))}`;
       if (rel === 'core/index.template.html' || rel.endsWith('/plugin.json')) continue;
       map[rel] = hash8(file);
     }
@@ -200,8 +220,12 @@ const json = obj => JSON.stringify(obj, null, 1) + '\n';
 
 // `absent` names plugin folders to treat as not there — how the tests drag a
 // plugin out without moving files that other test files are reading.
-export function build({ write = true, absent = [] } = {}) {
-  const plugins = readPlugins(absent);
+// `overlay` maps a plugin name to a folder outside web/plugins/ to build it
+// from (see the header); such a build is never written.
+export function build({ write = true, absent = [], overlay = {} } = {}) {
+  if (write && Object.keys(overlay).length)
+    throw new Error('a page with an overlaid plugin is never written into web/ — it names files web/plugins/ does not hold');
+  const plugins = readPlugins(absent, overlay);
   const assets = assetMap(plugins);
   const template = fs.readFileSync(path.join(WEB, 'core', 'index.template.html'), 'utf8');
   const html = render(template, plugins, assets);

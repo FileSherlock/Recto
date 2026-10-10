@@ -9,6 +9,10 @@
 //       → { space_width }
 //   await Shaping.fontMetrics({ family, bold, italic, size_px })
 //       → { family, bold, italic, file, sizePx, upem, space, adv, kern, missing } | null
+//   await Shaping.faceMetrics({ family, bold, italic })
+//       → { family, bold, italic, file, upem, ascender, descender, lineGap, capHeight,
+//           xHeight, underlinePos/Size, strikePos/Size, superSize/Offset, subSize/Offset,
+//           space, features: [OpenType tags] } | null      (font units)
 //
 // `size` is in POINTS and `scale` is px-per-pt as a percentage (GEO.docScale());
 // `family` is resolved through the font catalogue with fixed fallbacks
@@ -272,7 +276,57 @@
       return { family, bold, italic, ...metricsCache.get(key) };
     }
 
-    return { widths, fontMetrics, resolve };
+    // The face's vertical metrics and the OpenType features it carries, in
+    // font units (divide by upem): what a text frame places its first
+    // baseline, its leading and its decorations with, and what the
+    // Typography panel offers. HarfBuzz's own metrics with their fallbacks
+    // (hb_ot_metrics_get_position_with_fallback): the ascender is OS/2's
+    // typo value when the face says USE_TYPO_METRICS, else hhea's.
+    async function faceMetrics({ family, bold, italic }) {
+      bold = bold === true || bold === 1 || bold === '1';
+      italic = italic === true || italic === 1 || italic === '1';
+      const file = resolve(family || catalogue.default || FALLBACK_FAMILY, bold, italic);
+      if (!file) return null;
+      const rec = await face(file);
+      if (!rec.metrics) {
+        const T = hb.MetricsTag, at = tag => rec.font.getMetricPositionWithFallback(tag);
+        const ext = rec.font.hExtents();
+        const tags = table => { try { return rec.hbFace.getTableFeatureTags(table); } catch { return []; } };
+        // The tables' own values, the ones Affinity sets text with: hhea's line
+        // spacing, post's underline, OS/2's strikeout, typographic values and
+        // (version ≥ 2) x and cap height. null where the face has no table.
+        const table = (tag, len) => {
+          const b = rec.hbFace.referenceTable(tag);
+          return b && b.byteLength >= len ? new DataView(b.buffer, b.byteOffset, b.byteLength) : null;
+        };
+        const hhea = table('hhea', 10), post = table('post', 12), os2 = table('OS/2', 78);
+        const os2v2 = os2 && os2.getUint16(0) >= 2 && os2.byteLength >= 90;
+        // and what the outlines say: the tops of H, x and l, the bottom of q
+        const top = ch => { const g = rec.font.glyph(ch.codePointAt(0)); const e = g ? rec.font.glyphExtents(g) : null; return e ? e.yBearing : null; };
+        const bottom = ch => { const g = rec.font.glyph(ch.codePointAt(0)); const e = g ? rec.font.glyphExtents(g) : null; return e ? e.yBearing + e.height : null; };
+        rec.metrics = {
+          file, upem: rec.upem,
+          ascender: ext.ascender, descender: ext.descender, lineGap: ext.lineGap,
+          hheaAscender: hhea ? hhea.getInt16(4) : null, hheaDescender: hhea ? hhea.getInt16(6) : null, hheaLineGap: hhea ? hhea.getInt16(8) : null,
+          postUnderlinePosition: post ? post.getInt16(8) : null, postUnderlineThickness: post ? post.getInt16(10) : null,
+          os2StrikeoutSize: os2 ? os2.getInt16(26) : null, os2StrikeoutPosition: os2 ? os2.getInt16(28) : null,
+          typoAscender: os2 ? os2.getInt16(68) : null, typoDescender: os2 ? os2.getInt16(70) : null, typoLineGap: os2 ? os2.getInt16(72) : null,
+          winAscent: os2 ? os2.getUint16(74) : null, winDescent: os2 ? os2.getUint16(76) : null,
+          os2XHeight: os2v2 ? os2.getInt16(86) : null, os2CapHeight: os2v2 ? os2.getInt16(88) : null,
+          topH: top('H'), topX: top('x'), topL: top('l'), bottomQ: bottom('q'),
+          capHeight: at(T.CAP_HEIGHT), xHeight: at(T.X_HEIGHT),
+          underlinePos: at(T.UNDERLINE_OFFSET), underlineSize: at(T.UNDERLINE_SIZE),
+          strikePos: at(T.STRIKEOUT_OFFSET), strikeSize: at(T.STRIKEOUT_SIZE),
+          superSize: at(T.SUPERSCRIPT_EM_Y_SIZE), superOffset: at(T.SUPERSCRIPT_EM_Y_OFFSET),
+          subSize: at(T.SUBSCRIPT_EM_Y_SIZE), subOffset: at(T.SUBSCRIPT_EM_Y_OFFSET),
+          space: shape(rec, ' ', { kern: false, plain: true }).glyphs[0]?.advance ?? rec.upem / 4,
+          features: [...new Set([...tags('GSUB'), ...tags('GPOS')])].sort(),
+        };
+      }
+      return { family, bold, italic, ...rec.metrics };
+    }
+
+    return { widths, fontMetrics, faceMetrics, resolve };
   }
 
   globalThis.ShapingCore = { createShaper, parseKernTable, CHARS };
@@ -306,5 +360,6 @@
   window.Shaping = {
     widths: async request => (await ready()).widths(request),
     fontMetrics: async request => (await ready()).fontMetrics(request),
+    faceMetrics: async request => (await ready()).faceMetrics(request),
   };
 })();

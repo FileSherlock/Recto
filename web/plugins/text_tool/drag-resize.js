@@ -122,6 +122,39 @@
     window.addEventListener('mouseup', onUp);
   }
 
+  // ── Resize a text frame by one of its eight handles ───────────
+  // The text reflows as the frame changes (story-render.js lays it again on
+  // every renderBox); a frame never gets smaller than MIN on either side.
+
+  function initFrameResize(downEvent, box, svgEl, handle) {
+    downEvent.preventDefault();
+    downEvent.stopPropagation();
+    const MIN = 8;
+    const start = toSVGPoint(svgEl, downEvent.clientX, downEvent.clientY);
+    const o = { x: box.x, y: box.y, w: box.w, h: box.h };
+    const step = window.utbUndo?.capture([box]);
+
+    function onMove(e) {
+      const cur = toSVGPoint(svgEl, e.clientX, e.clientY);
+      const dx = cur.x - start.x, dy = cur.y - start.y;
+      let { x, y, w, h } = o;
+      if (handle.includes('e')) w = Math.max(MIN, o.w + dx);
+      if (handle.includes('w')) { const c = Math.min(dx, o.w - MIN); x = o.x + c; w = o.w - c; }
+      if (handle.includes('s')) h = Math.max(MIN, o.h + dy);
+      if (handle.includes('n')) { const c = Math.min(dy, o.h - MIN); y = o.y + c; h = o.h - c; }
+      Object.assign(box, { x, y, w, h });
+      renderBox(box);
+      window.refreshRuler?.();
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.utbUndo?.commit(step, 'resize frame', `resize:${box.id}`);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
   // ── Event delegation on SVG layers ───────────────────────────
 
   // We attach a single delegated listener to the document.
@@ -130,6 +163,14 @@
   document.addEventListener('mousedown', e => {
     const svgEl = e.target.closest('svg.text-layer');
     if (!svgEl) return;
+
+    // Frame handle → resize the text frame
+    if (e.target.classList.contains('utb-fh')) {
+      const box = utbState.getBox(e.target.closest('.utb-group')?.dataset.id);
+      if (box?.textMode === 'artistic' && typeof storyScaleDrag === 'function') storyScaleDrag(e, box, svgEl, e.target.dataset.handle);
+      else if (box) initFrameResize(e, box, svgEl, e.target.dataset.handle);
+      return;
+    }
 
     // Edge handle → resize
     if (e.target.classList.contains('utb-edge')) {
@@ -161,6 +202,15 @@
     const box = utbState.getBox(group.dataset.id);
     if (!box) return;
 
+    // The Frame Text tool edits the text object it is pressed on, the caret
+    // where it was pressed (Affinity: "click an object to select it")
+    if (box.textMode && (state.activeTool === 'frame-text' || state.activeTool === 'art-text') && typeof enterStoryEdit === 'function') {
+      e.preventDefault();
+      e.stopPropagation();
+      enterStoryEdit(box, { x: e.clientX, y: e.clientY });
+      return;
+    }
+
     // Select the box
     utbState.selectedId = box.id;
     selectBoxInSVG(box.id);
@@ -184,6 +234,7 @@
     if (e.target.closest('.floating-panel')) return;
     if (e.target.closest('#tools-sidebar')) return;
     if (e.target.closest('.utb-nudge-popover')) return;
+    if (e.target.closest('.tt-studio')) return;          // the Text panel acts on the selection
     if (utbState.selectedId) {
       utbState.selectedId = null;
       deselectAllInSVG();

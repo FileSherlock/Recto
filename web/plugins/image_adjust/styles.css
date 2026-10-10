@@ -1,0 +1,92 @@
+/* image_adjust — the adjustment filter on the page view, its ribbon bar and its panel. */
+
+/* The page as the viewer shows it — its image and, when webgl_mask is
+   installed and on, the revealed copy it draws over it — through the stack's
+   tables (image-adjust.js keeps #ia-filter's feFuncs). Overlays (text boxes,
+   rulers, other plugins' canvases) are not adjusted. */
+body.ia-on .page-container > img,
+body.ia-on .page-container > canvas.webgl-overlay {
+  filter: url(#ia-filter);
+}
+
+#ia-options-bar { order: 1; }
+
+/* the tool button says when an adjustment is active */
+#ia-toggle { position: relative; }
+#ia-toggle.ia-active::after {
+  content: '';
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8ab4f8;
+}
+
+.ia-slider { width: 80px; accent-color: #8ab4f8; }
+.ia-value { min-width: 38px; font-variant-numeric: tabular-nums; color: #9aa0a6; font-size: 11px; }
+
+/* ── the panel ─────────────────────────────────────────────── */
+.ia-panel {
+  position: fixed;
+  top: 104px;
+  right: 16px;
+  width: 318px;
+  max-height: calc(100% - 120px);
+  overflow-y: auto;
+  background: #202124;
+  border: 1px solid #3c4043;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  color: #e8eaed;
+  font-size: 12px;
+  z-index: 480;
+}
+.ia-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 6px 6px 12px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: move;
+  user-select: none;
+}
+.ia-body { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.ia-row { display: flex; align-items: center; gap: 6px; }
+.ia-row > label { color: #bdc1c6; min-width: 76px; }
+.ia-row > input[type="range"] { flex: 1; accent-color: #8ab4f8; }
+.ia-hint { color: #9aa0a6; font-size: 11px; }
+.ia-stack { list-style: none; margin: 0; padding: 0; border: 1px solid #3c4043; border-radius: 4px; }
+.ia-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.ia-item:last-child { border-bottom: none; }
+.ia-item.selected { background: rgba(138, 180, 248, 0.16); }
+.ia-item input { accent-color: #8ab4f8; }
+.ia-name { flex: 1; }
+.ia-empty { padding: 8px; color: #9aa0a6; }
+.ia-mini { width: 22px; height: 22px; padding: 0; }
+.ia-mini .material-symbols-outlined { font-size: 15px; }
+.ia-editor { display: flex; flex-direction: column; gap: 6px; }
+.ia-editor-title { font-weight: 600; color: #bdc1c6; text-transform: uppercase; font-size: 10px; letter-spacing: 0.06em; }
+.ia-curves { display: flex; flex-direction: column; gap: 6px; }
+.ia-curve-canvas { border-radius: 4px; cursor: crosshair; outline: none; align-self: center; }
+.ia-curve-canvas:focus { box-shadow: 0 0 0 1px #8ab4f8; }
+.ia-num { width: 50px; text-align: center; }
+.ia-points > label { min-width: 0; }
+.ia-points .panel-btn { margin-left: auto; }
+.ia-foot { justify-content: flex-end; }
+.ia-check { display: flex; align-items: center; gap: 4px; color: #bdc1c6; cursor: pointer; }
+.ia-check input { accent-color: #8ab4f8; }
+.ia-inline { min-width: 0 !important; margin-left: 6px; }
+.ia-pickers { gap: 4px; }
+.ia-pickers .panel-btn { margin-left: auto; }
+.ia-foot select { flex: 1; min-width: 0; }
+#viewer.ia-picking .page-container { cursor: crosshair; }

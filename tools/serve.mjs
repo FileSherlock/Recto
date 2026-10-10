@@ -3,6 +3,8 @@
 //
 //   node tools/serve.mjs [port]          default 5000 → http://localhost:5000
 //   node tools/serve.mjs --no-isolate    without the COOP/COEP headers
+//   node tools/serve.mjs --plugin <folder>   that plugin folder in place of
+//                                        web/plugins/<its name>/ (repeatable)
 //
 // Plain files out of web/, with three things a bare file server lacks:
 //   - the build (tools/build.mjs) runs on every request for index.html, so a
@@ -17,6 +19,12 @@
 // tests/golden/, tests/samples/ and lab/ — the documents the goldens were
 // recorded from, for checks and smoke tests in the browser. They are not part
 // of the site (nothing under web/ refers to them).
+//
+// A plugin developed in a repository of its own runs here before it is synced
+// in: --plugin <folder> builds the page with that folder in place of
+// web/plugins/<folder name>/ and serves it at plugins/<name>/. The page is the
+// site's own, so it looks exactly as it will once the plugin is synced; nothing
+// is written into web/ (index.html and generated/* come from memory).
 //
 // Every URL the page uses carries a content hash, so files are sent with
 // no-cache (revalidate) here; a production host may cache them forever.
@@ -35,7 +43,17 @@ const DEV_MOUNTS = {
 
 const args = process.argv.slice(2);
 const isolate = !args.includes('--no-isolate');
-const port = Number(args.find(a => /^\d+$/.test(a))) || 5000;
+const overlay = {};
+for (let i = 0; i < args.length; i++) {
+  if (args[i] !== '--plugin') continue;
+  if (!args[i + 1]) { console.error('--plugin needs a plugin folder'); process.exit(2); }
+  const folder = path.resolve(args[++i]);
+  overlay[path.basename(folder)] = folder;
+}
+const overlaid = Object.keys(overlay).length > 0;
+const MOUNTS = { ...DEV_MOUNTS, ...Object.fromEntries(Object.entries(overlay).map(([name, folder]) => [`/plugins/${name}/`, folder])) };
+const port = Number(args.find((a, i) => /^\d+$/.test(a) && args[i - 1] !== '--plugin')) || 5000;
+const page = () => build({ write: !overlaid, overlay });
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -68,7 +86,7 @@ const server = http.createServer((req, res) => {
   if (pathname.endsWith('/')) pathname += 'index.html';
 
   let base = WEB, rel = pathname;
-  for (const [prefix, dir] of Object.entries(DEV_MOUNTS))
+  for (const [prefix, dir] of Object.entries(MOUNTS))
     if (pathname.startsWith(prefix)) { base = dir; rel = pathname.slice(prefix.length - 1); }
   const file = path.join(base, path.normalize(rel));
   if (file !== base && !file.startsWith(base + path.sep))
@@ -77,12 +95,20 @@ const server = http.createServer((req, res) => {
   // The scan: index.html and generated/* are rebuilt when the page is asked for.
   if (pathname === '/index.html') {
     try {
-      return send(res, 200, req.method === 'HEAD' ? '' : build().html, { 'Content-Type': MIME['.html'] });
+      return send(res, 200, req.method === 'HEAD' ? '' : page().html, { 'Content-Type': MIME['.html'] });
     } catch (e) {
       console.error('build failed: ' + e.message);
       return send(res, 500, `<!DOCTYPE html><meta charset="utf-8"><title>Build failed</title><pre>build failed: ${escapeHtml(e.message)}</pre>`,
                   { 'Content-Type': MIME['.html'] });
     }
+  }
+  // With an overlaid plugin nothing is written: generated/* come from the same build.
+  if (overlaid && pathname.startsWith('/generated/')) {
+    let text;
+    try { text = page().generated[pathname.slice('/generated/'.length)]; }
+    catch (e) { return send(res, 500, `build failed: ${e.message}`, { 'Content-Type': 'text/plain' }); }
+    if (text === undefined) return send(res, 404, 'Not found', { 'Content-Type': 'text/plain' });
+    return send(res, 200, req.method === 'HEAD' ? '' : text, { 'Content-Type': MIME['.json'] });
   }
 
   fs.stat(file, (err, st) => {
@@ -107,8 +133,9 @@ const server = http.createServer((req, res) => {
 
 server.listen(port, '127.0.0.1', () => {
   try {
-    const { plugins } = build();
+    const { plugins } = page();
     console.log(`Recto (static) → http://localhost:${port}   plugins: ${plugins.map(p => p.name).join(', ') || '(none)'}`);
+    for (const [name, folder] of Object.entries(overlay)) console.log(`  ${name} from ${folder}`);
   } catch (e) {
     console.error(`Recto (static) → http://localhost:${port}   build failed: ${e.message}`);
   }

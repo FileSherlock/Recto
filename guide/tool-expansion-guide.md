@@ -54,6 +54,11 @@ something the page does. `node tools/build.mjs` runs once per deploy; the develo
 (`node tools/serve.mjs`) runs the same scan on every request for `index.html`. **Dropping a
 plugin folder in enables it on the next reload; dragging it out disables it.**
 
+A plugin can also live in a repository of its own and be synced into `web/plugins/`.
+`node tools/serve.mjs --plugin <folder>` then shows its working copy in this site, in place
+of the synced one, without writing anything into `web/` (see
+[Local Development](setup-and-deployment/local-development.md#a-plugin-developed-in-a-repository-of-its-own)).
+
 ### `plugin.json` Reference
 
 All fields, with their defaults (read by `readPlugins()` in `tools/build.mjs`):

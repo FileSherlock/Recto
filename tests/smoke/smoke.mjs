@@ -1,6 +1,6 @@
 // smoke.mjs — the whole static site in a real browser, once per golden document.
 //
-//   node tests/smoke/smoke.mjs [--chrome <exe>] [--only <golden name>]
+//   node tests/smoke/smoke.mjs [--chrome <exe>] [--only <golden name>] [--plugin <folder>]
 //
 // Starts tools/serve.mjs on a free port, opens the app headless and, for every
 // document of tests/golden/documents.json, uploads it through the real file
@@ -12,6 +12,9 @@
 //   settle(page, doc)  wait until the plugin is done with a freshly opened document
 //   exercise(page, doc, note)   drive the plugin's own UI; push remarks onto note
 //   quiesce(page)      stop background work before the next document
+// --plugin <folder> (repeatable) is passed on to tools/serve.mjs: the site runs
+// with that plugin folder in place of web/plugins/<its name>/ — a plugin
+// developed in a repository of its own, checked before it is synced in.
 // Not part of `node --test`: it needs Chrome and takes a minute.
 //
 // puppeteer-core is not a dependency of this repository (it has none); the
@@ -27,6 +30,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const args = process.argv.slice(2);
 const option = name => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
+// every --plugin <folder>, made absolute: the server runs in this repository's root
+const overlays = args.flatMap((a, i) => (a === '--plugin' && args[i + 1] ? ['--plugin', path.resolve(args[i + 1])] : []));
 
 const CHROME = option('--chrome') || process.env.CHROME || [
   '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser',
@@ -64,7 +69,7 @@ const freePort = () => new Promise((resolve, reject) => {
 
 async function main() {
   const port = await freePort(), base = `http://127.0.0.1:${port}`;
-  const server = spawn(process.execPath, [path.join('tools', 'serve.mjs'), String(port)], { cwd: ROOT, stdio: 'ignore' });
+  const server = spawn(process.execPath, [path.join('tools', 'serve.mjs'), String(port), ...overlays], { cwd: ROOT, stdio: 'ignore' });
   const steps = await pluginSteps();
   let browser, failures = 0;
   try {

@@ -23,7 +23,7 @@
   // A box's fields are the change; what a plugin derived from them — its
   // candidate widths, verdicts, the refiner's findings, the pixel raster — is
   // derived again after a restore, not kept.
-  const DERIVED = new Set(['_pixel', '_refine', '_candidateOwners', 'candidates', 'widths', 'widthFace',
+  const DERIVED = new Set(['_pixel', '_pixelIds', '_keepBaseline', '_refine', '_candidateOwners', 'candidates', 'widths', 'widthFace',
     'verdicts', 'refineInfo', 'refined', 'labelColor', 'labelAlign', 'picked']);
   function snapshot(box) {
     const out = {};

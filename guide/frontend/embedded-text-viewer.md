@@ -33,6 +33,7 @@ Every piece of text is stored as a `UnifiedTextBox` instance inside the global `
   bold, italic, underline, strikethrough: bool,
   letterSpacing: float, // em
   color: string|null,   // null = per-type default color
+  opacity: number,      // the colour's opacity, % (100 = solid)
   renderFont: string|null,    // optional render-face override; null = fontFamily
 
   // Kerning and word spacing
@@ -51,6 +52,11 @@ Every piece of text is stored as a `UnifiedTextBox` instance inside the global `
 
   // Layout
   autoWidth: bool,      // true = box.w follows the rendered text; no resize handles
+
+  // Artistic and Frame text (see ../frontend/artistic-and-frame-text.md)
+  textMode: null | 'artistic' | 'frame',
+  story: { paragraphs: [{ attrs, runs: [{ text, attrs }] }] } | null,   // StoryCore
+  frame: object | null, // overrides of StoryCore.FRAME_DEFAULTS
 
   // Redaction-only
   widths: {},           // candidate word → pixel width map

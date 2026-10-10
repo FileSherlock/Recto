@@ -18,8 +18,57 @@
    * Push a box's properties into the toolbar UI.
    * Called whenever a box is selected.
    */
+  // Artistic / Frame text: the ribbon shows and sets the character
+  // attributes of its selection — all of its text while the box is only
+  // selected, the selected characters while it is edited (story-edit.js)
+  const storyBoxOf = box => (box?.textMode && typeof storyApplyChar === 'function' ? box : null);
+  const selectedStory = () => storyBoxOf(getSelected());
+
+  function syncToolbarToStory(box) {
+    const st = window.storyCharState?.(box);
+    if (!st) return;
+    const a = st.attrs, mixed = new Set(st.mixed);
+    const ffSel = el('fabric-font-family');
+    if (ffSel) {
+      if (!Array.from(ffSel.options).some(o => o.value === a.fontFamily)) {
+        const opt = document.createElement('option');
+        opt.value = a.fontFamily; opt.textContent = `${a.fontFamily} (not installed)`;
+        ffSel.appendChild(opt);
+      }
+      ffSel.value = a.fontFamily;
+    }
+    const fs = el('fabric-font-size');
+    if (fs && document.activeElement !== fs) fs.value = mixed.has('sizePt') ? '' : Math.round(a.sizePt * 100) / 100;
+    el('fabric-bold')         ?.classList.toggle('active', !!a.bold);
+    el('fabric-italic')       ?.classList.toggle('active', !!a.italic);
+    el('fabric-underline')    ?.classList.toggle('active', a.underline !== 'none');
+    el('fabric-strikethrough')?.classList.toggle('active', a.strike !== 'none');
+    const c = el('fabric-color');
+    if (c && a.color && /^#[0-9a-f]{6}$/i.test(a.color)) c.value = a.color;
+    showOpacity(mixed.has('opacity') ? null : a.opacity);
+    const ls = el('fabric-letter-spacing');
+    if (ls && document.activeElement !== ls) ls.value = ((a.tracking || 0) / 1000).toFixed(2);
+    const kernI = el('kerning');
+    if (kernI) { kernI.checked = !!a.autoKern; const lbl = kernI.closest('label'); if (lbl) lbl.title = "Apply the font's native kerning to this text"; }
+    // what only a one-line box has: the measured space width and the nudge
+    for (const id of ['fabric-default-sw', 'fabric-space-width', 'toggle-space-labels', 'fabric-nudge-mode']) {
+      const b = el(id); if (b) b.disabled = true;
+    }
+  }
+  window.onStoryChange?.(() => { const b = selectedStory(); if (b) syncToolbarToStory(b); });
+
   function syncToolbarToBox(box) {
     if (!box) return;
+    for (const id of ['fabric-default-sw', 'fabric-space-width', 'toggle-space-labels']) {
+      const b = el(id); if (b) b.disabled = !!storyBoxOf(box);
+    }
+    window.syncStoryControls?.(box);
+    if (storyBoxOf(box)) {
+      syncToolbarToStory(box);
+      syncMatchSettings(null);
+      el('fabric-options-bar')?.classList.remove('hidden');
+      return;
+    }
 
     // The menu must SHOW the box's family even when the catalogue lacks it:
     // every toolbar change writes the menu's value back into the box
@@ -48,6 +97,7 @@
     if (colorInput && box.color && box.color.startsWith('#')) {
       colorInput.value = box.color;
     }
+    showOpacity(box.opacity ?? 100);
 
     const lsInput = el('fabric-letter-spacing');
     if (lsInput) lsInput.value = (box.letterSpacing || 0).toFixed(2);
@@ -98,6 +148,13 @@
 
   // Expose for drag-resize.js and other modules
   window.syncToolbarToBox = syncToolbarToBox;
+
+  // The opacity slider and its number show one value (null: mixed in the selection)
+  function showOpacity(v) {
+    const r = el('fabric-opacity'), n = el('fabric-opacity-value');
+    if (r && document.activeElement !== r) r.value = v ?? 100;
+    if (n && document.activeElement !== n) n.value = v == null ? '' : Math.round(v);
+  }
 
   function syncToolbarToSelection() {
     const box = getSelected();
@@ -202,16 +259,34 @@
 
   const STYLE_TOGGLES = ['fabric-bold', 'fabric-italic', 'fabric-underline', 'fabric-strikethrough'];
 
+  const STORY_TOGGLE = {
+    'fabric-bold': on => ({ bold: on }),
+    'fabric-italic': on => ({ italic: on }),
+    'fabric-underline': on => ({ underline: on ? 'single' : 'none' }),
+    'fabric-strikethrough': on => ({ strike: on ? 'single' : 'none' }),
+  };
   STYLE_TOGGLES.forEach(id => {
     el(id)?.addEventListener('click', () => {
-      el(id).classList.toggle('active');
+      const on = el(id).classList.toggle('active');
+      const sb = selectedStory();
+      if (sb) { storyApplyChar(sb, STORY_TOGGLE[id](on)); return; }
       const box = getSelected();
       if (box) persistFromToolbar(box);
     });
   });
 
-  el('fabric-font-family')?.addEventListener('change', () => persistFromToolbar(getSelected()));
+  el('fabric-font-family')?.addEventListener('change', () => {
+    const sb = selectedStory();
+    if (sb) { storyApplyChar(sb, { fontFamily: el('fabric-font-family').value }); return; }
+    persistFromToolbar(getSelected());
+  });
   el('fabric-font-size')  ?.addEventListener('input',  () => {
+    const sb = selectedStory();
+    if (sb) {
+      const v = parseFloat(el('fabric-font-size').value);
+      if (v > 0) storyApplyChar(sb, { sizePt: v }, `size:${sb.id}`);
+      return;
+    }
     const box = getSelected();
     if (box) {
       const step = window.utbUndo?.capture([box]);
@@ -224,10 +299,19 @@
       }
     }
   });
-  el('fabric-font-size')  ?.addEventListener('change', () => { const b = getSelected(); if (b) persistFromToolbar(b, `size:${b.id}`); });
+  el('fabric-font-size')  ?.addEventListener('change', () => {
+    if (selectedStory()) return;                       // the input handler applied it
+    const b = getSelected(); if (b) persistFromToolbar(b, `size:${b.id}`);
+  });
 
-  el('fabric-letter-spacing')?.addEventListener('change', () => persistFromToolbar(getSelected()));
+  el('fabric-letter-spacing')?.addEventListener('change', () => {
+    const sb = selectedStory();
+    if (sb) { storyApplyChar(sb, { tracking: Math.round((parseFloat(el('fabric-letter-spacing').value) || 0) * 1000) }); return; }
+    persistFromToolbar(getSelected());
+  });
   el('fabric-color')         ?.addEventListener('input', e => {
+    const sb = selectedStory();
+    if (sb) { storyApplyChar(sb, { color: e.target.value }, `color:${sb.id}`); return; }
     const box = getSelected();
     if (box) {
       const step = window.utbUndo?.capture([box]);
@@ -236,6 +320,24 @@
       renderBox(box);
     }
   });
+
+  // Text opacity: a story's selected characters, or a plain box's text
+  function applyOpacity(raw) {
+    const v = Math.max(0, Math.min(100, Math.round(parseFloat(raw))));
+    if (!Number.isFinite(v)) return;
+    showOpacity(v);
+    const sb = selectedStory();
+    if (sb) { storyApplyChar(sb, { opacity: v }, `opacity:${sb.id}`); return; }
+    const box = getSelected();
+    if (!box) return;
+    const step = window.utbUndo?.capture([box]);
+    box.opacity = v;
+    window.utbUndo?.commit(step, 'opacity', `opacity:${box.id}`);
+    renderBox(box);
+  }
+  el('fabric-opacity')?.addEventListener('input', e => applyOpacity(e.target.value));
+  el('fabric-opacity-value')?.addEventListener('change', e => applyOpacity(e.target.value));
+  el('fabric-opacity')?.addEventListener('dblclick', () => applyOpacity(100));
 
   // "Default" button: toggle native vs manual space width
   el('fabric-default-sw')?.addEventListener('click', async () => {
@@ -311,6 +413,8 @@
   // style before anything measures it via getBBox(); recalc candidate widths
   // for redactions (guarded so text_tool stays standalone).
   el('kerning')?.addEventListener('change', () => {
+    const sb = selectedStory();
+    if (sb) { storyApplyChar(sb, { autoKern: !!el('kerning').checked }); return; }
     const box = getSelected();
     if (!box) return;
     const step = window.utbUndo?.capture([box]);
@@ -389,6 +493,85 @@
       els.viewer.style.cursor = 'crosshair';
     }
   });
+
+  // ── Artistic / Frame text: Affinity's text context toolbar ────────────
+  // The ribbon groups marked .tt-story-only / .tt-frame-only show while text
+  // the user added is selected; a plain one-line box becomes Artistic text the
+  // moment one of them is used on it (storyApplyChar → ensureStory).
+
+  const storyCapable = box => !!box && (!!box.textMode || box.type === 'harfbuzz');
+  const SC = globalThis.StoryCore;
+
+  function showStoryGroups(box) {
+    const story = storyCapable(box), frame = box?.textMode === 'frame';
+    // (by class, not under the bar: a group that did not fit sits in the
+    // ribbon's "More" menu)
+    document.querySelectorAll('.tt-story-only').forEach(e => e.classList.toggle('hidden', !story));
+    document.querySelectorAll('.tt-frame-only').forEach(e => e.classList.toggle('hidden', !frame));
+  }
+
+  function syncStoryControls(box) {
+    showStoryGroups(box);
+    if (!storyCapable(box) || !SC) return;
+    const ch = box.textMode ? window.storyCharState?.(box) : { attrs: SC.charOf({}), mixed: [] };
+    const pa = box.textMode ? window.storyParaState?.(box) : { attrs: SC.paraOf({}), mixed: [] };
+    const fr = SC.frameOf(box.frame);
+    if (!ch || !pa) return;
+    el('tt-superscript')?.classList.toggle('active', ch.attrs.position === 'super');
+    el('tt-subscript')?.classList.toggle('active', ch.attrs.position === 'sub');
+    el('tt-highlight-btn')?.classList.toggle('active', !!ch.attrs.highlight);
+    if (ch.attrs.highlight && /^#[0-9a-f]{6}$/i.test(ch.attrs.highlight) && el('tt-highlight')) el('tt-highlight').value = ch.attrs.highlight;
+    const align = el('tt-align');
+    if (align) align.value = pa.mixed.includes('align') ? '' : pa.attrs.align;
+    const lt = el('tt-leading-type'), lv = el('tt-leading');
+    if (lt) lt.value = pa.mixed.includes('leadingType') ? '' : pa.attrs.leadingType;
+    if (lv && document.activeElement !== lv) {
+      lv.disabled = pa.attrs.leadingType === 'default';
+      lv.value = pa.attrs.leadingType === 'default' || pa.mixed.includes('leading') ? '' : pa.attrs.leading;
+    }
+    el('tt-bullets')?.classList.toggle('active', pa.attrs.list === 'bullet');
+    el('tt-numbers')?.classList.toggle('active', pa.attrs.list !== 'none' && pa.attrs.list !== 'bullet');
+    if (el('tt-valign')) el('tt-valign').value = fr.valign;
+    if (el('tt-columns') && document.activeElement !== el('tt-columns')) el('tt-columns').value = fr.columns;
+    if (el('tt-gutter') && document.activeElement !== el('tt-gutter')) el('tt-gutter').value = fr.gutter;
+  }
+  window.syncStoryControls = syncStoryControls;
+  window.onStoryChange?.(() => syncStoryControls(getSelected()));
+
+  // the box these controls act on: text the user added, or nothing
+  const storyTargetBox = () => { const b = getSelected(); return storyCapable(b) ? b : null; };
+  const onStory = (id, type, fn) => el(id)?.addEventListener(type, e => { const b = storyTargetBox(); if (b) fn(b, e); });
+
+  // Affinity steps each run's own size by a point
+  onStory('tt-size-up', 'click', b => storyMapChar(b, a => ({ sizePt: Math.round((a.sizePt + 1) * 100) / 100 })));
+  onStory('tt-size-down', 'click', b => storyMapChar(b, a => ({ sizePt: Math.max(1, Math.round((a.sizePt - 1) * 100) / 100) })));
+  onStory('tt-change-case', 'change', (b, e) => { const mode = e.target.value; e.target.value = ''; if (mode) storyChangeCase(b, mode); });
+  onStory('tt-superscript', 'click', b => storyApplyChar(b, { position: el('tt-superscript').classList.contains('active') ? 'normal' : 'super' }));
+  onStory('tt-subscript', 'click', b => storyApplyChar(b, { position: el('tt-subscript').classList.contains('active') ? 'normal' : 'sub' }));
+  onStory('tt-highlight-btn', 'click', b => storyApplyChar(b, { highlight: el('tt-highlight-btn').classList.contains('active') ? null : el('tt-highlight').value }));
+  onStory('tt-highlight', 'input', (b, e) => storyApplyChar(b, { highlight: e.target.value }, `highlight:${b.id}`));
+  onStory('tt-align', 'change', (b, e) => { if (e.target.value) storyApplyPara(b, { align: e.target.value }); });
+  onStory('tt-leading-type', 'change', (b, e) => {
+    const t = e.target.value;
+    if (!t) return;
+    // a value to start from that keeps the lines where they are near enough
+    const size = (window.storyCharState?.(b)?.attrs.sizePt) || b.sizePt || 12;
+    const leading = { multiple: 1.2, percent: 120, atLeast: Math.round(size * 1.2 * 10) / 10, exact: Math.round(size * 1.2 * 10) / 10 }[t] ?? 0;
+    storyApplyPara(b, { leadingType: t, leading });
+  });
+  onStory('tt-leading', 'change', (b, e) => { const v = parseFloat(e.target.value); if (v > 0) storyApplyPara(b, { leading: v }); });
+  onStory('tt-bullets', 'click', b => storyApplyPara(b, { list: el('tt-bullets').classList.contains('active') ? 'none' : 'bullet' }));
+  onStory('tt-numbers', 'click', b => storyApplyPara(b, { list: el('tt-numbers').classList.contains('active') ? 'none' : 'decimal' }));
+  onStory('tt-valign', 'change', (b, e) => storyApplyFrame(b, { valign: e.target.value }));
+  onStory('tt-columns', 'change', (b, e) => {
+    const n = Math.max(1, Math.min(50, parseInt(e.target.value, 10) || 1));
+    const fr = SC.frameOf(b.frame);
+    // columns that touch read as one: a first split gets a quarter inch between them
+    storyApplyFrame(b, fr.columns === 1 && n > 1 && !fr.gutter ? { columns: n, gutter: 18 } : { columns: n });
+  });
+  onStory('tt-gutter', 'change', (b, e) => storyApplyFrame(b, { gutter: Math.max(0, parseFloat(e.target.value) || 0) }));
+  for (const [id, tab] of [['tt-open-character', 'character'], ['tt-open-paragraph', 'paragraph'], ['tt-open-frame', 'frame'], ['tt-open-typography', 'typography']])
+    el(id)?.addEventListener('click', () => window.openTextStudio?.(tab));
 
   // Toggle-embedded-text button (show/hide embedded text in SVG globally)
   el('toggle-embedded-text')?.classList.add('active');

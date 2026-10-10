@@ -62,6 +62,7 @@ Running it takes one command and no install step — `node tools/serve.mjs`, the
 - **[Architecture Overview](./architecture/architecture-overview.md)** — the high-level system design: the static layout, the document service, the data flow.
   - [Scale & Size Detection](./architecture/scale-and-size-detection.md) — how the pt→px scale and the body font size of a document are found.
   - [Unified Text Box](./architecture/unified-text-box.md) — the one data model and rendering pipeline behind every piece of text on a page.
+- **[Artistic and Frame Text](./frontend/artistic-and-frame-text.md)** — Affinity's text tools and Character, Paragraph, Text Frame and Typography panels, setting by setting.
 - **[Tool Expansion Guide](./tool-expansion-guide.md)** — how to write a plugin: `plugin.json`, the `PDFHooks` bus, the `Doc` service, `assetURL()`, workers, tests, removal.
 - **[UI Map](./ui-map.md)** — every visible control: label → owning plugin → fragment → handler script.
 - **[Frontend Implementation](./frontend/javascript-module-reference.md)** — the vanilla JS and WebGL rendering engine, module by module.

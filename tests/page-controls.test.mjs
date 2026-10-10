@@ -26,9 +26,24 @@ const CONTROLS = {
   text_tool: [
     'tt-undo', 'tt-redo', 'toggle-fmt', 'tt-add-text-btn', 'tool-add-box', 'fabric-options-bar',
     'fabric-font-family', 'fabric-font-size', 'fabric-bold', 'fabric-italic', 'fabric-underline',
-    'fabric-strikethrough', 'fabric-color', 'kerning', 'fabric-nudge-mode', 'fabric-letter-spacing',
+    'fabric-strikethrough', 'fabric-color', 'fabric-opacity', 'fabric-opacity-value', 'kerning', 'fabric-nudge-mode', 'fabric-letter-spacing',
     'fabric-default-sw', 'fabric-space-width', 'fabric-space-width-display', 'toggle-space-labels',
     'utb-delete-box', 'tt-settings', 'tt-match-scope', 'tolerance', 'tt-name-case',
+    // Affinity's text tools, the text context toolbar's groups, the Text panel
+    'tt-art-text-btn', 'tt-frame-text-btn', 'tt-studio-btn',
+    'tt-text-group', 'tt-size-up', 'tt-size-down', 'tt-change-case', 'tt-superscript', 'tt-subscript', 'tt-highlight-btn', 'tt-highlight',
+    'tt-para-group', 'tt-align', 'tt-valign', 'tt-leading-type', 'tt-leading', 'tt-bullets', 'tt-numbers',
+    'tt-columns-group', 'tt-columns', 'tt-gutter', 'tt-panels-group', 'tt-open-character', 'tt-open-paragraph', 'tt-open-frame', 'tt-open-typography',
+    'tt-studio', 'tt-studio-head', 'tt-studio-close', 'tt-studio-scope',
+    'tt-ch-family', 'tt-ch-size', 'tt-ch-style', 'tt-ch-color', 'tt-ch-highlight', 'tt-ch-autokern', 'tt-ch-kern', 'tt-ch-tracking',
+    'tt-ch-baseline', 'tt-ch-leading-ov', 'tt-ch-shear', 'tt-ch-scalex', 'tt-ch-scaley', 'tt-ch-position', 'tt-ch-nobreak',
+    'tt-ch-underline', 'tt-ch-strike', 'tt-ch-stroke', 'tt-ch-lang', 'tt-ch-caps',
+    'tt-pa-align', 'tt-pa-leading-type', 'tt-pa-leading', 'tt-pa-left', 'tt-pa-right', 'tt-pa-first', 'tt-pa-before', 'tt-pa-after',
+    'tt-pa-sbmode', 'tt-pa-deftabs', 'tt-pa-tabs', 'tt-pa-tab-add', 'tt-pa-ws', 'tt-pa-ls', 'tt-pa-start', 'tt-pa-hyph', 'tt-pa-list',
+    'tt-pa-drop-on', 'tt-pa-drop-lines', 'tt-pa-fill',
+    'tt-fr-in-l', 'tt-fr-hide', 'tt-fr-cols', 'tt-fr-gutter', 'tt-fr-balance', 'tt-fr-rule', 'tt-fr-valign', 'tt-fr-maxpara',
+    'tt-fr-baseline', 'tt-fr-min', 'tt-convert-frame', 'tt-convert-art',
+    'tt-ot-liga', 'tt-ot-numform', 'tt-ot-position', 'tt-ot-ss', 'tt-ot-hide',
   ],
   webgl_mask: [
     'toggle-webgl', 'webgl-options-bar', 'edge-subtract',
@@ -61,6 +76,14 @@ test('text_tool: the shaper and the catalogue load before the toolbar', { skip: 
   // are shown and hidden wholesale, and text just typed must not vanish with them.
   const src = fs.readFileSync(path.join(WEB, 'plugins', 'text_tool', 'text-tool.js'), 'utf8');
   assert.ok(src.slice(src.indexOf('window.handleManualAddText')).includes("type: 'harfbuzz'"));
+});
+
+test('text_tool: the story model before the box, its renderer after the SVG one, its editor before the toolbar', { skip: unlessInstalled('text_tool') }, () => {
+  inOrder(['text_tool/story-core.js', 'text_tool/unified-text-box.js', 'text_tool/svg-renderer.js', 'text_tool/story-render.js',
+    'text_tool/story-edit.js', 'text_tool/toolbar.js', 'text_tool/inline-edit.js', 'text_tool/frame-tool.js', 'text_tool/artistic-tool.js', 'text_tool/text-studio.js']);
+  // frames and artistic text the user draws are 'harfbuzz' boxes too: never hidden with the extracted layers
+  for (const file of ['frame-tool.js', 'artistic-tool.js'])
+    assert.ok(fs.readFileSync(path.join(WEB, 'plugins', 'text_tool', file), 'utf8').includes("type: 'harfbuzz'"), file);
 });
 
 test('embedded_text_viewer: the extractor loads before the fetcher', { skip: unlessInstalled('embedded_text_viewer') }, () => {

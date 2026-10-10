@@ -14,6 +14,7 @@ are standalone maintenance scripts (font files, the refiner's word list), run by
 
 ```bash
 node tools/serve.mjs [port]             # dev server → http://localhost:5000 (rebuilds index.html on every request for it)
+node tools/serve.mjs --plugin <folder>  # the same, with a plugin folder from outside web/plugins/ in place of its copy there
 node tools/build.mjs                    # the scan: web/plugins/*/plugin.json → web/index.html + web/generated/*  (a deploy runs this once)
 node --test "tests/**/*.test.mjs"       # the test suite (node:test, zero dependencies)
 node tests/plugins/<name>/<file>.test.mjs   # one plugin's suite on its own
@@ -64,7 +65,7 @@ overlays. Prefer per-page work over whole-document passes so huge documents stay
 
 | Plugin | Role |
 |---|---|
-| `text_tool` | Edit/add text; `shaping.js` measures with HarfBuzz (`Shaping.widths`, `Shaping.fontMetrics`), `fonts.js` is the font catalogue (`FontCatalog`, from `generated/fonts.json`) |
+| `text_tool` | Edit/add text; `shaping.js` measures with HarfBuzz (`Shaping.widths`, `Shaping.fontMetrics`, `Shaping.faceMetrics`), `fonts.js` is the font catalogue (`FontCatalog`, from `generated/fonts.json`). Affinity's Artistic and Frame text: `story-core.js` (`StoryCore`, the rich-text model, no DOM), `story-render.js`, `story-edit.js`, the tools `frame-tool.js` / `artistic-tool.js` and the Text panel `text-studio.js` — see `guide/frontend/artistic-and-frame-text.md` |
 | `embedded_text_viewer` | Inline overlay of the PDF's embedded text; `extract.js` turns `Doc.structuredText` into spans |
 | `webgl_mask` | Black-region detection (`mask-core.js`, in the plugin's own worker) + GPU mask tinting |
 
@@ -85,7 +86,9 @@ read or redraw a page certify their result against those bytes.
 `web/vendor/` holds the pinned WebAssembly builds (MuPDF 1.28.0, harfbuzzjs 1.6.1 = HarfBuzz 14.4.0); read
 `web/vendor/README.md` before upgrading either — the core reads two MuPDF structs from the wasm heap, and the shaper
 applies the legacy `kern` table that the minimal HarfBuzz build leaves out. A plugin may carry files synced verbatim
-from another repository (its README under `guide/plugins/` says which folders); those are never edited here.
+from another repository, or be developed in one as a whole (its README under `guide/plugins/` says which folders);
+those copies are never edited here — they change in that repository and are synced in. That repository's dev server
+is this one's with `--plugin` (`build({ overlay })`): the site's own page with its working copy in place of the copy here.
 
 ## Coordinate contract
 

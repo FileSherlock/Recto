@@ -5,7 +5,9 @@
 //   node --test tests/*.test.mjs
 
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +25,8 @@ function normalise(html) {
     .replace(/<script src="plugins\/embedded_text_viewer\/extract\.js[^"]*"><\/script>/, '')   // the extractor (new)
     .replace(/<script src="plugins\/text_tool\/shaping\.js[^"]*"><\/script>/, '')             // HarfBuzz measurement (new)
     .replace(/<script src="plugins\/text_tool\/undo\.js[^"]*"><\/script>/, '')                // the undo stack (new)
+    .replace(/<script src="plugins\/text_tool\/(story-core|story-render|story-edit|frame-tool|artistic-tool|text-studio)\.js[^"]*"><\/script>/g, '')   // Artistic and Frame text, the Text panel (new)
+    .replace(/<script src="plugins\/image_adjust\/[^"]*"><\/script>/g, '')                     // view adjustments: Curves, Invert, … (a new plugin)
     .replace(/<script src="plugins\/ocr_tool\/box-rules\.js[^"]*"><\/script>/, '')             // which boxes are redactions (new)
     // Fabric.js (gone): the recorded page loaded it from cdnjs, with a polyfill for a warning it
     // caused, long after the last call into it had been removed — the page loads no outside script
@@ -97,4 +101,38 @@ test('a plugin that is not there leaves no trace on the page', () => {
   }
   const none = build({ write: false, absent: plugins });
   assert.ok(!/(src|href)="plugins\/|"plugins\//.test(none.html), 'the core alone refers to no plugin file');
+});
+
+test('a plugin overlaid from a folder of its own is built from that folder', () => {
+  // How a plugin developed in a repository of its own runs in the site before it
+  // is synced in (build({ overlay }), tools/serve.mjs --plugin): a copy of an
+  // installed plugin with one fragment marked stands in for web/plugins/<name>/.
+  const p = build({ write: false }).plugins.find(q => q.toolbar_button);
+  assert.ok(p, 'some plugin has a toolbar button');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'recto-overlay-'));
+  try {
+    const folder = path.join(tmp, p.name);
+    fs.cpSync(path.join(WEB, 'plugins', p.name), folder, { recursive: true });
+    const marked = path.join(folder, p.toolbar_button);
+    fs.appendFileSync(marked, '\n<span id="overlay-probe"></span>\n');
+    const { html, assets, generated } = build({ write: false, overlay: { [p.name]: folder } });
+    assert.ok(html.includes('id="overlay-probe"'), 'the fragment is read from the overlay');
+    assert.ok(!build({ write: false }).html.includes('overlay-probe'), 'and only with it');
+    assert.equal(assets[`plugins/${p.name}/${p.toolbar_button}`],
+                 createHash('sha256').update(fs.readFileSync(marked)).digest('hex').slice(0, 8), 'hashes are the overlay files\'');
+    assert.ok(!generated['plugins.json'].includes(tmp), 'no local path reaches plugins.json');
+
+    // a plugin web/plugins/ does not hold joins the page; its name must be its folder's
+    const extra = path.join(tmp, 'overlay_probe');
+    fs.mkdirSync(extra);
+    fs.writeFileSync(path.join(extra, 'plugin.json'), JSON.stringify({ name: 'overlay_probe', scripts_after_app: ['probe.js'] }));
+    fs.writeFileSync(path.join(extra, 'probe.js'), '// probe\n');
+    const more = build({ write: false, overlay: { overlay_probe: extra } });
+    assert.ok(more.plugins.some(q => q.name === 'overlay_probe'));
+    assert.match(more.html, /<script src="plugins\/overlay_probe\/probe\.js\?v=[0-9a-f]{8}"><\/script>/);
+    assert.throws(() => build({ write: false, overlay: { other_name: extra } }), /"name" is "overlay_probe"/);
+    assert.throws(() => build({ overlay: { overlay_probe: extra } }), /never written/);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });

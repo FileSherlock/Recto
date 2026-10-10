@@ -92,6 +92,13 @@ anything to work on.
 |---|---|---|---|
 | `redaction_matching` | [redaction-matching/](redaction-matching/) | Candidate-name → redaction-bar width matching in the bar's own face; owns the candidates sidebar (name format, starts-with / ends-with filter, matches table). Names that tie on width are all listed — click one or press `[` / `]` to choose the bar's label; page-pixel verdicts (`✓ ✗ –`) rank them when a hypothesis tester is present. Two bars that are one name (a space apart, or split over a line break) are read as one person: first name on one bar, last name on the other | The name pool, `web/plugins/redaction_matching/names.json` (fetched once) |
 
+- **Developed in its own repository**, `redaction-matching` (`Desktop/redaction-matching`, beside
+  this one, like tol0). `web/plugins/redaction_matching/`, `tests/plugins/redaction_matching/` and
+  `guide/plugins/redaction-matching/` are verbatim copies of its folders at the same paths, synced
+  in by its `npm run sync:recto` — edit them there, never in this repo; the sync refuses to
+  overwrite a copy that was changed here. Its `npm run serve` is this site with its working copy in
+  place of the synced one (`tools/serve.mjs --plugin`), so it looks exactly as it will here.
+
 ## Redaction refiner
 
 Redraws detected redaction bars to the true hidden-name extent by reading the
@@ -121,19 +128,36 @@ snapping redactions to lines.
   `ocr_tool` line). With neither it no-ops. The hook emission is generic and names no
   plugin, so it stays put — emitting into the void — if the refiner is removed.
 
+## Image adjustments
+
+Shows the pages through Affinity's adjustment layers — Invert, Curves, Levels,
+Brightness / Contrast, Threshold — computed as Affinity computes them, to read a scan:
+invert it, raise its contrast, stretch its darkest tones. The document is never changed;
+every analysis keeps reading the page's own pixels. A ribbon bar with the quick controls and
+Affinity's presets, and a floating panel with the adjustment stack and the Curves graph
+(histogram, pickers for the black, white and grey point).
+
+| Plugin | Docs | What it does | Data it keeps |
+|---|---|---|---|
+| `image_adjust` | [image-adjust/](image-adjust/) | An SVG filter of 256-entry tables over the page image (and `webgl_mask`'s overlay when it is on); an exact export of the adjusted page as PNG | The adjustment stack, in `localStorage` (`recto.imageAdjust`) |
+
+- **Requires nothing.** It reads pixels through `Doc`, and styles `webgl_mask`'s
+  `.webgl-overlay` by its class when it is there.
+
 ## Dependency order
 
 ```
 redaction_matching ──runtime globals──> text_tool ──> core (web/core/)
 ocr_tool           ──runtime globals──> text_tool ──> core
 base64_tool        ──runtime globals──> text_tool ──> core
+image_adjust       ──Doc, PDFHooks──────────────────> core
 redaction_refiner  ──'redactions:connected'──> embedded_text_viewer ──> core
 redaction_refiner  ──'redaction:refined'  ──> (redaction_matching listens, optionally)
 ```
 
 Load order follows each manifest's `order` (ties by name): `embedded_text_viewer` 10,
-`webgl_mask` 20, `base64_tool` 30, `redaction_matching` 40, `redaction_refiner` 50,
-`ocr_tool` 60, `text_tool` 70. None of the attachments above depends on it — they resolve
+`webgl_mask` 20, `image_adjust` 25, `base64_tool` 30, `redaction_matching` 40,
+`redaction_refiner` 50, `ocr_tool` 60, `text_tool` 70. None of the attachments above depends on it — they resolve
 at call time, inside event handlers.
 
 - **`redaction_matching` attaches to `text_tool` through guarded globals**, not imports. See

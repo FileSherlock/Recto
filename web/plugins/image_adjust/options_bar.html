@@ -1,0 +1,45 @@
+<!-- image_adjust's ribbon bar: quick Invert and Brightness / Contrast, the presets,
+     the Curves panel, bypass and reset (image-adjust.js). Contextual: opened by
+     #ia-toggle through openSubtoolbar. -->
+<div id="ia-options-bar" class="ribbon-bar options-bar hidden">
+  <div class="options-divider"></div>
+  <div class="options-group">
+    <div class="options-group-controls">
+      <button id="ia-invert" class="icon-button options-toggle" title="Invert — dark becomes light (Ctrl+I)">
+        <span class="material-symbols-outlined">invert_colors</span>
+      </button>
+      <span class="options-divider options-divider--inline"></span>
+      <label class="options-label" for="ia-contrast">Contrast</label>
+      <input type="range" id="ia-contrast" min="-100" max="100" step="1" value="0" title="Contrast (%) — double-click to reset" class="ia-slider">
+      <span id="ia-contrast-value" class="options-label ia-value">0 %</span>
+      <label class="options-label" for="ia-brightness">Brightness</label>
+      <input type="range" id="ia-brightness" min="-100" max="100" step="1" value="0" title="Brightness (%) — double-click to reset" class="ia-slider">
+      <span id="ia-brightness-value" class="options-label ia-value">0 %</span>
+    </div>
+    <div class="options-group-header">Quick adjust</div>
+  </div>
+  <div class="options-divider"></div>
+  <div class="options-group">
+    <div class="options-group-controls">
+      <select id="ia-preset" class="toolbar-select" title="Replace the adjustments with a preset">
+        <option value="">Presets…</option>
+      </select>
+      <button id="ia-open-panel" class="icon-button" title="Curves, Levels and the adjustment stack…">
+        <span class="material-symbols-outlined">ssid_chart</span>
+      </button>
+    </div>
+    <div class="options-group-header">Curves</div>
+  </div>
+  <div class="options-divider"></div>
+  <div class="options-group">
+    <div class="options-group-controls">
+      <button id="ia-bypass" class="icon-button options-toggle" title="Show the page without the adjustments">
+        <span class="material-symbols-outlined">visibility_off</span>
+      </button>
+      <button id="ia-reset" class="icon-button" title="Remove every adjustment">
+        <span class="material-symbols-outlined">restart_alt</span>
+      </button>
+    </div>
+    <div class="options-group-header">View</div>
+  </div>
+</div>

@@ -15,6 +15,7 @@ the baseline plugins.
 | [Build outputs](#build-outputs) | `tools/build.mjs` | `web/index.html` and `web/generated/*.json` |
 | [`window.RECTO_ASSETS` + `assetURL()`](#windowrecto_assets-and-asseturl) | `tools/build.mjs`, `web/core/hooks.js` | Content-hashed URLs for files a script fetches itself |
 | [`Shaping`](#shaping--text-measurement-text_tool) | `web/plugins/text_tool/shaping.js` | Text widths and face metrics through HarfBuzz |
+| [`StoryCore`](#storycore--artistic-and-frame-text-text_tool) | `web/plugins/text_tool/story-core.js` | The rich-text model of Artistic and Frame text |
 | [`FontCatalog`](#fontcatalog--the-font-catalogue-text_tool) | `web/plugins/text_tool/fonts.js` | The font catalogue on the page |
 | [`EtvExtract`](#etvextract--embedded-text-spans-embedded_text_viewer) | `web/plugins/embedded_text_viewer/extract.js` | Spans from a page's raw structured text |
 | [`MaskCore`](#maskcore--page-masks-webgl_mask) | `web/plugins/webgl_mask/mask-core.js` | The mask of one page raster |
@@ -498,6 +499,48 @@ and lays typed text with when it did.
 character the face lacks is listed in `missing`. `kern` holds only the non-zero pairs.
 Resolves to `null` when `size_px` is out of range or no file is installed for the family.
 Tables are cached per face file and size; the first call shapes every pair once.
+
+### `Shaping.faceMetrics({ family, bold, italic })`
+
+A face's vertical metrics and OpenType features, in font units (divide by `upem`): what
+Artistic and Frame text set their leading, first baseline, decorations and capitals with,
+and what the Typography panel offers. Cached per face file.
+
+| Field | From |
+|---|---|
+| `upem` | `head` |
+| `ascender`, `descender`, `lineGap` | HarfBuzz's horizontal extents (OS/2 typographic values when the face sets USE_TYPO_METRICS, else `hhea`) |
+| `hheaAscender`, `hheaDescender`, `hheaLineGap` | `hhea` itself (the ideal leading) |
+| `postUnderlinePosition`, `postUnderlineThickness` | `post` |
+| `os2StrikeoutPosition`, `os2StrikeoutSize`, `typoAscender`, `typoDescender`, `typoLineGap`, `winAscent`, `winDescent`, `os2XHeight`, `os2CapHeight` | `OS/2` (the last two from version 2 on) |
+| `topH`, `topX`, `topL`, `bottomQ` | the outlines of H, x, l (tops) and q (bottom) |
+| `capHeight`, `xHeight`, `underlinePos/Size`, `strikePos/Size`, `superSize/Offset`, `subSize/Offset` | HarfBuzz's metrics with its fallbacks |
+| `space` | the space's advance |
+| `features` | every GSUB and GPOS feature tag, sorted |
+
+A field is `null` where the face has no such table. Resolves to `null` when no file is
+installed for the family.
+
+---
+
+## `StoryCore` — Artistic and Frame text (`text_tool`)
+
+`web/plugins/text_tool/story-core.js`, no DOM. A story is
+`{ paragraphs: [{ attrs, runs: [{ text, attrs }] }] }`; attributes are overrides of
+`CHAR_DEFAULTS` / `PARA_DEFAULTS` (`FRAME_DEFAULTS` for `box.frame`), positions are
+`{ p, o }` (paragraph, UTF-16 offset), a range `{ start, end }` (`null` = the whole story).
+
+| Call | Returns |
+|---|---|
+| `fromText(text, charAttrs, paraAttrs)`, `toText(story)` | a story from plain text (a line feed = a new paragraph) and back |
+| `applyChar(story, range, patch)`, `mapChar(story, range, fn)`, `applyPara(story, range, patch)` | a new story |
+| `insertText(story, pos, text, attrs)`, `deleteRange(story, range)`, `replaceRange(story, range, text, attrs)` | `{ story, pos }` |
+| `charSummary(story, range)`, `paraSummary(story, range)` | `{ attrs, mixed: [keys] }` |
+| `changeCase(story, range, mode)` (`'upper'`, `'lower'`, `'sentence'`, `'title'`), `slice(story, range)`, `listMarkers(story)` | a new story; its text; the paragraphs' markers |
+| `scaledMetrics(faceMetrics, sizePx)`, `leadingPx(pa, a, m, pxPerPt)`, `firstBaselinePx(frame, a, m, leading, pxPerPt)`, `capsPlan(caps, features)` | Affinity's numbers for a face at a size |
+| `runCSS(a, pa, m, ctx)`, `paraCSS(pa, lead, prev, ctx, opts)`, `featureSettings(a, features)` | the CSS the renderer sets |
+
+The attributes, their Affinity names and how each is computed: [Artistic and Frame Text](../frontend/artistic-and-frame-text.md).
 
 ---
 

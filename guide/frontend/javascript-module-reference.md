@@ -31,16 +31,23 @@ the order of their manifest's `order` (`embedded_text_viewer` 10, `webgl_mask` 2
 | 8 | `core/app.js` | IIFE — wires core listeners; `openSubtoolbar`, `registerSubtoolbar`; opens the startup document | **emit:** `ui:ready` | All above |
 | 9 | `embedded_text_viewer/extract.js` | `EtvExtract` (`extractSpans`, `leanSpan`, …) | — | — |
 | 10 | `embedded_text_viewer/etv-fetch.js` | `utbFetchSpans`, `utbConnectRedactionsToLines`, `addEmbeddedTextSpan`, `_utbFindNearestLine`, `etvSpanCache` | **on:** `document:loaded`, `page:rendered` · **emit:** `redactions:connected` | `Doc`, `EtvExtract`; `utbState`, `renderBox`, … at run time |
-| 11 | `text_tool/shaping.js` | `Shaping` (`widths`, `fontMetrics`), `ShapingCore` | — | `assetURL` |
+| 11 | `text_tool/shaping.js` | `Shaping` (`widths`, `fontMetrics`, `faceMetrics`), `ShapingCore` | — | `assetURL` |
 | 12 | `text_tool/fonts.js` | `FontCatalog` | **on:** `document:loaded`, `typography:detected` | `Shaping` (run time) |
-| 13 | `text_tool/unified-text-box.js` | `UnifiedTextBox`, `utbState`, `spanToUnified`, `normUtbFont`, `utbCharsValid`, `utbFindNearestLine` | — | `FontCatalog` (run time) |
-| 14 | `text_tool/svg-renderer.js` | `renderBox`, `renderTextLayer`, `renderAllTextLayers`, `selectBoxInSVG`, `computeXPositions`, `clearAllSVGLayers` | **on:** `page:rendered` | `utbState`, `GEO` |
-| 15 | `text_tool/drag-resize.js` | IIFE — SVG-native drag/resize event delegation | — | `utbState`, `renderBox` |
-| 16 | `text_tool/ruler.js` | `refreshRuler` | **on:** `page:rendered` | `utbState`, `GEO` |
-| 17 | `text_tool/toolbar.js` | `syncToolbarToBox`, `syncToolbarToSelection`, `getNaturalSpaceWidth` | — | `utbState`, `renderBox`, `Shaping` |
-| 18 | `text_tool/micro-typo.js` | `enterMicroTypo`, `exitMicroTypo` | — | `utbState`, `computeXPositions`, `renderBox` |
-| 19 | `text_tool/inline-edit.js` | `enterInlineEdit`, `commitInlineEdit`, `cancelInlineEdit` | — | `utbState`, `renderBox`, `exitMicroTypo` |
-| 20 | `text_tool/text-tool.js` | `handleManualAddBox`, `handleManualAddText`, `utbDeleteBox` | — | `utbState`, `renderBox`, all above |
+| 13 | `text_tool/story-core.js` | `StoryCore` — the rich-text model of Artistic / Frame text (no DOM) | — | — |
+| 14 | `text_tool/unified-text-box.js` | `UnifiedTextBox`, `utbState`, `spanToUnified`, `normUtbFont`, `utbCharsValid`, `utbFindNearestLine` | — | `FontCatalog` (run time) |
+| 15 | `text_tool/undo.js` | `utbUndo` | **on:** `document:opening` | `utbState`, `renderBox` (run time) |
+| 16 | `text_tool/svg-renderer.js` | `renderBox`, `renderTextLayer`, `renderAllTextLayers`, `selectBoxInSVG`, `computeXPositions`, `clearAllSVGLayers` | **on:** `page:rendered` | `utbState`, `GEO`; `renderStoryBox` (run time) |
+| 17 | `text_tool/story-render.js` | `renderStoryBox`, `storySync`, `ensureStory`, `renderAllStories`, `storyFaceMetrics` | **on:** `zoom:changed` | `StoryCore`, `Shaping`, `GEO` |
+| 18 | `text_tool/drag-resize.js` | IIFE — SVG-native drag/resize event delegation, frame handles | — | `utbState`, `renderBox` |
+| 19 | `text_tool/ruler.js` | `refreshRuler` | **on:** `page:rendered` | `utbState`, `GEO` |
+| 20 | `text_tool/story-edit.js` | `enterStoryEdit`, `commitStoryEdit`, `storyTarget`, `storyCharState`, `storyParaState`, `storyApplyChar`, `storyApplyPara`, `storyApplyFrame`, `storyMapChar`, `storyChangeCase`, `onStoryChange` | **on:** `document:opening` | `StoryCore`, `renderBox`, `utbUndo` |
+| 21 | `text_tool/toolbar.js` | `syncToolbarToBox`, `syncToolbarToSelection`, `syncStoryControls`, `getNaturalSpaceWidth` | — | `utbState`, `renderBox`, `Shaping`, `story-edit.js` |
+| 22 | `text_tool/micro-typo.js` | `enterMicroTypo`, `exitMicroTypo` | — | `utbState`, `computeXPositions`, `renderBox` |
+| 23 | `text_tool/inline-edit.js` | `enterInlineEdit`, `commitInlineEdit`, `cancelInlineEdit` | — | `utbState`, `renderBox`, `exitMicroTypo`, `enterStoryEdit` |
+| 24 | `text_tool/text-tool.js` | `handleManualAddBox`, `handleManualAddText`, `utbDeleteBox` | — | `utbState`, `renderBox`, all above |
+| 25 | `text_tool/frame-tool.js` | `createTextFrame` — the Frame Text Tool | — | `StoryCore`, `utbState`, `enterStoryEdit` |
+| 26 | `text_tool/artistic-tool.js` | `storyScaleDrag`, `storyConvert` — the Artistic Text Tool | — | `StoryCore`, `Shaping`, `enterStoryEdit` |
+| 27 | `text_tool/text-studio.js` | `openTextStudio` — the Text panel | — | `StoryCore`, `story-edit.js`, `FontCatalog` |
 
 All paths are relative to `web/`; plugin files live under `web/plugins/`.
 
@@ -93,5 +100,6 @@ versions, licences and what an upgrade has to check.
 - [SVG Text Layer](embedded-text-viewer.md) — `UnifiedTextBox` data model, SVG rendering, embedded text ingestion, inline editing, micro-typography
 - [Toolbar & Text Tool](text-tool.md) — Formatting toolbar controls, manual boxes, the font catalogue
 - [Text Measurement](width-calculator.md) — `shaping.js`: HarfBuzz widths and face metrics
+- [Artistic and Frame Text](artistic-and-frame-text.md) — `story-*.js`, the Affinity text tools and the Text panel
 - [WebGL Mask](webgl-mask.md) — Mask detection in a worker, GPU-accelerated mask rendering
 - [Optional Plugins](../plugins/) — plugins outside the baseline, and the guarded-global seams they attach through

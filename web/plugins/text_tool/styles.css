@@ -233,3 +233,199 @@ body.hide-embedded-text .utb-group[data-type="embedded"] { display: none; }
    (inline-edit owns its inline display style) but is not painted. */
 .utb-group.utb-pixel-mode .utb-text { visibility: hidden; }
 .utb-pixel { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+/* ── Artistic and Frame text (story-render.js, story-edit.js) ──── */
+/* A story is HTML inside its group's <foreignObject>; CSS px there are the
+   SVG's image px. The text keeps its glyph overhang (italics, a cap-height
+   first baseline) visible; a frame's flow clips only the columns beyond its
+   right edge, where text that does not fit waits (story-render.js). */
+.tt-story-fo { overflow: visible; pointer-events: all; }
+.tt-story {
+  position: relative;
+  box-sizing: border-box;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-size: 12px;
+  line-height: normal;
+  cursor: default;
+  user-select: none;
+}
+.tt-story.tt-artistic { display: inline-block; white-space: pre; }
+.tt-story.tt-artistic .tt-flow { display: inline-block; }
+.tt-story.tt-frame .tt-flow { position: absolute; box-sizing: content-box; }
+.tt-flow { outline: none; caret-color: #1a73e8; }
+.tt-flow[contenteditable] { cursor: text; user-select: text; }
+.tt-para { position: relative; margin: 0; }
+.tt-para[data-marker]::before {
+  content: attr(data-marker);
+  position: absolute;
+  left: var(--tt-marker-x, 0);
+  top: var(--tt-marker-y, 0);
+  text-indent: 0;
+  white-space: pre;
+}
+.tt-run, .tt-leaf, .tt-strike { white-space: inherit; }
+.tt-tab { display: inline-block; overflow: hidden; vertical-align: baseline; white-space: pre; }
+.tt-tab-leader { border-bottom: 1px var(--tt-leader, dotted) currentColor; }
+.tt-probe { display: inline-block; width: 0; height: 0; vertical-align: baseline; }
+.tt-ph { line-height: inherit; }
+
+/* the selection of a story being edited while a panel has the focus */
+::highlight(tt-story-sel) { background-color: rgba(138, 180, 248, 0.45); }
+
+/* a frame outline while selected or edited (Affinity's frame bounds), its
+   handles only while selected */
+.utb-group[data-mode="frame"] .utb-bbox { stroke: rgba(66, 133, 244, 0.85); stroke-dasharray: 3 2; }
+.utb-group[data-mode="frame"].selected .utb-bbox,
+.utb-group[data-mode="frame"].editing .utb-bbox { opacity: 1; }
+.utb-fh {
+  display: none;
+  fill: #fff;
+  stroke: #1a73e8;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  pointer-events: all;
+}
+.utb-group.selected .utb-fh { display: inline; }
+.tt-overflow-marker rect { fill: #d93025; stroke: #fff; stroke-width: 0.8; vector-effect: non-scaling-stroke; }
+.tt-overflow-marker path { fill: #fff; }
+.tt-overflow-marker { pointer-events: all; cursor: help; }
+.tt-frame-draft {
+  fill: rgba(26, 115, 232, 0.06);
+  stroke: #1a73e8;
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+/* ── the ribbon's Artistic / Frame text groups ────────────────── */
+#tt-leading, #tt-columns, #tt-gutter { width: 46px; text-align: center; }
+#tt-change-case { width: 52px; }
+#tt-highlight { width: 26px; height: 22px; padding: 0; border: none; background: none; }
+.tt-ribbon-icon { font-size: 18px; color: #bdc1c6; }
+
+/* ── the Text panel (studio.html, text-studio.js) ─────────────── */
+.tt-studio {
+  position: fixed;
+  top: 104px;
+  right: 16px;
+  width: 384px;
+  max-height: calc(100% - 120px);
+  overflow-y: auto;
+  background: #202124;
+  border: 1px solid #3c4043;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  color: #e8eaed;
+  font-size: 12px;
+  z-index: 470;
+}
+.tt-studio-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 4px 4px 0 6px;
+  background: #202124;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: move;
+  user-select: none;
+}
+.tt-tabs { display: flex; gap: 2px; }
+.tt-tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #9aa0a6;
+  font: inherit;
+  font-weight: 600;
+  padding: 6px 6px;
+  cursor: pointer;
+}
+.tt-tab-btn.active { color: #e8eaed; border-bottom-color: #8ab4f8; }
+.tt-studio-scope { padding: 6px 12px; color: #9aa0a6; font-size: 11px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.tt-studio.tt-disabled .tt-pane { opacity: 0.4; pointer-events: none; }
+.tt-pane { padding: 4px 10px 10px; }
+.tt-sec { border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding: 4px 0 6px; }
+.tt-sec:last-child { border-bottom: none; }
+.tt-sec > summary {
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #80868b;
+  padding: 4px 0;
+  list-style-position: inside;
+}
+.tt-sec.tt-off { opacity: 0.4; pointer-events: none; }
+.tt-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.tt-row > label:first-child { min-width: 104px; color: #bdc1c6; }
+.tt-row.tt-sub > label:first-child { padding-left: 12px; color: #9aa0a6; }
+.tt-row .toolbar-input-small { width: 58px; }
+.tt-row .toolbar-select { flex: 1; min-width: 0; }
+.tt-row input[type="color"] { width: 28px; height: 22px; padding: 0; border: 1px solid #3c4043; background: none; }
+.tt-inline { min-width: 0 !important; margin-left: 6px; }
+.tt-unit { color: #9aa0a6; font-size: 11px; }
+.tt-check { display: flex; align-items: center; gap: 6px; margin: 4px 0; cursor: pointer; color: #bdc1c6; }
+.tt-check input { accent-color: #8ab4f8; }
+.tt-check.tt-unsupported { opacity: 0.45; }
+.tt-hint { color: #9aa0a6; font-size: 11px; line-height: 1.4; margin: 4px 0; }
+.tt-mixed { color: #9aa0a6 !important; font-style: italic; }
+.tt-seg { display: flex; gap: 2px; flex-wrap: wrap; margin: 4px 0; }
+.tt-seg button {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #3c4043;
+  color: #bdc1c6;
+  border-radius: 4px;
+  height: 26px;
+  min-width: 30px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tt-seg button .material-symbols-outlined { font-size: 17px; }
+.tt-seg button.active { background: rgba(138, 180, 248, 0.22); border-color: #8ab4f8; color: #e8eaed; }
+.tt-glyph { font-size: 11px; font-weight: 700; }
+.tt-grid3 { display: grid; grid-template-columns: 1fr 52px 52px 52px; gap: 4px; align-items: center; color: #9aa0a6; }
+.tt-grid3 > span { font-size: 10px; text-align: center; }
+.tt-grid3 .toolbar-input-small { width: 52px; padding: 0 4px; }
+.tt-grid2 { display: grid; grid-template-columns: auto 58px auto 58px; gap: 4px 8px; align-items: center; color: #bdc1c6; margin: 4px 0; }
+.tt-tabs-list { list-style: none; margin: 4px 0; padding: 0; }
+.tt-tabs-list li { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px; color: #bdc1c6; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
+.tt-mini { width: 20px; height: 20px; padding: 0; }
+.tt-mini .material-symbols-outlined { font-size: 14px; }
+.tt-ss-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px 8px; }
+.tt-convert { justify-content: space-between; margin-top: 8px; }
+.tt-sec-head { padding-top: 6px; }
+.tt-grid-pt { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 4px 6px; align-items: center; margin: 4px 0; }
+.tt-grid-pt > label { color: #bdc1c6; font-size: 11px; }
+.tt-pair { display: flex; align-items: center; gap: 3px; min-width: 0; }
+.tt-pair .toolbar-input-small { width: 50px; padding: 0 4px; }
+.tt-pair .toolbar-select { min-width: 0; flex: 1; padding: 0 4px; }
+.tt-quick { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; margin: 4px 0 6px; }
+.tt-quick button {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #3c4043;
+  color: #bdc1c6;
+  border-radius: 4px;
+  height: 26px;
+  font: 600 11px Georgia, serif;
+  cursor: pointer;
+}
+.tt-quick button.active { background: rgba(138, 180, 248, 0.22); border-color: #8ab4f8; color: #e8eaed; }
+
+/* the ribbon's text opacity (toolbar.js) */
+.tt-opacity { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; }
+.tt-opacity .material-symbols-outlined { font-size: 16px; color: #bdc1c6; }
+#fabric-opacity { width: 56px; accent-color: #8ab4f8; }
+#fabric-opacity-value { width: 42px; text-align: center; padding: 0 4px; }
+
+/* a story a pixel renderer drew (story-render.js pixelPass): its pieces' images
+   show, its HTML keeps the layout and is not painted */
+.utb-group.utb-pixel-mode .tt-story-fo { visibility: hidden; }

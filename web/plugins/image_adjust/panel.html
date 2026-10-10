@@ -1,0 +1,32 @@
+<!-- image_adjust's Adjustments panel: the stack of adjustments (top acts first)
+     and the editor of the selected one — the Curves graph with its channels,
+     histogram and picker, Levels, Brightness / Contrast, Threshold. A floating
+     panel of the plugin's own (image-adjust.js); drag it by its title. -->
+<div id="ia-panel" class="ia-panel hidden" role="dialog" aria-label="Adjustments">
+  <div class="ia-head" id="ia-panel-head">
+    <span>Adjustments</span>
+    <button id="ia-panel-close" class="icon-button" title="Close"><span class="material-symbols-outlined">close</span></button>
+  </div>
+  <div class="ia-body">
+    <div class="ia-row">
+      <select id="ia-add" class="toolbar-select" title="Add an adjustment at the bottom of the stack">
+        <option value="">Add adjustment…</option>
+        <option value="curves">Curves</option>
+        <option value="levels">Levels</option>
+        <option value="brightnessContrast">Brightness / Contrast</option>
+        <option value="invert">Invert</option>
+        <option value="threshold">Threshold</option>
+      </select>
+      <span class="ia-hint">applied top to bottom</span>
+    </div>
+    <ul id="ia-stack" class="ia-stack"></ul>
+    <div id="ia-editor" class="ia-editor"></div>
+    <div class="ia-row ia-foot">
+      <select id="ia-rounding" class="toolbar-select" title="Affinity rounds its screen rendering (GPU) half up and its CPU rendering down: up to one level apart">
+        <option value="gpu">As Affinity's screen (GPU)</option>
+        <option value="cpu">As Affinity's CPU render</option>
+      </select>
+      <button id="ia-export" class="panel-btn" title="Save this page with the adjustments applied to its own pixels (PNG)">Export page as PNG</button>
+    </div>
+  </div>
+</div>

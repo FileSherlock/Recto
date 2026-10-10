@@ -133,6 +133,17 @@ function renderBox(box) {
   }
   g.dataset.type = box.type;
 
+  // Artistic / Frame text: a story, drawn as HTML by story-render.js (which
+  // sets box.w / box.h for Artistic text and auto-height frames)
+  if (box.textMode && typeof window.renderStoryBox === 'function') {
+    // (story-render.js draws its own pixel pieces when a pixel renderer is there)
+    g.querySelectorAll('.utb-text, .utb-edge, .utb-space-label').forEach(el => el.remove());
+    box._pixel = null;
+    window.renderStoryBox(g, box);
+    _updateBBox(g, box);
+    return;
+  }
+
   // Text first so _autoFitWidth can measure the rendered glyphs and set box.w
   // before the bounding box / handles are drawn from it.
   _updateText(g, box);
@@ -209,6 +220,8 @@ function _updateText(g, box) {
 
   // Use inline style to ensure it overrides the CSS stylesheet colors
   text.style.fill = box.color || box.labelColor || UTB_TYPE_COLORS[box.type] || 'rgba(0,0,255,0.8)';
+  // the colour's transparency: the glyphs only (fill-opacity), not the box
+  text.style.fillOpacity = box.opacity != null && box.opacity < 100 ? String(Math.max(0, box.opacity) / 100) : '';
 
   if (box.bold) text.setAttribute('font-weight', 'bold');
   else text.removeAttribute('font-weight');

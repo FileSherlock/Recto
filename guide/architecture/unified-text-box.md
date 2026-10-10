@@ -34,8 +34,28 @@ All five modules live in `web/plugins/text_tool/` and are loaded, in this order,
 | `toolbar.js` | Unified formatting toolbar — one code path for all box types | `syncToolbarToBox(box)`, `syncToolbarToSelection()` |
 | `micro-typo.js` | Per-character nudge mode via hit-rects and a popover slider | `enterMicroTypo(box)`, `exitMicroTypo()` |
 | `inline-edit.js` | Double-click WYSIWYG editing for `embedded` and `harfbuzz` boxes | `enterInlineEdit(box)`, `commitInlineEdit()`, `cancelInlineEdit()` |
+| `story-core.js` | The rich-text model of Artistic and Frame text (no DOM) | `StoryCore` |
+| `story-render.js` | Draws a story box as HTML in its group | `renderStoryBox(g, box)`, `storySync(box)`, `ensureStory(box)` |
+| `story-edit.js` | Edits a story in place; what the ribbon and the Text panel write through | `enterStoryEdit`, `commitStoryEdit`, `storyApplyChar`, `storyApplyPara`, `storyApplyFrame`, `storyTarget` |
+| `frame-tool.js`, `artistic-tool.js` | Affinity's Frame Text and Artistic Text tools | `createTextFrame`, `storyScaleDrag`, `storyConvert` |
+| `text-studio.js` | The Text panel (Character, Paragraph, Text Frame, Typography) | `openTextStudio(tab)` |
 
 ---
+
+## Artistic and Frame text (story boxes)
+
+A `harfbuzz` box with a `textMode` — `'artistic'` or `'frame'` — carries its text as a
+**story** (`box.story`): paragraphs, each with its paragraph attributes, made of runs of
+characters with their character attributes (`story-core.js`). A frame also has `box.frame`
+(columns, insets, vertical position, initial advance, …). The plain fields every other reader
+uses — `text`, `fontFamily`, `sizePt`, `bold`, `italic`, `color`, `opacity`, `underline`,
+`strikethrough` — follow the story's first character (`storySync`), so a plugin that knows
+no stories still reads the box's text.
+
+`renderBox` hands a story box to `renderStoryBox` (`story-render.js`), which draws it as HTML in
+a `<foreignObject>` of its group; it is never pixel-rendered and has no `baseCharPositions`.
+Double-click edits it in place (`story-edit.js`). Artistic text sizes `box.w` / `box.h` to its
+text; a frame keeps them and reflows. See [Artistic and Frame Text](../frontend/artistic-and-frame-text.md).
 
 ## Rendering Pipeline
 
@@ -70,7 +90,7 @@ The layer is drawn by event, not by call: `svg-renderer.js` subscribes to `page:
 
 **Kerning seam.** Before rendering, a box whose kerning nobody chose (`box.kerningAuto`) asks `window.utbAutoKerning?.(box)` — `typeof`-guarded like every plugin seam — and takes a boolean answer as `box.kerning`. An analysis plugin that knows whether the page's producer kerned answers; without one the box keeps `false`.
 
-**Pixel-renderer seam.** A plugin may define `window.utbPixelRender(box, xs, baseline)` to draw a box as a raster in image-pixel space instead of vector text (`xs` = the absolute per-character x positions the SVG would use, or `[box.x]`; `baseline` = `computeBaseline(box)`). `svg-renderer.js` calls it `typeof`-guarded for every box; the result rides on the transient `box._pixel` so `_autoFitWidth` can size auto-width boxes from its `advanceW`. Double-click on the image opens inline edit like on the text. With no plugin defining the seam the pipeline is unchanged.
+**Pixel-renderer seam.** A plugin may define `window.utbPixelRender(box, xs, baseline)` to draw a box as a raster in image-pixel space instead of vector text (`xs` = the absolute per-character x positions the SVG would use, or `[box.x]`; `baseline` = `computeBaseline(box)`). `svg-renderer.js` calls it `typeof`-guarded for every box; the result rides on the transient `box._pixel` so `_autoFitWidth` can size auto-width boxes from its `advanceW`. Double-click on the image opens inline edit like on the text. With no plugin defining the seam the pipeline is unchanged. A story box (Artistic / Frame text) is drawn through the same seam as one-line pieces, one per run and line (`pixelPass` in `story-render.js`; the pieces' ids are `<box id>~<n>`).
 
 ---
 

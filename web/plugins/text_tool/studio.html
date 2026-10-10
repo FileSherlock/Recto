@@ -1,0 +1,367 @@
+<!-- text_tool's Text panel: Affinity's Character, Paragraph, Text Frame and
+     Typography panels in one floating panel (text-studio.js), in Affinity's
+     order and with its labels. Every control names the attribute it shows and
+     sets in data-k — "char:<key>", "para:<key>", "frame:<key>" (StoryCore's
+     attribute names, in the units the panel shows: pt, %, ‰ of an em,
+     degrees); a toggle button names its attribute in data-toggle and its
+     "on" value in data-on-value. They act on the selected text while a text
+     is edited, on all of it while its box is only selected. -->
+<div id="tt-studio" class="tt-studio hidden" role="dialog" aria-label="Text">
+  <div class="tt-studio-head" id="tt-studio-head">
+    <div class="tt-tabs" role="tablist">
+      <button class="tt-tab-btn active" data-tab="character" role="tab">Character</button>
+      <button class="tt-tab-btn" data-tab="paragraph" role="tab">Paragraph</button>
+      <button class="tt-tab-btn" data-tab="frame" role="tab">Text Frame</button>
+      <button class="tt-tab-btn" data-tab="typography" role="tab">Typography</button>
+    </div>
+    <button id="tt-studio-close" class="icon-button" title="Close"><span class="material-symbols-outlined">close</span></button>
+  </div>
+  <div id="tt-studio-scope" class="tt-studio-scope">Select or edit text you added (Artistic or Frame text).</div>
+
+  <!-- ── Character ─────────────────────────────────────────────── -->
+  <div class="tt-pane" data-pane="character">
+    <div class="tt-sec tt-sec-head">
+      <div class="tt-row"><label for="tt-ch-family">Font Family</label>
+        <select id="tt-ch-family" class="toolbar-select" data-k="char:fontFamily"></select></div>
+      <div class="tt-row"><label for="tt-ch-size">Font Size</label>
+        <input id="tt-ch-size" type="number" class="toolbar-input-small" min="0.5" max="1296" step="1" data-k="char:sizePt"><span class="tt-unit">pt</span>
+        <select id="tt-ch-style" class="toolbar-select" title="Font Style" data-k="char:style">
+          <option value="regular">Regular</option><option value="bold">Bold</option>
+          <option value="italic">Italic</option><option value="bolditalic">Bold Italic</option>
+        </select></div>
+      <div class="tt-row"><label for="tt-ch-color">Font Colour</label>
+        <input id="tt-ch-color-on" type="checkbox" title="A colour of its own (off: the colour of text you added)" data-on="char:color">
+        <input id="tt-ch-color" type="color" value="#000000" data-k="char:color" data-nullable>
+        <input id="tt-ch-opacity" type="number" class="toolbar-input-small" min="0" max="100" step="1" title="Opacity" data-k="char:opacity"><span class="tt-unit">%</span></div>
+      <div class="tt-row"><label for="tt-ch-highlight">Background Colour</label>
+        <input id="tt-ch-highlight-on" type="checkbox" title="A colour behind the text" data-on="char:highlight">
+        <input id="tt-ch-highlight" type="color" value="#fff176" data-k="char:highlight" data-nullable></div>
+    </div>
+
+    <details open class="tt-sec"><summary>Position &amp; Transform</summary>
+      <div class="tt-grid-pt">
+        <label for="tt-ch-autokern">Kerning</label>
+        <span class="tt-pair"><select id="tt-ch-autokern" class="toolbar-select" data-k="char:autoKern" data-bool title="Auto: the font's kerning">
+            <option value="true">Auto</option><option value="false">None</option></select>
+          <input id="tt-ch-kern" type="number" class="toolbar-input-small" step="1" title="Manual kerning after each character (‰ of an em)" data-k="char:manualKern"></span>
+        <label for="tt-ch-shear">Shear</label>
+        <span class="tt-pair"><input id="tt-ch-shear" type="number" class="toolbar-input-small" min="-85" max="85" step="1" data-k="char:shear"><span class="tt-unit">°</span></span>
+        <label for="tt-ch-tracking">Tracking</label>
+        <span class="tt-pair"><input id="tt-ch-tracking" type="number" class="toolbar-input-small" min="-1000" max="10000" step="10" data-k="char:tracking"><span class="tt-unit">‰</span></span>
+        <label for="tt-ch-scalex">Horizontal Scale</label>
+        <span class="tt-pair"><input id="tt-ch-scalex" type="number" class="toolbar-input-small" min="1" max="1000" step="1" data-k="char:scaleX"><span class="tt-unit">%</span></span>
+        <label for="tt-ch-baseline">Baseline</label>
+        <span class="tt-pair"><input id="tt-ch-baseline" type="number" class="toolbar-input-small" step="0.5" data-k="char:baselineShift"><span class="tt-unit">pt</span></span>
+        <label for="tt-ch-scaley">Vertical Scale</label>
+        <span class="tt-pair"><input id="tt-ch-scaley" type="number" class="toolbar-input-small" min="1" max="1000" step="1" data-k="char:scaleY"><span class="tt-unit">%</span></span>
+        <label for="tt-ch-leading-ov">Leading Override</label>
+        <span class="tt-pair"><input id="tt-ch-leading-ov" type="number" class="toolbar-input-small" min="0" step="0.5" placeholder="Auto" data-k="char:leadingOverride" data-nullable><span class="tt-unit">pt</span></span>
+        <label for="tt-ch-position">Super/Subscript</label>
+        <span class="tt-pair"><select id="tt-ch-position" class="toolbar-select" data-k="char:position">
+            <option value="normal">None</option><option value="super">Superscript</option><option value="sub">Subscript</option></select></span>
+      </div>
+      <label class="tt-check"><input id="tt-ch-nobreak" type="checkbox" data-k="char:noBreak"> No break</label>
+    </details>
+
+    <details open class="tt-sec"><summary>Decorations</summary>
+      <div class="tt-row"><label for="tt-ch-underline">Underline</label>
+        <select id="tt-ch-underline" class="toolbar-select" data-k="char:underline">
+          <option value="none">No Underline</option><option value="single">Single Underline</option><option value="double">Double Underline</option>
+        </select>
+        <input id="tt-ch-ul-color-on" type="checkbox" title="Underline Colour of its own (off: the text's)" data-on="char:underlineColor">
+        <input id="tt-ch-ul-color" type="color" value="#000000" title="Underline Colour" data-k="char:underlineColor" data-nullable></div>
+      <div class="tt-row"><label for="tt-ch-strike">Strikethrough</label>
+        <select id="tt-ch-strike" class="toolbar-select" data-k="char:strike">
+          <option value="none">No Strikethrough</option><option value="single">Single Strikethrough</option><option value="double">Double Strikethrough</option>
+        </select>
+        <input id="tt-ch-st-color-on" type="checkbox" title="Strikethrough Colour of its own (off: the text's)" data-on="char:strikeColor">
+        <input id="tt-ch-st-color" type="color" value="#000000" title="Strikethrough Colour" data-k="char:strikeColor" data-nullable></div>
+      <div class="tt-row"><label for="tt-ch-stroke-w">Outline Stroke</label>
+        <input id="tt-ch-stroke-w" type="number" class="toolbar-input-small" min="0" step="0.1" title="Width" data-k="char:strokeWidth"><span class="tt-unit">pt</span>
+        <input id="tt-ch-stroke-on" type="checkbox" title="Outline Colour" data-on="char:strokeColor">
+        <input id="tt-ch-stroke" type="color" value="#000000" title="Outline Colour" data-k="char:strokeColor" data-nullable></div>
+    </details>
+
+    <details open class="tt-sec"><summary>Typography</summary>
+      <div class="tt-quick">
+        <button id="tt-q-liga" data-toggle="char:ot_liga" title="Standard ligatures">fi</button>
+        <button id="tt-q-calt" data-toggle="char:ot_calt" title="Contextual alternates">ct</button>
+        <button id="tt-q-ordn" data-toggle="char:ot_ordn" title="Ordinals">1ˢᵗ</button>
+        <button id="tt-q-frac" data-toggle="char:ot_frac" title="Fractions">½</button>
+        <button id="tt-q-sups" data-toggle="char:ot_position" data-on-value="sups" data-off-value="normal" title="Superscript (the font's superior figures)">x²</button>
+        <button id="tt-q-subs" data-toggle="char:ot_position" data-on-value="subs" data-off-value="normal" title="Subscript (the font's inferior figures)">x₂</button>
+        <button id="tt-q-allcaps" data-toggle="char:caps" data-on-value="all" data-off-value="none" title="All caps">TT</button>
+        <button id="tt-q-smallcaps" data-toggle="char:caps" data-on-value="small" data-off-value="none" title="Small caps">Tᴛ</button>
+      </div>
+      <button id="tt-show-typography" class="panel-btn" title="Show Typography Panel">More in Typography…</button>
+    </details>
+
+    <details class="tt-sec"><summary>Language</summary>
+      <div class="tt-row"><label for="tt-ch-lang">Language</label>
+        <select id="tt-ch-lang" class="toolbar-select" data-k="char:lang" title="Spelling and hyphenation, and the language the font shapes for">
+          <option value="">Default</option><option value="en-US">English (US)</option><option value="en-GB">English (UK)</option>
+          <option value="de-DE">German</option><option value="fr-FR">French</option><option value="es-ES">Spanish</option>
+          <option value="it-IT">Italian</option><option value="pt-BR">Portuguese (Brazil)</option><option value="nl-NL">Dutch</option>
+          <option value="tr-TR">Turkish</option><option value="id-ID">Indonesian</option><option value="la">Latin</option>
+        </select></div>
+    </details>
+  </div>
+
+  <!-- ── Paragraph ─────────────────────────────────────────────── -->
+  <div class="tt-pane hidden" data-pane="paragraph">
+    <div class="tt-sec tt-sec-head">
+      <div class="tt-seg" id="tt-pa-align" data-k="para:align">
+        <button data-v="left" title="Left Align"><span class="material-symbols-outlined">format_align_left</span></button>
+        <button data-v="center" title="Centre Align"><span class="material-symbols-outlined">format_align_center</span></button>
+        <button data-v="right" title="Right Align"><span class="material-symbols-outlined">format_align_right</span></button>
+        <button data-v="justify-left" title="Justified Left"><span class="material-symbols-outlined">format_align_justify</span></button>
+        <button data-v="justify-center" title="Justified Centre"><span class="tt-glyph">≡c</span></button>
+        <button data-v="justify-right" title="Justified Right"><span class="tt-glyph">≡r</span></button>
+        <button data-v="justify-all" title="Justified All"><span class="tt-glyph">≡≡</span></button>
+        <button data-v="towards-spine" title="Align Towards Spine"><span class="tt-glyph">⇤</span></button>
+        <button data-v="away-spine" title="Align Away From Spine"><span class="tt-glyph">⇥</span></button>
+      </div>
+    </div>
+
+    <details open class="tt-sec"><summary>Spacing</summary>
+      <div class="tt-row"><label for="tt-pa-leading-type">Leading</label>
+        <select id="tt-pa-leading-type" class="toolbar-select" data-k="para:leadingType">
+          <option value="default">Default</option><option value="multiple">Multiple</option><option value="percent">% Height</option>
+          <option value="exact">Exactly</option><option value="atLeast">At Least</option>
+        </select>
+        <input id="tt-pa-leading" type="number" class="toolbar-input-small" min="0" step="0.1" data-k="para:leading"></div>
+      <div class="tt-grid-pt">
+        <label for="tt-pa-left">Left Indent</label>
+        <span class="tt-pair"><input id="tt-pa-left" type="number" class="toolbar-input-small" step="1" data-k="para:leftIndent"><span class="tt-unit">pt</span></span>
+        <label for="tt-pa-right">Right Indent</label>
+        <span class="tt-pair"><input id="tt-pa-right" type="number" class="toolbar-input-small" min="0" step="1" data-k="para:rightIndent"><span class="tt-unit">pt</span></span>
+        <label for="tt-pa-before">Space Before</label>
+        <span class="tt-pair"><input id="tt-pa-before" type="number" class="toolbar-input-small" min="0" step="1" data-k="para:spaceBefore"><span class="tt-unit">pt</span></span>
+        <label for="tt-pa-first">First Line Indent</label>
+        <span class="tt-pair"><input id="tt-pa-first" type="number" class="toolbar-input-small" step="1" data-k="para:firstIndent"><span class="tt-unit">pt</span></span>
+        <label for="tt-pa-after">Space After</label>
+        <span class="tt-pair"><input id="tt-pa-after" type="number" class="toolbar-input-small" min="0" step="1" data-k="para:spaceAfter"><span class="tt-unit">pt</span></span>
+      </div>
+      <div class="tt-row"><label for="tt-pa-sbmode">Use space before</label>
+        <select id="tt-pa-sbmode" class="toolbar-select" data-k="para:spaceBeforeMode">
+          <option value="between">Only between paragraphs</option><option value="columnTop">Only at column top</option><option value="always">Always</option>
+        </select></div>
+      <label class="tt-check"><input id="tt-pa-sum" type="checkbox" data-k="para:sumSpacing"> Sum space before and after</label>
+    </details>
+
+    <details class="tt-sec"><summary>Tab Stops</summary>
+      <div class="tt-row"><label for="tt-pa-deftabs">Default tab stops</label>
+        <input id="tt-pa-deftabs" type="number" class="toolbar-input-small" min="1" step="1" title="Space between each default tab stop" data-k="para:defaultTabs"><span class="tt-unit">pt</span></div>
+      <ul id="tt-pa-tabs" class="tt-tabs-list"></ul>
+      <div class="tt-row">
+        <input id="tt-pa-tab-pos" type="number" class="toolbar-input-small" min="0" step="1" placeholder="pt" title="Position (pt from the paragraph's left)">
+        <select id="tt-pa-tab-align" class="toolbar-select" title="Alignment">
+          <option value="left">Left</option><option value="center">Centre</option><option value="right">Right</option><option value="decimal">Decimal</option>
+        </select>
+        <select id="tt-pa-tab-leader" class="toolbar-select" title="Leader">
+          <option value="">None</option><option value=".">. . .</option><option value="-">- - -</option><option value="_">Underline</option>
+        </select>
+        <button id="tt-pa-tab-add" class="panel-btn" title="Add a tab stop">Add</button>
+      </div>
+    </details>
+
+    <details class="tt-sec"><summary>Justification</summary>
+      <div class="tt-grid3"><span></span><span>Minimum</span><span>Desired</span><span>Maximum</span>
+        <label>Word Spacing %</label>
+        <input id="tt-pa-ws-min" type="number" class="toolbar-input-small" min="0" max="1000" step="1" data-k="para:wordSpacingMin">
+        <input id="tt-pa-ws" type="number" class="toolbar-input-small" min="0" max="1000" step="1" data-k="para:wordSpacing">
+        <input id="tt-pa-ws-max" type="number" class="toolbar-input-small" min="0" max="1000" step="1" data-k="para:wordSpacingMax">
+        <label>Letter Spacing %</label>
+        <input id="tt-pa-ls-min" type="number" class="toolbar-input-small" min="-100" max="500" step="1" data-k="para:letterSpacingMin">
+        <input id="tt-pa-ls" type="number" class="toolbar-input-small" min="-100" max="500" step="1" data-k="para:letterSpacing">
+        <input id="tt-pa-ls-max" type="number" class="toolbar-input-small" min="-100" max="500" step="1" data-k="para:letterSpacingMax">
+      </div>
+      <p class="tt-hint">The browser justifies by widening the spaces; the desired values are the spacing every line starts from.</p>
+    </details>
+
+    <details class="tt-sec"><summary>Flow Options</summary>
+      <div class="tt-row"><label for="tt-pa-start">Start</label>
+        <select id="tt-pa-start" class="toolbar-select" data-k="para:startAt">
+          <option value="anywhere">Anywhere</option><option value="column">In Next Column</option>
+        </select></div>
+      <label class="tt-check"><input id="tt-pa-keep-prev" type="checkbox" data-k="para:keepWithPrevious"> Keep with previous paragraph</label>
+      <label class="tt-check"><input id="tt-pa-orphans" type="checkbox" data-k="para:preventOrphans"> Prevent orphaned first lines</label>
+      <label class="tt-check"><input id="tt-pa-keep-together" type="checkbox" data-k="para:keepTogether"> Keep paragraph together</label>
+      <label class="tt-check"><input id="tt-pa-widows" type="checkbox" data-k="para:preventWidows"> Prevent widowed last lines</label>
+      <label class="tt-check"><input id="tt-pa-keep-next" type="checkbox" data-k="para:keepWithNext"> Keep with next paragraph</label>
+    </details>
+
+    <details class="tt-sec"><summary>Hyphenation</summary>
+      <label class="tt-check"><input id="tt-pa-hyph" type="checkbox" data-k="para:hyphenate"> Use auto-hyphenation</label>
+      <div class="tt-row"><label for="tt-pa-hyph-word">Minimum word length</label>
+        <input id="tt-pa-hyph-word" type="number" class="toolbar-input-small" min="1" max="50" step="1" data-k="para:hyphMinWord"></div>
+      <div class="tt-row"><label for="tt-pa-hyph-before">Minimum prefix</label>
+        <input id="tt-pa-hyph-before" type="number" class="toolbar-input-small" min="1" max="20" step="1" data-k="para:hyphMinBefore"></div>
+      <div class="tt-row"><label for="tt-pa-hyph-after">Minimum suffix</label>
+        <input id="tt-pa-hyph-after" type="number" class="toolbar-input-small" min="1" max="20" step="1" data-k="para:hyphMinAfter"></div>
+      <div class="tt-row"><label for="tt-pa-hyph-lines">Max consecutive hyphens</label>
+        <input id="tt-pa-hyph-lines" type="number" class="toolbar-input-small" min="0" max="50" step="1" title="0 = unlimited" data-k="para:hyphMaxLines"></div>
+      <p class="tt-hint" id="tt-hyph-note">Hyphenation comes from the browser's dictionaries for the text's language.</p>
+    </details>
+
+    <details class="tt-sec"><summary>Bullets &amp; Numbering</summary>
+      <div class="tt-row"><label for="tt-pa-list">Type</label>
+        <select id="tt-pa-list" class="toolbar-select" data-k="para:list">
+          <option value="none">No List</option><option value="bullet">Bullet</option><option value="decimal">1, 2, 3, 4…</option>
+          <option value="upper-roman">I, II, III, IV…</option><option value="lower-roman">i, ii, iii, iv…</option>
+          <option value="upper-alpha">A, B, C, D…</option><option value="lower-alpha">a, b, c, d…</option>
+          <option value="decimal-2">01…</option><option value="decimal-3">001…</option><option value="decimal-4">0001…</option>
+        </select></div>
+      <div class="tt-row"><label for="tt-pa-list-char">Bullet · after number</label>
+        <input id="tt-pa-list-char" type="text" class="toolbar-input-small" maxlength="3" title="Bullet text" data-k="para:listChar">
+        <input id="tt-pa-list-suffix" type="text" class="toolbar-input-small" maxlength="3" title="Text after the number" data-k="para:listSuffix"></div>
+      <div class="tt-row"><label for="tt-pa-list-start">Start numbering at</label>
+        <input id="tt-pa-list-start" type="number" class="toolbar-input-small" min="0" step="1" title="0 = continue the previous list" data-k="para:listStart"></div>
+      <div class="tt-row"><label for="tt-pa-list-indent">Tab stop indent</label>
+        <input id="tt-pa-list-indent" type="number" class="toolbar-input-small" min="0" step="1" data-k="para:listIndent"><span class="tt-unit">pt</span></div>
+    </details>
+
+    <details class="tt-sec"><summary>Drop Caps</summary>
+      <label class="tt-check"><input id="tt-pa-drop-on" type="checkbox" data-drop-enable> Enable dropped capitals</label>
+      <div class="tt-row"><label for="tt-pa-drop-lines">Height in lines</label>
+        <input id="tt-pa-drop-lines" type="number" class="toolbar-input-small" min="0" max="20" step="1" data-k="para:dropLines"></div>
+      <div class="tt-row"><label for="tt-pa-drop-chars">Number of characters</label>
+        <input id="tt-pa-drop-chars" type="number" class="toolbar-input-small" min="1" max="20" step="1" data-k="para:dropChars"></div>
+      <div class="tt-row"><label for="tt-pa-drop-dist">Distance to text</label>
+        <input id="tt-pa-drop-dist" type="number" class="toolbar-input-small" min="0" step="0.5" data-k="para:dropDistance"><span class="tt-unit">pt</span></div>
+    </details>
+
+    <details class="tt-sec"><summary>Decorations</summary>
+      <div class="tt-row"><label for="tt-pa-fill">Fill</label>
+        <input id="tt-pa-fill-on" type="checkbox" data-on="para:fill">
+        <input id="tt-pa-fill" type="color" value="#eeeeee" data-k="para:fill" data-nullable></div>
+      <label class="tt-check"><input id="tt-pa-rule-above" type="checkbox" data-k="para:ruleAbove"> Rule above (top edge)</label>
+      <label class="tt-check"><input id="tt-pa-rule-below" type="checkbox" data-k="para:ruleBelow"> Rule below (bottom edge)</label>
+      <div class="tt-row"><label for="tt-pa-rule-color">Rule</label>
+        <input id="tt-pa-rule-color" type="color" data-k="para:ruleColor">
+        <input id="tt-pa-rule-weight" type="number" class="toolbar-input-small" min="0" step="0.25" data-k="para:ruleWeight"><span class="tt-unit">pt</span></div>
+    </details>
+  </div>
+
+  <!-- ── Text Frame ────────────────────────────────────────────── -->
+  <div class="tt-pane hidden" data-pane="frame">
+    <p class="tt-hint tt-frame-hint" id="tt-fr-hint">These settings belong to Frame text.</p>
+    <details open class="tt-sec tt-frame-sec"><summary>General</summary>
+      <div class="tt-row"><label for="tt-fr-fill">Fill</label>
+        <input id="tt-fr-fill-on" type="checkbox" data-on="frame:fill">
+        <input id="tt-fr-fill" type="color" value="#ffffff" data-k="frame:fill" data-nullable></div>
+      <div class="tt-row"><label for="tt-fr-stroke">Stroke</label>
+        <input id="tt-fr-stroke-on" type="checkbox" data-on="frame:stroke">
+        <input id="tt-fr-stroke" type="color" value="#000000" data-k="frame:stroke" data-nullable>
+        <input id="tt-fr-stroke-w" type="number" class="toolbar-input-small" min="0" step="0.25" data-k="frame:strokeWidth"><span class="tt-unit">pt</span></div>
+      <div class="tt-row"><label>Insets</label>
+        <label class="tt-check tt-inline"><input id="tt-fr-link" type="checkbox" data-k="frame:linkInsets"> Link Insets</label></div>
+      <div class="tt-grid2">
+        <label for="tt-fr-in-l">Left</label><input id="tt-fr-in-l" type="number" class="toolbar-input-small" min="0" step="1" data-k="frame:insetLeft" data-inset>
+        <label for="tt-fr-in-r">Right</label><input id="tt-fr-in-r" type="number" class="toolbar-input-small" min="0" step="1" data-k="frame:insetRight" data-inset>
+        <label for="tt-fr-in-t">Top</label><input id="tt-fr-in-t" type="number" class="toolbar-input-small" min="0" step="1" data-k="frame:insetTop" data-inset>
+        <label for="tt-fr-in-b">Bottom</label><input id="tt-fr-in-b" type="number" class="toolbar-input-small" min="0" step="1" data-k="frame:insetBottom" data-inset>
+      </div>
+      <label class="tt-check"><input id="tt-fr-hide" type="checkbox" data-k="frame:hideOverflow"> Hide Overflow</label>
+      <label class="tt-check" title="Recto: Affinity has no such switch"><input id="tt-fr-auto" type="checkbox" data-k="frame:autoHeight"> Height follows the text (Recto)</label>
+    </details>
+
+    <details open class="tt-sec tt-frame-sec"><summary>Columns</summary>
+      <div class="tt-row"><label for="tt-fr-cols">Number of columns</label>
+        <input id="tt-fr-cols" type="number" class="toolbar-input-small" min="1" max="50" step="1" data-k="frame:columns"></div>
+      <div class="tt-row"><label for="tt-fr-gutter">Gutter</label>
+        <input id="tt-fr-gutter" type="number" class="toolbar-input-small" min="0" step="1" data-k="frame:gutter"><span class="tt-unit">pt</span></div>
+      <label class="tt-check"><input id="tt-fr-balance" type="checkbox" data-k="frame:balance"> Balance text in columns</label>
+    </details>
+
+    <details class="tt-sec tt-frame-sec"><summary>Column Rules</summary>
+      <div class="tt-row"><label for="tt-fr-rule">Rule</label>
+        <input id="tt-fr-rule-on" type="checkbox" data-on="frame:ruleColor">
+        <input id="tt-fr-rule" type="color" value="#000000" data-k="frame:ruleColor" data-nullable>
+        <input id="tt-fr-rule-w" type="number" class="toolbar-input-small" min="0" step="0.25" data-k="frame:ruleWeight"><span class="tt-unit">pt</span></div>
+      <div class="tt-row"><label for="tt-fr-rule-style">Style</label>
+        <select id="tt-fr-rule-style" class="toolbar-select" data-k="frame:ruleStyle">
+          <option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option>
+        </select></div>
+      <div class="tt-row"><label for="tt-fr-rule-top">Top · Bottom</label>
+        <input id="tt-fr-rule-top" type="number" class="toolbar-input-small" min="0" step="1" title="Gap at the top" data-k="frame:ruleTop">
+        <input id="tt-fr-rule-bottom" type="number" class="toolbar-input-small" min="0" step="1" title="Gap at the bottom" data-k="frame:ruleBottom"><span class="tt-unit">pt</span></div>
+    </details>
+
+    <details open class="tt-sec tt-frame-sec"><summary>Vertical Position</summary>
+      <div class="tt-seg" id="tt-fr-valign" data-k="frame:valign">
+        <button data-v="top" title="Top Align"><span class="material-symbols-outlined">vertical_align_top</span></button>
+        <button data-v="center" title="Center Vertically"><span class="material-symbols-outlined">vertical_align_center</span></button>
+        <button data-v="bottom" title="Bottom Align"><span class="material-symbols-outlined">vertical_align_bottom</span></button>
+        <button data-v="justify" title="Justify Vertically"><span class="material-symbols-outlined">format_line_spacing</span></button>
+      </div>
+      <div class="tt-row"><label for="tt-fr-maxpara">Max Paragraph Space</label>
+        <input id="tt-fr-maxpara" type="number" class="toolbar-input-small" min="0" step="1" data-k="frame:maxParaSpace"><span class="tt-unit">pt</span></div>
+      <div class="tt-row"><label for="tt-fr-baseline">Initial advance</label>
+        <select id="tt-fr-baseline" class="toolbar-select" data-k="frame:baseline">
+          <option value="default">Default</option><option value="leading">Leading</option><option value="pointsize">Pointsize</option>
+          <option value="ascent">Ascent</option><option value="cap">Cap Height</option><option value="x">X Height</option>
+          <option value="fixed">Fixed</option>
+        </select></div>
+      <div class="tt-row"><label for="tt-fr-min">Minimum</label>
+        <input id="tt-fr-min" type="number" class="toolbar-input-small" min="0" step="0.5" data-k="frame:baselineMin"><span class="tt-unit">pt</span></div>
+    </details>
+
+    <div class="tt-row tt-convert">
+      <button id="tt-convert-frame" class="panel-btn" title="Layer ▸ Convert to Text Frame">Convert to Text Frame</button>
+      <button id="tt-convert-art" class="panel-btn" title="Layer ▸ Convert to Artistic Text">Convert to Artistic Text</button>
+    </div>
+  </div>
+
+  <!-- ── Typography (OpenType) ─────────────────────────────────── -->
+  <div class="tt-pane hidden" data-pane="typography">
+    <label class="tt-check"><input id="tt-ot-hide" type="checkbox" checked> Hide irrelevant features</label>
+    <details open class="tt-sec"><summary>Ligatures</summary>
+      <label class="tt-check" data-feature="liga"><input id="tt-ot-liga" type="checkbox" data-k="char:ot_liga"> Standard Ligatures</label>
+      <label class="tt-check" data-feature="clig"><input id="tt-ot-clig" type="checkbox" data-k="char:ot_clig"> Contextual Ligatures</label>
+      <label class="tt-check" data-feature="dlig"><input id="tt-ot-dlig" type="checkbox" data-k="char:ot_dlig"> Discretionary Ligatures</label>
+      <label class="tt-check" data-feature="hlig"><input id="tt-ot-hlig" type="checkbox" data-k="char:ot_hlig"> Historical Ligatures</label>
+    </details>
+    <details open class="tt-sec"><summary>Alternates</summary>
+      <label class="tt-check" data-feature="calt"><input id="tt-ot-calt" type="checkbox" data-k="char:ot_calt"> Contextual Alternates</label>
+      <label class="tt-check" data-feature="salt"><input id="tt-ot-salt" type="checkbox" data-k="char:ot_salt"> Stylistic Alternates</label>
+      <label class="tt-check" data-feature="swsh"><input id="tt-ot-swsh" type="checkbox" data-k="char:ot_swsh"> Swash</label>
+      <label class="tt-check" data-feature="cswh"><input id="tt-ot-cswh" type="checkbox" data-k="char:ot_cswh"> Contextual Swash</label>
+      <label class="tt-check" data-feature="hist"><input id="tt-ot-hist" type="checkbox" data-k="char:ot_hist"> Historical Forms</label>
+      <label class="tt-check" data-feature="ornm"><input id="tt-ot-ornm" type="checkbox" data-k="char:ot_ornm"> Ornaments</label>
+      <label class="tt-check" data-feature="zero"><input id="tt-ot-zero" type="checkbox" data-k="char:ot_zero"> Slashed Zero</label>
+    </details>
+    <details open class="tt-sec"><summary>Figures</summary>
+      <div class="tt-row"><label for="tt-ot-numform">Figure Style</label>
+        <select id="tt-ot-numform" class="toolbar-select" data-k="char:ot_numForm">
+          <option value="default">Default</option><option value="lnum">Lining</option><option value="onum">Oldstyle</option>
+        </select></div>
+      <div class="tt-row"><label for="tt-ot-numspacing">Figure Width</label>
+        <select id="tt-ot-numspacing" class="toolbar-select" data-k="char:ot_numSpacing">
+          <option value="default">Default</option><option value="pnum">Proportional</option><option value="tnum">Tabular</option>
+        </select></div>
+      <div class="tt-row"><label for="tt-ot-position">Figure Position</label>
+        <select id="tt-ot-position" class="toolbar-select" data-k="char:ot_position">
+          <option value="normal">Normal</option><option value="sups">Superior</option><option value="subs">Inferior</option>
+          <option value="numr">Numerator</option><option value="dnom">Denominator</option><option value="sinf">Scientific Inferior</option>
+        </select></div>
+      <label class="tt-check" data-feature="ordn"><input id="tt-ot-ordn" type="checkbox" data-k="char:ot_ordn"> Ordinals</label>
+      <label class="tt-check" data-feature="frac"><input id="tt-ot-frac" type="checkbox" data-k="char:ot_frac"> Fractions</label>
+    </details>
+    <details open class="tt-sec"><summary>Capitals</summary>
+      <div class="tt-row"><label for="tt-ch-caps">Capitals</label>
+        <select id="tt-ch-caps" class="toolbar-select" data-k="char:caps">
+          <option value="none">None</option><option value="c2sc">Caps to Small Caps</option><option value="small">Small Caps</option>
+          <option value="all">All Caps</option><option value="allSmall">All Small Caps</option><option value="c2pc">Caps to Petite Caps</option>
+          <option value="petite">Petite Caps</option><option value="allPetite">All Petite Caps</option>
+          <option value="titling">Titling</option><option value="unicase">Unicase</option>
+        </select></div>
+      <label class="tt-check" data-feature="case"><input id="tt-ot-case" type="checkbox" data-k="char:ot_case"> Case-Sensitive Forms</label>
+      <label class="tt-check" data-feature="cpsp"><input id="tt-ot-cpsp" type="checkbox" data-k="char:ot_cpsp"> Capital Spacing</label>
+      <label class="tt-check" data-feature="titl"><input id="tt-ot-titl" type="checkbox" data-k="char:ot_titl"> Titling Alternates</label>
+    </details>
+    <details open class="tt-sec"><summary>Stylistic Sets</summary>
+      <div id="tt-ot-ss" class="tt-ss-grid"></div>
+    </details>
+  </div>
+</div>

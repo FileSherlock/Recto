@@ -31,6 +31,13 @@
       <button id="fabric-underline"     class="icon-button options-toggle" title="Underline"><u style="font-family:serif;">U</u></button>
       <button id="fabric-strikethrough" class="icon-button options-toggle" title="Strikethrough"><s style="font-family:serif;">S</s></button>
       <input type="color" id="fabric-color" value="#000000" title="Text color" style="margin-left: 4px;">
+      <!-- the text colour's transparency (Affinity: the fill's Opacity) -->
+      <span class="tt-opacity" title="Text opacity — 100 % is solid, 0 % invisible">
+        <span class="material-symbols-outlined">opacity</span>
+        <input type="range" id="fabric-opacity" min="0" max="100" step="1" value="100" aria-label="Text opacity">
+        <input type="number" id="fabric-opacity-value" class="toolbar-input-small" min="0" max="100" step="1" value="100" aria-label="Text opacity (%)">
+        <span class="options-label">%</span>
+      </span>
       <label class="checkbox-lbl" style="margin-left: 6px;" title="Apply the font's native kerning to this text">
         <input type="checkbox" id="kerning"> Kerning</label>
       <span class="options-divider options-divider--inline"></span>
@@ -39,6 +46,97 @@
       </button>
     </div>
     <div class="options-group-header">Style</div>
+  </div>
+
+  <!-- Artistic and Frame text only (Affinity's text context toolbar): shown while
+       one is selected (syncToolbarToBox); a plain text box becomes Artistic text
+       the moment one of these is used on it -->
+  <div class="options-divider tt-story-only hidden"></div>
+  <div class="options-group tt-story-only hidden" id="tt-text-group">
+    <div class="options-group-controls">
+      <button id="tt-size-up" class="icon-button" title="Increase font size (Ctrl+Shift+>)">
+        <span class="material-symbols-outlined">text_increase</span>
+      </button>
+      <button id="tt-size-down" class="icon-button" title="Decrease font size (Ctrl+Shift+<)">
+        <span class="material-symbols-outlined">text_decrease</span>
+      </button>
+      <select id="tt-change-case" class="toolbar-select" title="Change Case — rewrites the selected text">
+        <option value="">Aa</option>
+        <option value="upper">UPPERCASE</option>
+        <option value="lower">lowercase</option>
+        <option value="sentence">Sentence case</option>
+        <option value="title">Title Case</option>
+      </select>
+      <button id="tt-superscript" class="icon-button options-toggle" title="Superscript">
+        <span class="material-symbols-outlined">superscript</span>
+      </button>
+      <button id="tt-subscript" class="icon-button options-toggle" title="Subscript">
+        <span class="material-symbols-outlined">subscript</span>
+      </button>
+      <button id="tt-highlight-btn" class="icon-button options-toggle" title="Highlight Color — on / off">
+        <span class="material-symbols-outlined">format_ink_highlighter</span>
+      </button>
+      <input type="color" id="tt-highlight" value="#fff176" title="Highlight colour">
+    </div>
+    <div class="options-group-header">Text</div>
+  </div>
+
+  <div class="options-divider tt-story-only hidden"></div>
+  <div class="options-group tt-story-only hidden" id="tt-para-group">
+    <div class="options-group-controls">
+      <select id="tt-align" class="toolbar-select" title="Align">
+        <option value="left">Left Align</option>
+        <option value="center">Center Align</option>
+        <option value="right">Right Align</option>
+        <option value="justify-left">Justified Left</option>
+        <option value="justify-center">Justified Center</option>
+        <option value="justify-right">Justified Right</option>
+        <option value="justify-all">Justified All</option>
+      </select>
+      <select id="tt-valign" class="toolbar-select tt-frame-only" title="Vertical Align (frame text)">
+        <option value="top">Top Align</option>
+        <option value="center">Center Vertically</option>
+        <option value="bottom">Bottom Align</option>
+        <option value="justify">Justify Vertically</option>
+      </select>
+      <select id="tt-leading-type" class="toolbar-select" title="Paragraph Leading">
+        <option value="default">Leading: Default</option>
+        <option value="multiple">Multiple</option>
+        <option value="percent">% Height</option>
+        <option value="atLeast">At Least</option>
+        <option value="exact">Exactly</option>
+      </select>
+      <input type="number" id="tt-leading" class="toolbar-input-small" step="0.1" min="0" title="Leading value (× for Multiple, % for % Height, pt for At Least / Exactly)">
+      <button id="tt-bullets" class="icon-button options-toggle" title="Bulleted List">
+        <span class="material-symbols-outlined">format_list_bulleted</span>
+      </button>
+      <button id="tt-numbers" class="icon-button options-toggle" title="Numbered List">
+        <span class="material-symbols-outlined">format_list_numbered</span>
+      </button>
+    </div>
+    <div class="options-group-header">Paragraph</div>
+  </div>
+
+  <div class="options-divider tt-frame-only hidden"></div>
+  <div class="options-group tt-frame-only hidden" id="tt-columns-group">
+    <div class="options-group-controls">
+      <span class="material-symbols-outlined tt-ribbon-icon" title="Number of columns">view_column</span>
+      <input type="number" id="tt-columns" class="toolbar-input-small" min="1" max="50" step="1" value="1" title="Number of columns">
+      <input type="number" id="tt-gutter" class="toolbar-input-small" min="0" step="0.5" value="0" title="Gutter Width (pt)">
+      <span class="options-label">pt</span>
+    </div>
+    <div class="options-group-header">Columns</div>
+  </div>
+
+  <div class="options-divider tt-story-only hidden"></div>
+  <div class="options-group tt-story-only hidden" id="tt-panels-group">
+    <div class="options-group-controls">
+      <button id="tt-open-character" class="icon-button" title="Character panel"><span class="material-symbols-outlined">match_case</span></button>
+      <button id="tt-open-paragraph" class="icon-button" title="Paragraph panel"><span class="material-symbols-outlined">format_paragraph</span></button>
+      <button id="tt-open-frame" class="icon-button tt-frame-only" title="Text Frame panel"><span class="material-symbols-outlined">select_all</span></button>
+      <button id="tt-open-typography" class="icon-button" title="Typography panel (OpenType)"><span class="material-symbols-outlined">font_download</span></button>
+    </div>
+    <div class="options-group-header">Panels</div>
   </div>
 
   <div class="options-divider"></div>

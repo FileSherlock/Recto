@@ -13,6 +13,8 @@
   function enterInlineEdit(box) {
     // Guard: only embedded / harfbuzz spans are editable
     if (box.type === 'redaction') return;
+    // Artistic / Frame text is edited in place by story-edit.js
+    if (box.textMode) { window.enterStoryEdit?.(box); return; }
 
     // Exit any active micro-typo or prior edit session
     if (typeof exitMicroTypo === 'function') exitMicroTypo();
@@ -50,6 +52,7 @@
     input.style.fontFamily = `"${box.fontFamily}"`;
     input.style.fontSize = `${pxSize}px`;
     input.style.color = box.color || _typeColor(box.type);
+    if (box.opacity != null && box.opacity < 100) input.style.opacity = String(Math.max(0, box.opacity) / 100);
     input.style.fontWeight = box.bold ? 'bold' : 'normal';
     input.style.fontStyle = box.italic ? 'italic' : 'normal';
     input.style.width = '100%';
@@ -92,8 +95,11 @@
 
   // ── Commit ──────────────────────────────────────────────────
 
+  // A story box's session is story-edit.js's, not this one's.
+  const storySession = () => !!utbState.getBox(utbState.editingId)?.textMode;
+
   function commitInlineEdit() {
-    if (!utbState.editingId) return;
+    if (!utbState.editingId || storySession()) return;
 
     const box = utbState.getBox(utbState.editingId);
     const group = document.querySelector(`.utb-group[data-id="${utbState.editingId}"]`);
@@ -148,7 +154,7 @@
   // ── Cancel ──────────────────────────────────────────────────
 
   function cancelInlineEdit() {
-    if (!utbState.editingId) return;
+    if (!utbState.editingId || storySession()) return;
 
     const group = document.querySelector(`.utb-group[data-id="${utbState.editingId}"]`);
     if (group) {
@@ -184,6 +190,15 @@
   document.addEventListener('dblclick', e => {
     // Don't trigger if clicking inside an active edit input
     if (e.target.closest('.utb-inline-edit')) return;
+
+    // Artistic / Frame text: edit it in place, the caret where it was clicked
+    const story = e.target.closest('.tt-story');
+    if (story) {
+      const box = utbState.getBox(story.closest('.utb-group')?.dataset.id);
+      if (box?.textMode && utbState.editingId !== box.id)
+        window.enterStoryEdit?.(box, { x: e.clientX, y: e.clientY });
+      return;
+    }
 
     const textEl = e.target.closest('.utb-text') || e.target.closest('.utb-bbox') ||
       e.target.closest('.utb-pixel');   // pixel-rendered box (svg-renderer seam)

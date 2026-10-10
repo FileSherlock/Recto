@@ -18,7 +18,8 @@ API. Everything else is a plugin.
   own; it hands plugins the primitives (page pixels, raw structured text) through the `Doc`
   service.
 - **`web/plugins/text_tool/`** — edit and add text with real font metrics (HarfBuzz-shaped
-  widths).
+  widths), and Affinity's Artistic and Frame text: rich text with the Character, Paragraph,
+  Text Frame and Typography settings, columns, drop caps, OpenType features.
 - **`web/plugins/embedded_text_viewer/`** — inspect the text already embedded in the PDF.
 - **`web/plugins/webgl_mask/`** — find the blacked-out regions of a scanned page and tint
   them on the GPU.
@@ -44,13 +45,16 @@ See [`guide/tool-expansion-guide.md`](guide/tool-expansion-guide.md) to write on
 node tools/serve.mjs            # → http://localhost:5000
 node tools/serve.mjs 8080       # another port
 node tools/serve.mjs --no-isolate   # without the COOP/COEP headers
+node tools/serve.mjs --plugin <folder>   # a plugin folder from elsewhere in place of its copy in web/plugins/
 ```
 
 Then open <http://localhost:5000>. The server is a zero-dependency static file server for
 `web/` that also runs the build on every request for `index.html`, so a plugin folder dropped
 into or taken out of `web/plugins/` shows on reload. It serves `.wasm` as `application/wasm`
 and sends COOP/COEP headers (cross-origin isolation, which exposes memory measurement in the
-browser). It listens on `127.0.0.1` only and is meant for development.
+browser). It listens on `127.0.0.1` only and is meant for development. `--plugin <folder>` is
+for a plugin developed in a repository of its own: the page is built and served with that
+folder in place of `web/plugins/<folder name>/`, and nothing is written into `web/`.
 
 The PDF directly in `web/assets/pdfs/` is the startup document; without one the app starts
 empty.
