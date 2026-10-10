@@ -17,8 +17,9 @@
 //                              segments left/right of the bar with their
 //                              baseCharPositions (the reader's pens)
 //   the line's terms           span.ocr: font (set), baseline, phy, tol,
-//                              top/bot, quant, spaceAdv; the row space from
-//                              box.refineInfo (the refiner's rowSpaceWidth)
+//                              top/bot, quant; the row space and the gap to
+//                              each neighbour from box.refineInfo (the
+//                              refiner's verdict — hvRowSpace, hvGap)
 //   the page bytes + bar model pixel-view.js pvPageInfo: the whitened page,
 //                              detectObjects (objects + edge model), quant
 //   the sets                   pvSetsForBox / pvEnsureSets
@@ -86,6 +87,46 @@ function hvKernTable(pageNum, spaceAdv) {
 }
 window.PDFHooks?.on('document:loaded', () => hvKern.clear());
 
+// The space between a candidate's words, viewBox px: the row's — the space
+// the refiner derived the bar's edges with (box.refineInfo: a side's space,
+// the face's natural advance or a justified row's stretched median), so
+// name and bar are one measure. A side where a mark binds to the name ("(",
+// "<", the comma after it) carries no space (0) — it says nothing about the
+// row, and taken as the row's it measured "(Name Here)" one space short:
+// the other side's is taken. With neither — a bar between two marks, or
+// before the refiner has run — the face's own space under the page's
+// producer law (pixel-view.js pvSpaceAdv: the space typed text gets, which
+// the page's natural gaps measure to 0.03 px), its face loaded first. The
+// reader's calibration (box.ocr.spaceAdv) is the last resort: an estimate
+// made for counting spaces, it runs low (3.19 px against 4.00 on a Times
+// e-mail).
+async function hvRowSpace(box, span, set, sx) {
+  const ri = box.refineInfo;
+  const side = [ri?.left, ri?.right].find(s => s?.space > 0);
+  if (side) return side.space;
+  await hvFace(set);
+  return pvSpaceAdv(span, set, pvLaw(span, set)) * sx;
+}
+// pvSpaceAdv needs the face behind the set: start loading it, and wait
+async function hvFace(set) {
+  if (pvFaceOfSet(set)) return;
+  const st = set.dynamic ? null : pvSetStyle(set.name);
+  const loading = st ? pvFaces.get(pvFaceUrl(st.family, st.bold, st.italic)) : null;
+  if (loading instanceof Promise) await loading;
+}
+// The gap a name leaves to its neighbour on one side, page px: the
+// refiner's verdict there — how far from the neighbour's ink it put the
+// bar's edge: a space; two after a sentence on a page that spaces its
+// sentences so ("plane.  [Bledsoe] said" — one put the name a space too far
+// left, and with no word after it the truth was contradicted); none where a
+// mark binds to the name; a fragment's missing letters and a space. An edge
+// at the bar's ink (the neighbour is not the name's) or no verdict: the
+// fallback (a space, or none beside a mark that touches).
+function hvGap(s, side, fallback, sx) {
+  if (!s || s.kind === 'ink' || s.edge == null || s.inkEdge == null) return fallback;
+  return (side === 'left' ? s.edge - s.inkEdge : s.inkEdge - s.edge) / sx;
+}
+
 async function ocrTestHypothesis(box, name) {
   if (typeof OCRHypothesis === 'undefined' || typeof OCRRender === 'undefined') return hvReason(box, 'engine not loaded');
   if (typeof RedactionRefiner === 'undefined') return hvReason(box, 'no refiner');
@@ -111,17 +152,18 @@ async function ocrTestHypothesis(box, name) {
   const set = (adj?.src && setInfo.byName.get(adj.src)) || setInfo.primary;
 
   const ri = box.refineInfo;
-  const spaceLine = ri?.left?.space ?? ri?.right?.space ?? span.ocr.spaceAdv ?? pvSpaceAdv(span, set);
+  const spaceLine = await hvRowSpace(box, span, set, sx);
   const penLeft = leftChars.length ? leftChars[leftChars.length - 1].x1 / sx : null;
   const penRight = rightChars.length ? rightChars[0].x0 / sx : null;
   if (penLeft == null && penRight == null) return hvReason(box, 'no pen on either side');
-  // the gap the name leaves to each neighbour: a space, or none where the
-  // neighbour is punctuation that touches it ("Kellen," — the memo's lists)
+  // the gap the name leaves to each neighbour (hvGap): the refiner's verdict,
+  // else a space, or none where the neighbour is punctuation that touches
+  // it ("Kellen," — the memo's lists)
   const closes = ch => /[,.;:!?'"’”)\]}]/.test(ch), opens = ch => /[('"‘“\[{]/.test(ch);
   const leftCh = leftChars.length ? leftChars[leftChars.length - 1].cp.c : '';
   const rightCh = rightChars.length ? rightChars[0].cp.c : '';
-  const gapLeft = leftCh && opens(leftCh) ? 0 : spaceLine / sx;
-  const gapRight = rightCh && closes(rightCh) ? 0 : spaceLine / sx;
+  const gapLeft = hvGap(ri?.left, 'left', leftCh && opens(leftCh) ? 0 : spaceLine / sx, sx);
+  const gapRight = hvGap(ri?.right, 'right', rightCh && closes(rightCh) ? 0 : spaceLine / sx, sx);
 
   // the bar: the detected box object over it
   const bx0 = box.x / sx, bx1 = (box.x + box.w) / sx, by0 = box.y / sx, by1 = (box.y + box.h) / sx;
@@ -170,11 +212,11 @@ window.OCRHypothesisView = hypothesisView;
 // page, glyph by glyph at its own advances (the set's, or the producer's
 // build's where they differ: LAWS §6). Laid out PLAIN — no page metrics:
 // the measured kern table is for placing glyphs on the page and widened
-// every name's miss on the memos — with the refiner's row space, the space
-// the bar was derived with, so the two are the same measure (the reader's
-// calibrated space is 0.07 px tighter and fits the bars worse). On the
-// memos this agrees with HarfBuzz to the font unit once HarfBuzz stops
-// forming ligatures (RICHARD BARNETT, LESLEY GROFF: 0.5 px short with them).
+// every name's miss on the memos — with the row space (hvRowSpace: the
+// refiner's, the space the bar was derived with, so the two are the same
+// measure). On the memos this agrees with HarfBuzz to the font unit once
+// HarfBuzz stops forming ligatures (RICHARD BARNETT, LESLEY GROFF: 0.5 px
+// short with them).
 // Widths are returned in viewBox px like box.w. A string with a glyph the
 // set lacks gets null; the whole call is null when the row has no reader
 // line or no set is loaded.
@@ -195,8 +237,7 @@ async function ocrMeasureWidths(box, strings) {
   // viewBox px per page px: the OCR boxes were scaled by this when created
   const info = pvPageInfo(box.page);
   const sx = info ? (state.pageWidth || info.page.w) / info.page.w : 1;
-  const ri = box.refineInfo;
-  const space = ri?.left?.space ?? ri?.right?.space ?? ((span.ocr.spaceAdv ?? pvSpaceAdv(span, set)) * sx);
+  const space = await hvRowSpace(box, span, set, sx);
   const widths = strings.map(s => {
     const text = typeof utbApplyCase === 'function' ? utbApplyCase(String(s), box.uppercase) : box.uppercase ? String(s).toUpperCase() : String(s);
     const lay = OCRRender.layoutLine(set, text, 0, { spaceAdv: space / sx });

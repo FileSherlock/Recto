@@ -329,7 +329,10 @@ know (EFTA00038617, Calibri, 2026-09-05): a bar that opens a sentence on a
 page that double-spaces its sentences starts **two** spaces after the period
 (`refineInfo.left.spaces === 2`, and `left.edge` already includes it — the
 engine's `line.pen0` input is the place to hand it over; `penLeft +
-spaceLine` puts `Bledsoe` a space too far left after `plane.`); and a
+spaceLine` puts `Bledsoe` a space too far left after `plane.`; since
+2026-10-10 the seam takes each side's gap from the refiner's verdict,
+`hvGap` in `ocr_tool/hypothesis-view.js`, and the truth there is no longer
+contradicted); and a
 neighbour the bar partly covers is `partial`, its pen a sliver reading. On
 that page the seam contradicts `Gregory Bledsoe` on one unexplained pixel
 with a page-metric advance of 107.02 px against 107.44 px from the font, and

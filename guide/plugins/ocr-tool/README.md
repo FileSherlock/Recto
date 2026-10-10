@@ -237,10 +237,34 @@ engine's `hypothesis.js` (synced verbatim, certified in tol0 by
 identifies a sliver; it verifies a short list. Registered after
 `pixel-view.js`; without `redaction_refiner` it returns `null`.
 
+Where the name sits and how its words are spaced come from the refiner's
+verdict on the bar (`box.refineInfo`). The gap to each neighbour (`hvGap`) is
+how far from the neighbour's ink the refiner put that edge: a space; two after
+a sentence on a page that spaces its sentences so; none where a mark binds to
+the name (`(`, `<`, a quote, the comma after it — the refiner's punctuation
+rules, not a second copy of them); a fragment's missing letters and a space.
+An edge at the bar's ink (the neighbour is not the name's) keeps a space. The
+space between the name's words (`hvRowSpace`) is the row's, the one the
+refiner derived the bar with — from whichever side carries one: a side that
+abuts a mark carries 0, which is not the row's. With neither (a bar between
+two marks, or before the refiner has run) it is the face's own space under the
+producer's law, the face loaded first (`pvSpaceAdv`, as typed text gets it),
+and only without the face the reader's calibration. Until 2026-10-10 the
+first side's space was taken even when it was that 0, and the gap was one
+space whatever the refiner had found: measured on bars whose hidden text is
+known (recto-eval's `match.*`: three synthetic pages made for the cases, and
+the FBI summary's second release), a two-word name beside `( )` or quotes
+measured one space short and fell out of the matcher's 0.3 px window (one
+opening a line before a comma measured short too), and the true name after a
+double-spaced sentence end with no word after the bar was contradicted (on
+the summary page too). After:
+the width seam 30 → 38 of 39 bars, the hypothesis seam 35 → 38 of 39, 16
+units better, 0 worse.
+
 The same file defines the **width seam** `window.ocrMeasureWidths(box,
 strings) → Promise<{ widths: (number | null)[], face } | null>`: the strings
 laid out in the reader's glyph set for the bar's row (`OCRRender.layoutLine`,
-plain — no page metrics — with the refiner's row space), so a matcher measures
+plain — no page metrics — with the row space, `hvRowSpace` above), so a matcher measures
 candidates in the face that actually drew the page, at its own advances,
 rather than in the installed font file. Widths come back in viewBox px; a
 string with a glyph the set lacks is `null`; the call is `null` when the row
@@ -256,12 +280,15 @@ sizes, underline, colour, paragraphs and redaction bars against synthetic pages
 with known answers (laid out from specs, rendered by MuPDF at 96 dpi, embedded
 as scans), confirmed hand labels and second releases of a redacted page (what
 a bar hides, typed into it with the bar's formatting, against the release that
-shows it), the embedded text layer as a second opinion — and whether the
-detected formatting **writes the page back**: every
+shows it), the embedded text layer as a second opinion, how redaction
+matching measures a bar whose hidden text is known (the refined bar, the
+width and hypothesis seams, asked about that text only: `match.*`) — and
+whether the detected formatting **writes the page back**: every
 certified segment drawn as read, re-laid under the law (`PixelView.relayout`),
 and typed afresh from its formatting alone, each judged by the pixel view's own
 diff. It runs this plugin's files headless (the engine, `line-boxes.js`,
-`ocr-tool.js`, `pixel-view.js`, text_tool's box model) and certifies that a node
+`ocr-tool.js`, `pixel-view.js`, `hypothesis-view.js`, the redaction refiner,
+text_tool's box model) and certifies that a node
 read of the startup document is the browser's shipped read and the headless
 pixel view the smoke test's verdict. Its skill (`.claude/skills/ocr-eval/SKILL.md`
 there) is the loop: the top failure group, a measured counterfactual, the
@@ -270,7 +297,8 @@ change where it belongs, `node run.mjs --against latest`; its
 (see Pens, below — typed write-back over the full tier's 30,564 certified
 segments 66.4 % → 77.1 %, 3,267 better, 3 worse and explained) and
 `render.js lineLayout`'s set change inside a word (re-laid lines 112 better,
-0 worse; the Calibri page 17 → 46 of 49). Still open there: underline, colour
+0 worse; the Calibri page 17 → 46 of 49); the matcher's seams' space and gaps
+(*The hypothesis seam*, above; 16 better, 0 worse). Still open there: underline, colour
 and paragraphs are not detected; the shipped Times New Roman, Courier New and
 Segoe UI files are another build than the bundle's sets in a few characters
 each (the report lists them); editing a Times 16 px e-mail line moves its pens
@@ -339,7 +367,8 @@ Two switches in the **MuPDF pixels** section of the Settings panel (`settings.ht
   runs low (7.699 px there; 3.512 px on an e-mail whose gaps are all 4.000),
   so typed text slipped a lattice step every few words. The calibration is
   still the answer where the face is not known (a page-cut set) or still
-  loading, and for the width seams below, which pass no law.
+  loading. The matcher's seams space a name with the refiner's row space and
+  fall back to this law space (*The hypothesis seam*, above).
 - **The producer's law.** A certified line fixes the face, the size and every
   pen, not how the producer arrived at them, and that differs between
   documents in the same face (measured 2026-09: Courier New laid at the
