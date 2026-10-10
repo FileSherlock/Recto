@@ -2,10 +2,13 @@
 
 export const switches = ['ocr-toggle-text'];
 
-// A short document is read to the end; a long one's automatic read is cut short.
+// A short document is read to the end; a long one's automatic read is cut
+// short — after page 1, whose boxes the pixel view then judges (cut as soon as
+// it started, page 1 came or did not by timing: 62/62 one run, 0/0 the next).
 export async function settle(page, doc) {
   if (doc.num_pages <= 7) { await page.waitForFunction(() => OCRTool.state.autoDone && !OCRTool.state.running); return; }
-  await page.waitForFunction(() => OCRTool.state.running || OCRTool.state.autoDone);
+  await page.waitForFunction(() => OCRTool.state.autoDone ||
+    utbState.boxes.some(b => b.page === 1 && (b.type === 'ocr' || b.ocrSource)), { timeout: 180000 });
   await quiesce(page);
 }
 
