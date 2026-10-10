@@ -152,8 +152,24 @@ the right):
 Spaces are sized from the **neighbour word's own font and size** with
 `text_tool`'s HarfBuzz shaper (`getNaturalSpaceWidth`, which measures through
 `Shaping.widths`; else a `0.25em` estimate), and stretched to the row's
-measured spacing when the line is justified (measured spaces clearly *above*
-natural are trusted; a short one under the bar is ignored). The missing
+measured spacing when the line is justified (`rowSpaceWidth`). Each gap of the
+row is measured from where the word before it starts plus its glyphs'
+advances to where the next word starts (`rowGaps`): every pen sits on MuPDF's
+¼-px lattice, and measured start to start the snaps cancel along a line —
+measured from a word's last glyph each gap kept two, and a monospace line
+read 7.33 and 7.58 px for its 7.42 px cells. A gap counts once whatever its
+number of spaces (a tab read as nine spaces cannot outvote the row); one
+clearly below natural is a space partly under the bar and is ignored. The row
+is stretched when the mean of the gaps near the typical one sits above
+natural by more than the snapping can leave in it (¼ px per span over the
+gaps, at least 0.1 px), and then that mean is its space. Until 2026-10-10 it
+was the median, trusted only 12 % (at least 0.5 px) above natural: Word
+justifies a nearly full Times line by a quarter pixel a space, which a
+three-word name pays four times (1.4 px off its bar), and the median kept one
+gap's snap (0.16 px on a Courier line). Measured with recto-eval's justified
+redaction pages (21 bars in Times, Calibri and Courier): refined edges 23 → 26
+of 26 pen-exact bars, widths 25 → 30 of 30, fits 19 → 26 of 26; on the real
+corpus no bar of a certified row moves. The missing
 letters of a fragment are measured by `Shaping.widths` directly — plain
 advances, `kerning: false`, `ligatures: false`, as the matcher measures —
 behind a `typeof Shaping !== 'undefined'` guard; without the shaper the

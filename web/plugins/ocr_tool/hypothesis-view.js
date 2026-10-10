@@ -94,18 +94,22 @@ window.PDFHooks?.on('document:loaded', () => hvKern.clear());
 // "<", the comma after it) carries no space (0) — it says nothing about the
 // row, and taken as the row's it measured "(Name Here)" one space short:
 // the other side's is taken. With neither — a bar between two marks, or
-// before the refiner has run — the face's own space under the page's
-// producer law (pixel-view.js pvSpaceAdv: the space typed text gets, which
-// the page's natural gaps measure to 0.03 px), its face loaded first. The
-// reader's calibration (box.ocr.spaceAdv) is the last resort: an estimate
-// made for counting spaces, it runs low (3.19 px against 4.00 on a Times
-// e-mail).
-async function hvRowSpace(box, span, set, sx) {
+// before the refiner has run — the row's own measure as the refiner takes
+// it (RedactionRefiner.rowSpaceWidth over the row's spans: a justified line
+// stretches every space alike; a bar opening such a line before a comma
+// measured 1.8 px short without it), natural being the face's own space under
+// the page's producer law (pixel-view.js pvSpaceAdv: the space typed text
+// gets, which the page's natural gaps measure to 0.03 px), its face loaded
+// first. The reader's calibration (box.ocr.spaceAdv) is the last resort: an
+// estimate made for counting spaces, it runs low (3.19 px against 4.00 on a
+// Times e-mail).
+async function hvRowSpace(box, span, set, sx, spans) {
   const ri = box.refineInfo;
   const side = [ri?.left, ri?.right].find(s => s?.space > 0);
   if (side) return side.space;
   await hvFace(set);
-  return pvSpaceAdv(span, set, pvLaw(span, set)) * sx;
+  const natural = pvSpaceAdv(span, set, pvLaw(span, set)) * sx;
+  return spans && typeof RedactionRefiner?.rowSpaceWidth === 'function' ? RedactionRefiner.rowSpaceWidth(spans, natural) : natural;
 }
 // pvSpaceAdv needs the face behind the set: start loading it, and wait
 async function hvFace(set) {
@@ -152,7 +156,7 @@ async function ocrTestHypothesis(box, name) {
   const set = (adj?.src && setInfo.byName.get(adj.src)) || setInfo.primary;
 
   const ri = box.refineInfo;
-  const spaceLine = await hvRowSpace(box, span, set, sx);
+  const spaceLine = await hvRowSpace(box, span, set, sx, nb.spans);
   const penLeft = leftChars.length ? leftChars[leftChars.length - 1].x1 / sx : null;
   const penRight = rightChars.length ? rightChars[0].x0 / sx : null;
   if (penLeft == null && penRight == null) return hvReason(box, 'no pen on either side');
@@ -237,7 +241,7 @@ async function ocrMeasureWidths(box, strings) {
   // viewBox px per page px: the OCR boxes were scaled by this when created
   const info = pvPageInfo(box.page);
   const sx = info ? (state.pageWidth || info.page.w) / info.page.w : 1;
-  const space = await hvRowSpace(box, span, set, sx);
+  const space = await hvRowSpace(box, span, set, sx, nb.spans);
   const widths = strings.map(s => {
     const text = typeof utbApplyCase === 'function' ? utbApplyCase(String(s), box.uppercase) : box.uppercase ? String(s).toUpperCase() : String(s);
     const lay = OCRRender.layoutLine(set, text, 0, { spaceAdv: space / sx });

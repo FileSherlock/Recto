@@ -723,11 +723,44 @@ test('an unread OCR marker is not a neighbour', async () => {
   near(box.x + box.w, 250, 0.01, 'right edge untouched');
 });
 
+// one span of 7 px one-glyph words with a gap of each width between them
+const row = (ws, adv = 7) => {
+  const cps = [];
+  let x = 0;
+  for (const w of [...ws, null]) {
+    cps.push({ c: 'x', x, w: adv });
+    x += adv;
+    if (w == null) break;
+    cps.push({ c: ' ', x, w });
+    x += w;
+  }
+  return [{ baseCharPositions: cps }];
+};
+
 test('row space width: natural unless the row is clearly justified', () => {
-  const mk = (ws) => [{ baseCharPositions: ws.map((w) => ({ c: ' ', x: 0, w })) }];
-  assert.equal(R.rowSpaceWidth(mk([3.9, 4.1, 2.7]), 4), 4);      // 2.7 = space under the bar, ignored
-  assert.equal(R.rowSpaceWidth(mk([6, 6.2, 5.9]), 4), 6);        // justified → measured
-  assert.equal(R.rowSpaceWidth(mk([]), 4), 4);
+  assert.equal(R.rowSpaceWidth(row([3.9, 4.1, 2.7]), 4), 4);      // 2.7 = space under the bar, ignored
+  near(R.rowSpaceWidth(row([6, 6.2, 5.9]), 4), 6.0333, 0.001, 'justified → the mean of the measured');
+  assert.equal(R.rowSpaceWidth([{ baseCharPositions: [] }], 4), 4);
+});
+
+test('row space width: gaps measured start to start, so the pens\' ¼-px snaps cancel', () => {
+  // a line of 7.416 px monospace cells, every pen snapped to the ¼-px lattice: end to
+  // start the gaps read 7.33 or 7.58 (their mean 0.1 px wide); start to start they are the cells
+  const pitch = 7.416, snap = (x) => Math.round(x * 4) / 4;
+  const cells = 'xx xxxx xxxx xx xxxxx x xxx xxx xxxx';
+  const mono = [{ baseCharPositions: [...cells].map((c, k) => ({ c, x: snap(k * pitch), w: pitch })) }];
+  assert.equal(R.rowSpaceWidth(mono, pitch), pitch, 'a monospace line is not stretched');
+  // a Times line stretched 0.3 px a space: 4.3 px gaps, pens snapped
+  let x = 0;
+  const cps = [];
+  for (let k = 0; k < 12; k++) {
+    for (let g = 0; g < 4; g++) { cps.push({ c: 'e', x: snap(x), w: 7.1 }); x += 7.1; }
+    if (k < 11) { cps.push({ c: ' ', x: snap(x), w: 4.3 }); x += 4.3; }
+  }
+  near(R.rowSpaceWidth([{ baseCharPositions: cps }], 4), 4.3, 0.03, 'a 0.3 px stretch is a stretch');
+  // one gap read as nine spaces (a tab) is one gap among the row's
+  const tab = [{ baseCharPositions: [{ c: 'x', x: 0, w: 7 }, ...Array.from({ length: 9 }, (_, k) => ({ c: ' ', x: 7 + k * 4.4, w: 4.4 })), { c: 'y', x: 46.6, w: 7 }] }];
+  assert.equal(R.rowSpaceWidth([...row([4, 4, 4.25, 3.75]), ...tab], 4), 4);
 });
 
 test('refineAllRedactions skips the selected box and re-measures once', async () => {

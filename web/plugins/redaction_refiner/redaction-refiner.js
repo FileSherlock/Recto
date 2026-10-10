@@ -117,10 +117,18 @@
   // until a pass moves nothing (a settled bar costs a signature compare).
   const MAX_REFINE_PASSES = 3;
 
-  // A row counts as justified when its median measured space exceeds the font's
-  // natural advance by more than this (relative, with an absolute floor).
+  // A measured space this far below the font's natural advance (relative,
+  // with an absolute floor) is partly under the bar and says nothing.
   const JUSTIFY_TOL_FRAC = 0.12;
   const JUSTIFY_TOL_MIN_PX = 0.5;
+  // Every pen sits on MuPDF's ¼-px lattice, so a gap read between two pens is
+  // ±¼ px. Gaps this close to the typical one are the row's spaces; the row
+  // is stretched when their mean sits above natural by more than the snapping
+  // can leave in it (rowGaps: ¼ px per span over the gaps, never under a tenth
+  // of a pixel).
+  const SNAP_PX = 0.25;
+  const SNAP_SPREAD_PX = 0.5;
+  const STRETCH_MIN_PX = 0.1;
 
   const DICT_URL = assetURL('plugins/redaction_refiner/words.txt');
 
@@ -531,23 +539,59 @@
     return span.sizePt * pxPerPt() * 0.25;
   }
 
-  // The inter-word space actually used on this row. Justification only ever
-  // STRETCHES spaces above the natural advance, so: drop measured spaces that
-  // read clearly below natural (a space partly under the bar), and trust the
-  // median of the rest only when it sits clearly above natural.
-  function rowSpaceWidth(spans, natural) {
-    const measured = [];
+  // The row's word gaps, one space's width each: from where the word before
+  // the gap STARTS plus its glyphs' advances to where the word after it
+  // starts, over the number of spaces between. Measured from the word's last
+  // glyph, every gap carried two independent ¼-px snaps — a monospace line
+  // read 7.33 and 7.58 px for its 7.42 px cells, and the snaps of a short row
+  // need not cancel. Measured from start to start they telescope: the gaps of
+  // a span add up to its last word's start less its first's, less the
+  // advances, so a span's snapping is ¼ px over all its gaps. `chains` counts
+  // the spans that gave gaps.
+  function rowGaps(spans) {
+    const gaps = [];
+    let chains = 0;
     for (const s of spans) {
       const cps = s.baseCharPositions;
       if (!Array.isArray(cps)) continue;
-      for (const cp of cps) if (cp.c === ' ' && cp.w > 0) measured.push(cp.w);
+      let start = null, adv = 0, n = 0, gave = false;
+      for (const cp of cps) {
+        if ((cp.c || '') === ' ') { if (start != null) n++; continue; }
+        if (start != null && n > 0) {                 // the first glyph after a gap
+          const w = (cp.x - (start + adv)) / n;
+          if (w > 0) { gaps.push(w); gave = true; }
+          start = null;
+        }
+        if (start == null) { start = cp.x; adv = 0; n = 0; }
+        adv += cp.w || 0;
+      }
+      if (gave) chains++;
     }
-    if (!measured.length) return natural;
+    return { gaps, chains };
+  }
+
+  // The inter-word space actually used on this row. Justification only ever
+  // STRETCHES spaces above the natural advance, so: drop gaps that read
+  // clearly below natural (a space partly under the bar), and trust the row's
+  // own measure only when it sits clearly above natural. That measure is the
+  // MEAN of the gaps near the typical one (rowGaps), where the snaps cancel —
+  // the median kept one gap's (0.16 px wide on a Courier line, which a
+  // two-word bar's fit pays three times: 0.51 px). And a stretch of a quarter
+  // pixel — Word justifying a nearly full Times line — is real: the old
+  // threshold (12 %, at least 0.5 px) called such a line natural and put a
+  // three-word name 1.4 px off its bar. A gap counts once, whatever its
+  // number of spaces, so a tab read as nine spaces cannot outvote the row.
+  function rowSpaceWidth(spans, natural) {
+    const { gaps, chains } = rowGaps(spans);
+    if (!gaps.length) return natural;
     const tol = Math.max(JUSTIFY_TOL_MIN_PX, natural * JUSTIFY_TOL_FRAC);
-    const real = measured.filter((w) => w >= natural - tol);
+    const real = gaps.filter((w) => w >= natural - tol);
     if (!real.length) return natural;
     const typical = median(real);
-    return typical > natural + tol ? typical : natural;
+    const near = real.filter((w) => Math.abs(w - typical) <= SNAP_SPREAD_PX);
+    const mean = near.reduce((t, w) => t + w, 0) / near.length;
+    const slack = Math.max(STRETCH_MIN_PX, SNAP_PX * Math.max(1, chains) / near.length);
+    return mean > natural + slack ? mean : natural;
   }
 
   // Width (image px) of `text` set in the span's font + size, via HarfBuzz
