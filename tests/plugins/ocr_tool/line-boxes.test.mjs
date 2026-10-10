@@ -36,11 +36,13 @@ test('the startup document: a box per segment at the pens, the bars split the li
   const p1 = data.pages[0];
   const { boxes, tally } = X.pageBoxes(1, p1.res, p1.pass, opts());
   assert.deepEqual(tally, { lines: 54, clean: 54, unread: 0, boxes: 3 });
-  // line 1, `From: "[bar]"`: two boxes, no separator space, the bold Times header face
-  const [a, b] = boxes;
-  assert.deepEqual([a.data.text, b.data.text], ['From: "', '"']);
+  // line 1, `From: "[bar]"`: the bold label, then the regular quotes either
+  // side of the bar — a box per face and per side, no separator space
+  const [a, b, c] = boxes;
+  assert.deepEqual([a.data.text, b.data.text, c.data.text], ['From:', '"', '"']);
   assert.deepEqual([a.data.fontFamily, a.data.bold, a.data.italic, a.data.sizePt], ['Times New Roman', true, false, 12]);
-  assert.equal(a.data.lineId, b.data.lineId);
+  assert.deepEqual([b.data.fontFamily, b.data.bold, c.data.bold], ['Times New Roman', false, false]);
+  assert.equal(a.data.lineId, c.data.lineId);
   assert.equal(a.data.x, 76.75);                                      // the first pen, as measured
   assert.equal(a.data.color, null);                                   // clean: the type's own colour
   assert.deepEqual([a.ocr.clean, a.ocr.trusted, a.ocr.font, a.ocr.baseline], [true, true, 'timesbd16', 68]);

@@ -172,9 +172,14 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
   what `new UnifiedTextBox(data)` takes — and `lawInputs`, `readIsWeak`,
   `dominantTypography` answer the adapter's other questions of a read.
   `ocrAddBoxes` only makes the boxes and starts the law learning.
-- **Underline and colour** (since 2026-10-10). A box carries one underline and
-  one colour, so a line is split where either changes, as it is at a bar (a
-  blue underlined link inside a black sentence: three boxes). The underline
+- **Underline, colour and face** (since 2026-10-10). A box carries one
+  underline, one colour and one face, so a line is split where any of them
+  changes, as it is at a bar (a blue underlined link inside a black
+  sentence: three boxes; a bold label and its regular value — "Subject:" |
+  "Vacation 4.18.11 …" — two). Each is a WORD's, its glyphs' majority, and a
+  line splits between words only (inside a word two glyphs can share an
+  anti-aliased pixel). A word drawn by a set with no face of its own (the
+  bullet sets) takes its neighbour's. The underline
   is a rule the read found — `detectObjects`' thin `'rule'` objects, which the
   slim read keeps since cache version 4 — starting below the baseline row and
   no deeper than the line's descent, under the glyph's middle

@@ -251,9 +251,12 @@
       // words only: inside a word two glyphs can share an anti-aliased pixel,
       // which two boxes would draw apart (a link read "htt" + "p://…" missed a
       // pixel each), and a change there is far likelier a detection's noise.
+      // So is the face: a box has one, and a union line's bold label and
+      // regular value ("Subject:" | "Vacation 4.18.11 …") are two boxes — one
+      // box took the label's face for the whole line.
       const rects = L.boxes ?? [];
       const ruleOf = underlinedEntries(L, res.objects || []);
-      const under = new Map(), inkOf = [];
+      const under = new Map(), inkOf = [], faceOf = [], wordFace = [];
       for (let i = 0; i < L.entries.length;) {
         let j = i + 1;
         while (j < L.entries.length && L.entries[j].i - L.entries[j - 1].i - txLen(L.entries[j - 1].ch) === 0) j++;
@@ -263,13 +266,22 @@
         const inks = new Map();
         for (const e of word) inks.set(e.ink || null, (inks.get(e.ink || null) || 0) + 1);
         const ink = [...inks.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        const set = majoritySet(word, L.font), f = fontFromSetName(set, setFonts);
+        // a word drawn by a set with no face of its own — the bullet sets: the
+        // name falls back to Times, which split the memo's "•" off a Calibri
+        // line and gave the line's bars Times — takes its neighbour's face
+        const known = !!setFonts?.[String(set || '').split('+')[0]];
+        wordFace.push({ n: word.length, face: known ? `${f.family}|${f.bold}|${f.italic}` : null });
         for (const e of word) { if (rule) under.set(e, rule); inkOf.push(ink); }
         i = j;
       }
+      for (let k = 0; k < wordFace.length; k++) if (wordFace[k].face == null)
+        wordFace[k].face = wordFace.slice(0, k).reverse().find(w => w.face != null)?.face ?? wordFace.slice(k + 1).find(w => w.face != null)?.face ?? '';
+      for (const w of wordFace) for (let k = 0; k < w.n; k++) faceOf.push(w.face);
       const segs = [[L.entries[0]]];
       for (let i = 1; i < L.entries.length; i++) {
         const a = L.entries[i - 1], b = L.entries[i];
-        if (boxBetween(rects, a, b) || under.has(a) !== under.has(b) || inkOf[i - 1] !== inkOf[i]) segs.push([]);
+        if (boxBetween(rects, a, b) || under.has(a) !== under.has(b) || inkOf[i - 1] !== inkOf[i] || faceOf[i - 1] !== faceOf[i]) segs.push([]);
         segs[segs.length - 1].push(b);
       }
 

@@ -297,12 +297,16 @@ function utbConnectRedactionsToLines() {
     // bar through a tall text-layer span (EFTA00173953: "Target Profile:"
     // reached the second Subject line's first bar by 5 of its 16 rows, and
     // the bar was then refined against that row's words).
+    // Of the line's pieces (a row cut by bars, a bold label and a regular
+    // value), the one nearest the bar: the text beside the hidden one names
+    // its face — the first piece of "From: "[bar]"" is the bold label.
     const pageBoxes = embeddedBoxes.filter(b => b.page === rb.page);
+    const apart = eb => Math.max(0, eb.x - (rb.x + rb.w), rb.x - (eb.x + eb.w));
     const best = (list) => {
       let box = null, overlap = 0, need = Infinity;
       for (const eb of list) {
         const o = Math.min(rb.y + rb.h, eb.y + eb.h) - Math.max(rb.y, eb.y);
-        if (o > overlap) { overlap = o; box = eb; need = 0.5 * Math.min(rb.h, eb.h); }
+        if (o > overlap || (box && o === overlap && apart(eb) < apart(box))) { overlap = o; box = eb; need = 0.5 * Math.min(rb.h, eb.h); }
       }
       return box && overlap >= need ? box : null;
     };
