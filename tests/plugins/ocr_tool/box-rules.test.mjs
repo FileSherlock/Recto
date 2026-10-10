@@ -133,3 +133,22 @@ test('a box containing other boxes on its rows is replaced by what it covers bey
   assert.deepEqual(R.deoverlap(fourth).map(o => [o.x0, o.x1, o.y0, o.y1]),
     [[201, 303, 413, 433], [476, 713, 416, 433], [306, 469, 416, 430], [643, 678, 399, 433]]);
 });
+
+test('a bar in slices — glyphs touching its sides — is one box again', { skip }, () => {
+  // the Calibri seams page: "(" and ")" against the bar; the engine gave three
+  // thin rows typed 'rule' and two stacked boxes, each shorter than a line
+  const p = page(600, 500, [{ x0: 160, y0: 148, x1: 263, y1: 169 }]);
+  const objects = [{ type: 'rule', x0: 163, y0: 148, x1: 260, y1: 152 }, { type: 'rule', x0: 161, y0: 152, x1: 263, y1: 153 },
+    { type: 'rule', x0: 160, y0: 153, x1: 260, y1: 156 }, box(163, 156, 260, 161), box(160, 161, 260, 168),
+    { type: 'rule', x0: 0, y0: 400, x1: 600, y1: 402 }];
+  const { kept, dropped } = R.filter(p, rows(12, 60, 18), objects);
+  assert.deepEqual(kept.map(o => [o.type, o.x0, o.y0, o.x1, o.y1]), [['box', 163, 148, 260, 168], ['rule', 0, 400, 600, 402]]);
+  assert.equal(kept[0].restacked, 5);
+  assert.equal(dropped.length, 0);
+  // two lines' bars that touch are each a line tall: left as they are
+  const two = [box(100, 150, 300, 168), box(100, 168, 300, 186)];
+  assert.deepEqual(R.restack(two, R.grid(rows(12, 60, 18))), two);
+  // a double underline is rules only: left as it is
+  const dbl = [{ type: 'rule', x0: 100, y0: 172, x1: 300, y1: 173 }, { type: 'rule', x0: 100, y0: 174, x1: 300, y1: 175 }];
+  assert.deepEqual(R.restack(dbl, R.grid(rows(12, 60, 18))), dbl);
+});

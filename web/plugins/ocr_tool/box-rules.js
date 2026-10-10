@@ -116,6 +116,49 @@
     return { ...out, keep: false, why: 'away from the text' };
   }
 
+  // A bar can come out of the engine in slices: its runs break where a glyph
+  // touches its side — "(" and ")" against a bar on the Calibri seams page
+  // gave three thin rows typed 'rule' and two stacked boxes, each shorter than
+  // a line, so each was dropped and the bar was gone. Slices that stack —
+  // rows touching (≤ STACK_GAP_PX apart), the same columns (± STACK_COL_PX) —
+  // and each fall short of a line are one box, as tall as they are together
+  // across the columns they all share, when at least one is a box and the
+  // whole is no taller than NARROW_TALL lines (two lines' bars that touch
+  // are each a line tall: never restacked; a double underline is rules only).
+  const STACK_GAP_PX = 1;
+  const STACK_COL_PX = 3;
+  function restack(objects, g) {
+    if (!g) return objects;
+    const short = o => (o.type === 'box' || o.type === 'rule') && o.y1 - o.y0 < GRID_MIN_H * g.pitch;
+    const slices = objects.filter(short).sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0);
+    const group = new Map();                                 // slice -> its group (an array)
+    for (const o of slices) {
+      const below = slices.find(a => a !== o && group.has(a) && a.y0 <= o.y0 && o.y0 - a.y1 <= STACK_GAP_PX &&
+        Math.abs(a.x0 - o.x0) <= STACK_COL_PX && Math.abs(a.x1 - o.x1) <= STACK_COL_PX);
+      const gr = below ? group.get(below) : [];
+      gr.push(o); group.set(o, gr);
+    }
+    const merged = new Map();                                // first slice of a merged group -> its box
+    const gone = new Set();
+    for (const gr of new Set(group.values())) {
+      if (gr.length < 2 || !gr.some(o => o.type === 'box')) continue;
+      // the columns every slice has: the bar's body (a slice's end can run
+      // into the glyph that touches it — the "(" took 3 columns of one row)
+      const m = { type: 'box', x0: Math.max(...gr.map(o => o.x0)), y0: Math.min(...gr.map(o => o.y0)),
+        x1: Math.min(...gr.map(o => o.x1)), y1: Math.max(...gr.map(o => o.y1)), restacked: gr.length };
+      if (m.y1 - m.y0 > NARROW_TALL * g.pitch) continue;
+      merged.set(gr[0], m);
+      for (const o of gr) gone.add(o);
+    }
+    if (!gone.size) return objects;
+    const out = [];
+    for (const o of objects) {
+      if (merged.has(o)) out.push(merged.get(o));
+      else if (!gone.has(o)) out.push(o);
+    }
+    return out;
+  }
+
   const PIECE_MIN_PX = 9;      // a remainder (or a piece) narrower than this is a separator's bridge, not a bar
   const PIECE_SLACK_PX = 3;    // the separator glyph beside a piece, left out of the remainder
   const PIECE_ROWS_PX = 4;     // rows a piece may reach beyond its container (the bridge's AA)
@@ -154,7 +197,7 @@
   function filter(page, lines, objects) {
     const g = grid(lines);
     const kept = [], dropped = [];
-    for (const o of deoverlap(objects)) {
+    for (const o of deoverlap(restack(objects, g))) {
       if (o.type !== 'box') { kept.push(o); continue; }
       const v = verdict(page, lines, o, g);
       if (v.keep) kept.push(o);
@@ -163,6 +206,6 @@
     return { kept, dropped };
   }
 
-  root.OCRBoxRules = { blackness, grid, anchoring, verdict, deoverlap, filter,
+  root.OCRBoxRules = { blackness, grid, anchoring, verdict, restack, deoverlap, filter,
     BLACK_MAX, BLACK_FRACTION, MIN_ROWS, ON_LINE, GRID_GAP, GRID_MIN_H, NARROW_PX, NARROW_TALL };
 })(globalThis);
