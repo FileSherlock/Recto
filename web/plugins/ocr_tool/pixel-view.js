@@ -165,6 +165,9 @@ function pvSetsForBox(box) {
   }
   const sizePx = box.sizePt * GEO.docPxPerPt();
   const want = { family: box.fontFamily, bold: !!box.bold, italic: !!box.italic };
+  // the page's own build first: typed over a page, text is the page's
+  const own = pvPageSet(box, want, sizePx);
+  if (own && !pvLacking(own, box.text).length) return { primary: own, byName: new Map([[own.name, own]]), label: own.name };
   const hit = sets.find(s => {
     const st = pvSetStyle(s.name);
     return st && st.plain && st.family === want.family && st.bold === want.bold &&
@@ -181,6 +184,40 @@ function pvSetsForBox(box) {
   if (!dyn.set) return hit && !dyn.pending ? asHit() : dyn;   // no face to draw from: the set with its gap
   return { primary: dyn.set, byName: new Map([[dyn.set.name, dyn.set]]), label: dyn.set.name };
 }
+// The set the page's own lines were read in for a face and size — when the
+// page was set in another build than the bundle's plain set: the warrant's
+// Times through the linear compositor (tnrlin1024 beside times16: other
+// compositing), the memo's Calibri 1.02 (other shapes and advances). Of the
+// read glyphs in that face and size on the box's own row (a page can hold
+// two builds of a face, a line mostly one of them), else on the page, the
+// set that drew the most; null when there are none (the plain set, or the
+// installed face, then).
+function pvPageSet(box, want, sizePx) {
+  const fits = name => {
+    const st = pvSetStyle(name), set = st && pvSetByName(name);
+    return set && st.family === want.family && st.bold === want.bold && st.italic === want.italic &&
+      Math.abs(set.sizePx - sizePx) < 0.02 ? set : null;
+  };
+  const row = new Map(), page = new Map();
+  for (const b of utbState.boxes) {
+    if (b === box || b.page !== box.page || !pvAsRead(b)) continue;
+    const onRow = Math.min(b.y + b.h, box.y + box.h) - Math.max(b.y, box.y) >= 0.5 * Math.min(b.h, box.h);
+    const first = b.ocr.font.split('+')[0];
+    for (const cp of b.baseCharPositions || []) {
+      if (!cp.c || cp.c === ' ' || cp.c === '□' || cp.ligTail) continue;
+      const name = cp.src || first;
+      page.set(name, (page.get(name) || 0) + 1);
+      if (onRow) row.set(name, (row.get(name) || 0) + 1);
+    }
+  }
+  const most = count => {
+    let best = null, n = 0;
+    for (const [name, c] of count) { const set = c > n && fits(name); if (set) { best = set; n = c; } }
+    return best;
+  };
+  return most(row) || most(page);
+}
+
 // the characters of a text a set has no record for (spaces and the unread
 // marker are never drawn)
 function pvLacking(set, text) {
