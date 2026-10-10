@@ -21,6 +21,7 @@
     "engine/ftraster.js",
     "ocr-result.js",
     "box-rules.js",
+    "line-boxes.js",
     "ocr-tool.js",
     "pixel-view.js",
     "hypothesis-view.js"

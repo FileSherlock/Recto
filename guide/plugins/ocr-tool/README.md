@@ -114,7 +114,9 @@ here.** The workflow:
    writing.)
 
 Only `ocr-tool.js` (the adapter: UI wiring, page-raster → engine buffer,
-lines → UnifiedTextBoxes), `ocr-worker.js` (the Worker the adapter reads
+the read's boxes into `utbState`), `line-boxes.js` (which boxes a read makes —
+DOM-free, `OCRLineBoxes`, below), `box-rules.js` (which dark regions are
+redactions, DOM-free), `ocr-worker.js` (the Worker the adapter reads
 in), `law-worker.js` (the Worker it learns the producer's law in),
 `ocr-result.js` (the slim result shape shared by the worker, the cache
 and `ocrAddBoxes`), `pixel-view.js` (the MuPDF pixel view) and
@@ -155,6 +157,14 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
 - Per-glyph measured ¼-px pens go into `baseCharPositions`, so the SVG
   overlay reproduces the original character placement; the box `y/h` are
   chosen so `computeBaseline()` returns the *measured* baseline exactly.
+- Which boxes a read makes is `line-boxes.js` (`OCRLineBoxes`), DOM-free like
+  `box-rules.js`: the page loads it before `ocr-tool.js`, node imports the same
+  file (`tests/plugins/ocr_tool/line-boxes.test.mjs`, and the evaluation
+  harness below). `pageBoxes(page, slimRead, pass, { sx, sy })` returns plain
+  specs in the order `ocrAddBoxes` adds them — `{ data, ocr?, ink? }`, `data`
+  what `new UnifiedTextBox(data)` takes — and `lawInputs`, `readIsWeak`,
+  `dominantTypography` answer the adapter's other questions of a read.
+  `ocrAddBoxes` only makes the boxes and starts the law learning.
 - Line font/bold/italic/size come from the winning glyph set
   (`timesbd16` → Times New Roman bold 12 pt, `cour13` → Courier New 9.75 pt).
 - Non-byte-clean lines render in orange (`box.color` override); unreadable
@@ -237,6 +247,35 @@ string with a glyph the set lacks is `null`; the call is `null` when the row
 has no reader line or no set is loaded. `redaction_matching` takes these over
 its HarfBuzz widths when offered.
 
+## Measuring it: the evaluation harness
+
+`~/Desktop/recto-eval`, a repository of its own beside Recto and tol0 (kept out
+of Recto so this one stays small), scores what this plugin makes of a read —
+letters and word spaces against tol0's checked transcripts, faces, styles,
+sizes, underline, colour, paragraphs and redaction bars against synthetic pages
+with known answers (laid out from specs, rendered by MuPDF at 96 dpi, embedded
+as scans), confirmed hand labels and second releases of a redacted page (what
+a bar hides, typed into it with the bar's formatting, against the release that
+shows it), the embedded text layer as a second opinion — and whether the
+detected formatting **writes the page back**: every
+certified segment drawn as read, re-laid under the law (`PixelView.relayout`),
+and typed afresh from its formatting alone, each judged by the pixel view's own
+diff. It runs this plugin's files headless (the engine, `line-boxes.js`,
+`ocr-tool.js`, `pixel-view.js`, text_tool's box model) and certifies that a node
+read of the startup document is the browser's shipped read and the headless
+pixel view the smoke test's verdict. Its skill (`.claude/skills/ocr-eval/SKILL.md`
+there) is the loop: the top failure group, a measured counterfactual, the
+change where it belongs, `node run.mjs --against latest`; its
+`IMPROVEMENTS.md` is the worklist. Fixed 2026-10-10 with it: the typed space
+(see Pens, below — typed write-back over the full tier's 30,564 certified
+segments 66.4 % → 77.1 %, 3,267 better, 3 worse and explained) and
+`render.js lineLayout`'s set change inside a word (re-laid lines 112 better,
+0 worse; the Calibri page 17 → 46 of 49). Still open there: underline, colour
+and paragraphs are not detected; the shipped Times New Roman, Courier New and
+Segoe UI files are another build than the bundle's sets in a few characters
+each (the report lists them); editing a Times 16 px e-mail line moves its pens
+on ~12 % of segments, where the learned law cannot write a word.
+
 ## Limits
 
 Byte-exact reading requires the document family's renderer to be modelled —
@@ -285,9 +324,22 @@ Two switches in the **MuPDF pixels** section of the Settings panel (`settings.ht
   start the reader line was laid from (`render.js lineStart` over
   `box.ocr.entries`) and with the line's own measured gaps for its spaces —
   so an edited line keeps its unchanged pens and continues under the same
-  law. New breaks use the reader's page-calibrated space (`box.ocr.spaceAdv`,
-  also stored in the slim cache, payload version 2) or an approximate
-  per-family em fraction.
+  law. The words of that re-layout are the transcript's (`render.js
+  lineLayout`): a union line whose reader took one word's glyphs from two
+  sets of the same face and size (two builds of Calibri) is still laid as
+  one run per word, each glyph under its own set's law — broken at the set
+  change, as before 2026-10-10, the word's fragments got starts of their own
+  and its break a phantom space, and on a Calibri page 29 of 33 such lines
+  moved when re-laid. Every space without a measured gap of its own — all of
+  a typed box's, a new break in an edited line — is **the face's own space
+  under the producer's law** (`pvSpaceAdv`: its advance quantized and scaled
+  as the law lays every glyph; 600/1000 em × 13 px = 7.800 px on the startup
+  document's Courier body). Until 2026-10-10 it was the reader's per-set
+  calibration (`box.ocr.spaceAdv`), an estimate made for counting spaces that
+  runs low (7.699 px there; 3.512 px on an e-mail whose gaps are all 4.000),
+  so typed text slipped a lattice step every few words. The calibration is
+  still the answer where the face is not known (a page-cut set) or still
+  loading, and for the width seams below, which pass no law.
 - **The producer's law.** A certified line fixes the face, the size and every
   pen, not how the producer arrived at them, and that differs between
   documents in the same face (measured 2026-09: Courier New laid at the
@@ -373,7 +425,8 @@ Two switches in the **MuPDF pixels** section of the Settings panel (`settings.ht
   `npm test` (synthetic round trip render → readPage → clean). Recto:
   `node --test "tests/**/*.test.mjs"` — `tests/plugins/ocr_tool/page.test.mjs`
   checks the controls on the generated page and that the engine loads before
-  the adapters; `tests/plugins/ocr_tool/smoke.mjs` adds this plugin's steps
+  the adapters, `line-boxes.test.mjs` the boxes a read makes (replayed from the
+  startup document's shipped read); `tests/plugins/ocr_tool/smoke.mjs` adds this plugin's steps
   (wait for the auto read, pixel view on and off) to the browser smoke test,
   `node tests/smoke/smoke.mjs`. Browser: tol0's `npm run recto-test`
   asserts every byte-clean OCR box reports 0 differing pixels; its
@@ -389,14 +442,14 @@ sizePx, plain }`, or `null` for page-cut sets. Family names are the text tool's
 catalogue names, so a line read with `nimbus791` is a `Nimbus Mono PS` box and
 the browser draws its vector text from the URW file itself.
 
-- `ocrAddBoxes` sets each segment's family/bold/italic from the set that drew
-  most of its glyphs (per-glyph `src` on union lines), through
-  `ocrFontFromSetName`.
+- `OCRLineBoxes.pageBoxes` sets each segment's family/bold/italic from the set
+  that drew most of its glyphs (per-glyph `src` on union lines), through
+  `OCRLineBoxes.fontFromSetName`.
 - When a read finishes (live or replayed from the cache) the adapter emits
   `typography:detected { fontFamily, sizePt, source: 'ocr' }` with the
   dominant face and size of the certified lines (weighted by glyph count);
   `text_tool`'s `fonts.js` selects it in the font menu and size input. Not
-  after a weak read (`ocrReadIsWeak`: fewer than 3 certified lines, or fewer
+  after a weak read (`OCRLineBoxes.readIsWeak`: fewer than 3 certified lines, or fewer
   than half of the lines read): the claim outranks the text layer's, and on
   a page the reader could not read the two lines it certified at ±10 named
   Cambria for a Times New Roman 11 pt memo.

@@ -188,14 +188,31 @@ function pvLacking(set, text) {
     .filter(c => OCRRender.advanceOf(set, c) == null);
 }
 
-function pvSpaceAdv(box, set) {
+// The space a box is laid with where it has no measured gap of its own —
+// every space of a typed box, a new break in an edited line: the face's own
+// space under the producer's law (law: the one the box is laid with, pvLaw),
+// quantized and scaled as the law lays every glyph. The reader's per-set
+// calibration (box.ocr.spaceAdv) is an estimate made for COUNTING spaces —
+// the smallest dense cluster of measured gaps — and runs low: 7.699 px on the
+// startup document's Courier body, whose producer laid 600/1000 em × 13 px =
+// 7.800, so typed text slipped a lattice step every few words, and 3.512 px
+// on an e-mail whose gaps are all 4.000. Measured 2026-10-10 (recto-eval, 35
+// documents): wherever a page sets natural spaces, the face's space under the
+// law is the median measured gap to 0.03 px; justified lines are wider, which
+// is the paragraph's doing, not a space. The calibration stays the answer
+// where the face is not known (a page-cut set) or still loading, and for a
+// caller that passes no law (the width seams, hypothesis-view.js).
+function pvSpaceAdv(box, set, law) {
+  const face = pvFaceOfSet(set);
+  const g = face?.gidFor ? face.gidFor(0x20) : 0;
+  const own = g ? face.advance(g) * set.sizePx / face.unitsPerEm : null;
+  if (law && own != null) return OCRRender.lawAdv(own, set.sizePx, law);
   if (box.ocr?.spaceAdv) return box.ocr.spaceAdv;
   // another OCR line on this page read with the same set carries the
   // page-calibrated space
   for (const b of utbState.boxes)
     if (b.page === box.page && b.ocr?.spaceAdv && b.ocr.font === set.name) return b.ocr.spaceAdv;
-  const face = pvFaceOfSet(set);
-  if (face?.gidFor) { const g = face.gidFor(0x20); if (g) return face.advance(g) * set.sizePx / face.unitsPerEm; }
+  if (own != null) return own;
   const family = pvStyleOf(set)?.family || box.fontFamily;
   return (PV_SPACE_EM[family] ?? 0.25) * set.sizePx;
 }
@@ -298,7 +315,7 @@ function pvLayout(box, primary, byName, law) {
     start = box.x + ll.delta;
     spaceWidths = manualSpace == null ? ll.spaceWidths : null;
   }
-  const opts = { spaceAdv: manualSpace ?? pvSpaceAdv(box, primary), spaceWidths, metrics: law,
+  const opts = { spaceAdv: manualSpace ?? pvSpaceAdv(box, primary, law), spaceWidths, metrics: law,
     letterSpacing, glyphSets: same ? ents.map(e => setOf(e.src)) : null, metricsBySet };
   let lay = OCRRender.layoutLine(primary, box.text, start, opts);
   // a label its owner aligns to the box's right edge (text_tool's

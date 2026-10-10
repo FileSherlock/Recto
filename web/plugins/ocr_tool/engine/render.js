@@ -336,20 +336,55 @@
   // transcript in order, words}. layoutLine(set, text, firstPen + delta,
   // {metrics, spaceWidths}) then reproduces the line; an edit that keeps the
   // early words keeps their pens, and text past the edit follows the law.
-  // bySrc: Map src → {sizePx, m} for a union line whose words were drawn by
-  // different sets (each word is one set — wordsOf breaks at a set change).
+  // bySrc: Map src → {sizePx, m} for a union line whose glyphs were drawn by
+  // different sets: each glyph advances under its own set's law, and a kern
+  // applies between two glyphs of one set only (layoutLine's rule).
+  //
+  // The words are the TRANSCRIPT's: a set change inside a word does not break
+  // it (layoutWords). A union pool may read one word's glyphs from two sets of
+  // the same face and size — two builds of Calibri, "E" | "p" | "stein" — but
+  // the producer laid the word as one run from one start. Broken there, as
+  // wordsOf breaks it for the law learner, each fragment got a start of its
+  // own and the break a space width that layoutLine then gave the next real
+  // space: on a Calibri page 29 of 33 such lines no longer came back at their
+  // pens (measured 2026-10-10, Recto's recto-eval; 33 of 33 with this).
+  function layoutWords(L, spaceAdv) {
+    const g = (L.entries || []).filter(e => e.ch !== '□');
+    if (!g.length || g.some(e => e.i == null)) return wordsOf(L, spaceAdv);
+    const words = [];
+    let w = [];
+    for (let k = 0; k < g.length; k++) {
+      if (k && g[k].i - g[k - 1].i - txLen(g[k - 1].ch) !== 0 && w.length) { words.push(w); w = []; }
+      w.push(g[k]);
+    }
+    if (w.length) words.push(w);
+    return words;
+  }
   function lineLayout(L, sizePx, m, spaceAdv, bySrc) {
-    const ws = wordsOf(L, spaceAdv);
+    const ws = layoutWords(L, spaceAdv);
     if (!ws.length) return { delta: 0, hit: 0, feasible: false, spaceWidths: [], words: 0 };
-    const lawOf = w => (w[0].src && bySrc?.get(w[0].src)) || { sizePx, m };
-    const starts = ws.map(w => { const l = lawOf(w); return solveStart(wordItems(w, l.sizePx, l.m), w[0].pen); });
+    const lawOf = e => (e.src && bySrc?.get(e.src)) || { sizePx, m };
+    // a word's advances accumulated glyph by glyph, as solveStart items
+    const itemsOf = w => {
+      const items = [{ S: 0, p: w[0].pen }];
+      let S = 0;
+      for (let k = 1; k < w.length; k++) {
+        const a = w[k - 1], l = lawOf(a);
+        S += lawAdv(a.adv, l.sizePx, l.m);
+        if (l.m?.kern && (a.src || null) === (w[k].src || null)) { const kv = l.m.kern.get(a.ch + w[k].ch); if (kv) S += kv; }
+        items.push({ S, p: w[k].pen });
+      }
+      return items;
+    };
+    const starts = ws.map(w => solveStart(itemsOf(w), w[0].pen));
     const spaceWidths = [];
     let x = ws[0][0].pen + starts[0].delta;     // the float pen, as layoutLine carries it
     for (let k = 0; k < ws.length; k++) {
-      const w = ws[k], l = lawOf(w);
+      const w = ws[k];
       x = w[0].pen + starts[k].delta;
       for (let g = 0; g < w.length; g++) {
-        if (g && l.m?.kern) { const kv = l.m.kern.get(w[g - 1].ch + w[g].ch); if (kv) x += kv; }
+        const l = lawOf(w[g]);
+        if (g && l.m?.kern && (w[g - 1].src || null) === (w[g].src || null)) { const kv = l.m.kern.get(w[g - 1].ch + w[g].ch); if (kv) x += kv; }
         x += lawAdv(w[g].adv, l.sizePx, l.m);
       }
       if (k + 1 < ws.length) {

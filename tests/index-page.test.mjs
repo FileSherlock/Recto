@@ -28,6 +28,7 @@ function normalise(html) {
     .replace(/<script src="plugins\/text_tool\/(story-core|story-render|story-edit|frame-tool|artistic-tool|text-studio)\.js[^"]*"><\/script>/g, '')   // Artistic and Frame text, the Text panel (new)
     .replace(/<script src="plugins\/image_adjust\/[^"]*"><\/script>/g, '')                     // view adjustments: Curves, Invert, … (a new plugin)
     .replace(/<script src="plugins\/ocr_tool\/box-rules\.js[^"]*"><\/script>/, '')             // which boxes are redactions (new)
+    .replace(/<script src="plugins\/ocr_tool\/line-boxes\.js[^"]*"><\/script>/, '')            // a read's boxes, DOM-free (new)
     // Fabric.js (gone): the recorded page loaded it from cdnjs, with a polyfill for a warning it
     // caused, long after the last call into it had been removed — the page loads no outside script
     .replace(/<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/fabric\.js\/[^"]*"><\/script>/, '')
