@@ -180,18 +180,31 @@
     const editing = window.storyEditing?.() === box;
     if (editing) window.commitStoryEdit?.();
     const step = window.utbUndo?.capture([box]);
-    window.ensureStory?.(box);
-    if (box.textMode === mode) return;
-    if (mode === 'frame') {
-      // the frame is the text's extent, a hair wider so that nothing wraps
-      box.w = Math.ceil(box.w + 2);
-      box.h = Math.ceil(box.h + 1);
-      box.textMode = 'frame';
-    } else {
-      box.textMode = 'artistic';
-      box.frame = {};
+    // a one-line box becomes Artistic text first, its baseline where it was
+    if (!box.textMode) { window.ensureStory?.(box); renderBox(box); }
+    if (box.textMode !== mode) {
+      // the text stays where it is: a frame puts its first baseline at its
+      // Initial advance below the top, Artistic text hangs from it — the box
+      // moves so that the first line starts and sits where it did
+      const was = window.storyFirstLine?.(box);
+      if (mode === 'frame') {
+        // the frame is the text's extent, a hair wider so that nothing wraps
+        box.w = Math.ceil(box.w + 2);
+        box.h = Math.ceil(box.h + 1);
+        box.textMode = 'frame';
+      } else {
+        box.textMode = 'artistic';
+        box.frame = {};
+      }
+      box._baselineOffset = null;          // Artistic text measures its first baseline afresh
+      renderBox(box);
+      const now = was && window.storyFirstLine?.(box);
+      if (now && (now.x !== was.x || now.baseline !== was.baseline)) {
+        box.x += was.x - now.x;
+        box.y += was.baseline - now.baseline;
+        renderBox(box);
+      }
     }
-    renderBox(box);
     window.utbUndo?.commit(step, mode === 'frame' ? 'convert to text frame' : 'convert to artistic text');
     utbState.selectedId = box.id;
     selectBoxInSVG(box.id);

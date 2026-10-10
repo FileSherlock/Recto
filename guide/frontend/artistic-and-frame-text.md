@@ -31,7 +31,23 @@ A frame **reflows** when its eight handles resize it. Text that does not fit sho
 red **overflow marker** at the frame's bottom right.
 
 **Convert to Text Frame / Convert to Artistic Text** (Affinity's Layer menu) are at the foot of
-the Text Frame tab: the story stays; a converted Artistic text's frame is its text's extent.
+the Text Frame tab: the story stays, and so does the text on the page — the box moves so that
+the first line starts and sits where it did (a frame puts its first baseline at its Initial
+advance, Artistic text hangs from it); a converted Artistic text's frame is its text's extent.
+
+**Fitting text over the page** — the ribbon's Spacing and Style tools a one-line box has work on
+Artistic and Frame text too, through attributes Affinity already has:
+
+- **Space W.** (`fabric-space-width`, px) sets the paragraphs' desired **Word Spacing**
+  (Paragraph ▸ Justification, % of the face's space) so that a space is that wide in the face of
+  the selection's first character; **Default** (`fabric-default-sw`) is 100 % — the face's own
+  space. The pixel view lays the spaces at that width, and the paragraph's desired letter spacing
+  after every glyph, as the HTML does.
+- **sp#** (`toggle-space-labels`) badges every run of spaces inside a line with its width.
+- **Nudge** (`fabric-nudge-mode`) puts a hit area on every character; a character's x nudge is the
+  **manual kerning** of the pair it closes (Kerning ▸ Manual on the character before it), so it
+  moves that character and the rest of its line. The story's first character moves the whole
+  text; the first character of another line has nothing to kern against and has no hit area.
 
 Kerning nobody chose follows the page, as a typed box's does (`utbAutoKerning`, when an analysis plugin answers it).
 

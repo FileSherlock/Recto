@@ -50,18 +50,27 @@
     if (ls && document.activeElement !== ls) ls.value = ((a.tracking || 0) / 1000).toFixed(2);
     const kernI = el('kerning');
     if (kernI) { kernI.checked = !!a.autoKern; const lbl = kernI.closest('label'); if (lbl) lbl.title = "Apply the font's native kerning to this text"; }
-    // what only a one-line box has: the measured space width and the nudge
-    for (const id of ['fabric-default-sw', 'fabric-space-width', 'toggle-space-labels', 'fabric-nudge-mode']) {
-      const b = el(id); if (b) b.disabled = true;
+    // the space width: the paragraphs' desired word spacing (Affinity's
+    // Justification ▸ Word Spacing, % of the face's space), in px of the
+    // face's space here; Default is 100 %
+    const ps = window.storyParaState?.(box);
+    const ws = ps?.attrs.wordSpacing ?? 100, wsMixed = !!ps?.mixed.includes('wordSpacing');
+    el('fabric-default-sw')?.classList.toggle('active', ws === 100 && !wsMixed);
+    const space = window.storySpacePx?.(a);
+    const sw = el('fabric-space-width'), swDisplay = el('fabric-space-width-display');
+    if (sw && document.activeElement !== sw && space > 0 && !wsMixed) sw.value = space * ws / 100;
+    if (swDisplay) swDisplay.textContent = space > 0 && !wsMixed ? `${(space * ws / 100).toFixed(1)}px` : '–';
+    // the nudge: per pair manual kerning (micro-typo.js), not while the text is edited
+    const nudgeBtn = el('fabric-nudge-mode');
+    if (nudgeBtn) {
+      nudgeBtn.classList.toggle('active', utbState.microTypoId === box.id);
+      nudgeBtn.disabled = window.storyEditing?.() === box;
     }
   }
   window.onStoryChange?.(() => { const b = selectedStory(); if (b) syncToolbarToStory(b); });
 
   function syncToolbarToBox(box) {
     if (!box) return;
-    for (const id of ['fabric-default-sw', 'fabric-space-width', 'toggle-space-labels']) {
-      const b = el(id); if (b) b.disabled = !!storyBoxOf(box);
-    }
     window.syncStoryControls?.(box);
     if (storyBoxOf(box)) {
       syncToolbarToStory(box);
@@ -341,6 +350,15 @@
 
   // "Default" button: toggle native vs manual space width
   el('fabric-default-sw')?.addEventListener('click', async () => {
+    // Artistic / Frame text: back to the face's own spaces (word spacing
+    // 100 %); moving the slider is what sets another width
+    const sb = selectedStory();
+    if (sb) {
+      const ps = window.storyParaState?.(sb);
+      if (ps && (ps.attrs.wordSpacing !== 100 || ps.mixed.includes('wordSpacing'))) storyApplyPara(sb, { wordSpacing: 100 });
+      syncToolbarToStory(sb);
+      return;
+    }
     const box = getSelected();
     if (!box) return;
 
@@ -376,6 +394,16 @@
 
   // Space width slider (live drag)
   el('fabric-space-width')?.addEventListener('input', e => {
+    // Artistic / Frame text: the width as the paragraphs' desired word
+    // spacing, in % of the face's space (the selection's first character's)
+    const sb = selectedStory();
+    if (sb) {
+      const space = window.storySpacePx?.(window.storyCharState?.(sb)?.attrs || {});
+      if (!(space > 0)) return;
+      storyApplyPara(sb, { wordSpacing: parseFloat(e.target.value) / space * 100 }, `space:${sb.id}`);
+      syncToolbarToStory(sb);
+      return;
+    }
     const box = getSelected();
     if (!box || box.defaultSpaceWidth) return;
     const step = window.utbUndo?.capture([box]);
@@ -401,8 +429,9 @@
       return;
     }
 
-    // Enter micro-typo mode if the box has character positions
-    if (utbCharsValid(box) && typeof enterMicroTypo === 'function') {
+    // Enter micro-typo mode if the box has character positions (Artistic and
+    // Frame text take theirs from their layout)
+    if ((utbCharsValid(box) || storyBoxOf(box)) && typeof enterMicroTypo === 'function') {
       enterMicroTypo(box);
       el('fabric-nudge-mode')?.classList.add('active');
     }

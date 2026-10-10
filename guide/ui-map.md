@@ -84,8 +84,10 @@ or toggled manually via `toggle-fmt`.
 
 The redaction-only match terms (tolerance, letter case) are in the Settings panel above.
 While Artistic or Frame text is selected, Font, Style and the story groups act on the
-selected characters when it is edited, on all of its text otherwise; the space-width controls
-and Nudge belong to one-line boxes and are disabled.
+selected characters when it is edited, on all of its text otherwise. Space W. / Default set the
+paragraphs' desired word spacing (shown in px of the face's space), sp# badges their spaces, and
+Nudge kerns the pair before the pressed character (`micro-typo.js`, disabled while the text is
+edited) — see `guide/frontend/artistic-and-frame-text.md`.
 
 ### WebGL Masks bar — `#webgl-options-bar` (webgl_mask, contextual)
 

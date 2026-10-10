@@ -382,13 +382,48 @@
     }
   }
 
+  // The page positions of a story's layout. They are taken RELATIVE TO THE
+  // FLOW, and the flow's origin from the box's own numbers: the browser
+  // truncates the foreignObject's position to its 1/64 px layout grid
+  // (Artistic text clicked at x 63.2 started at 63.1875), which moves pens on
+  // the ¼ px lattice. So the first line of Artistic text starts at box.x on
+  // the baseline it was given (box.y + the measured first baseline).
+  // → { flow, k (screen px per doc px), docX, docY } | null
+  function flowMap(g, box) {
+    const flow = g?.querySelector('.tt-flow');
+    if (!flow) return null;
+    const k = unitOf(flow);
+    const fr = flow.getBoundingClientRect();
+    const inFrame = box.textMode === 'frame';
+    const ox = box.x + (inFrame ? parseFloat(flow.style.left) || 0 : 0);
+    const oy = box.y + (inFrame ? parseFloat(flow.style.top) || 0 : 0);
+    return { flow, k, docX: x => ox + (x - fr.left) / k, docY: y => oy + (y - fr.top) / k };
+  }
+
+  // The spacing of a run as runCSS gives it to the browser, in px at `sizePx`
+  // (a drop cap's size, else the run's own): tracking and manual kerning in ‰
+  // of an em and the paragraph's desired letter spacing in % of the space,
+  // after every glyph; a space is the face's own plus the paragraph's desired
+  // word spacing over 100 % of the space at the run's size.
+  function spacingOf(a, pa, box, ctx, sizePx) {
+    const runSpace = scaled(a, box, ctx.pxPerPt).space;
+    const ownSpace = sizePx === a.sizePt * ctx.pxPerPt ? runSpace : SC.scaledMetrics(metricsOf(a, box), sizePx).space;
+    return {
+      letterPx: ((a.tracking || 0) + (a.manualKern || 0)) / 1000 * sizePx + (pa.letterSpacing || 0) / 100 * runSpace,
+      // (to 1e-9 px: a width set in px comes back through a % of the space)
+      spacePx: pa.wordSpacing === 100 ? null : Math.round((ownSpace + (pa.wordSpacing - 100) / 100 * runSpace) * 1e9) / 1e9,
+      ownSpace,
+    };
+  }
+
   // A story drawn by the pixel seam, as one-line boxes: every line of the
   // laid-out story is cut into pieces of one run each; the browser's layout
-  // says where a line starts and where its baseline is, the seam lays the
-  // glyphs of a piece and its advance places the next piece of the same line
-  // (a justified line is cut at its spaces too, which the browser stretched).
-  // Every piece drawn → the HTML is hidden and the pieces' images show; any
-  // piece declined → the story stays HTML. Not while the story is edited.
+  // says where a line starts and where its baseline is (flowMap), the seam
+  // lays the glyphs of a piece with the run's spacing and its advance places
+  // the next piece of the same line (a justified line is cut at its spaces
+  // too, which the browser stretched). Every piece drawn → the HTML is hidden
+  // and the pieces' images show; any piece declined → the story stays HTML.
+  // Not while the story is edited.
   function pixelPass(g, box, ctx) {
     g.querySelectorAll('.utb-pixel').forEach(e => e.remove());
     g.classList.remove('utb-pixel-mode');
@@ -397,20 +432,9 @@
     if (typeof window.utbPixelRender !== 'function') return;
     const give_up = () => { forgetPieces(box, before); };
     if (utbState.editingId === box.id) return give_up();
-    const flow = g.querySelector('.tt-flow');
-    if (!flow) return give_up();
-    // The layout's positions are taken RELATIVE TO THE FLOW, and the flow's
-    // origin from the box's own numbers: the browser truncates the
-    // foreignObject's position to its 1/64 px layout grid (Artistic text
-    // clicked at x 63.2 started at 63.1875), which moves pens on the ¼ px
-    // lattice. So the first line of Artistic text starts at box.x on the
-    // baseline it was given (box.y + the measured first baseline).
-    const k = unitOf(flow);                                              // screen px per doc px
-    const fr = flow.getBoundingClientRect();
-    const inFrame = box.textMode === 'frame';
-    const ox = box.x + (inFrame ? parseFloat(flow.style.left) || 0 : 0);
-    const oy = box.y + (inFrame ? parseFloat(flow.style.top) || 0 : 0);
-    const docX = x => ox + (x - fr.left) / k, docY = y => oy + (y - fr.top) / k;
+    const map = flowMap(g, box);
+    if (!map) return give_up();
+    const { flow, docX, docY } = map;
     const clipRight = box.textMode === 'frame' && SC.frameOf(box.frame).hideOverflow ? box.x + box.w + 1 : Infinity;
 
     // the pieces, in reading order
@@ -418,7 +442,8 @@
     for (const pe of flow.querySelectorAll('.tt-para')) {
       const para = box.story.paragraphs[+pe.dataset.p];
       if (!para) continue;
-      const justified = SC.paraOf(para.attrs).align.startsWith('justify');
+      const pa = SC.paraOf(para.attrs);
+      const justified = pa.align.startsWith('justify');
       let last = null;
       for (const lf of pe.querySelectorAll('.tt-leaf')) {
         const node = lf.firstChild;
@@ -440,7 +465,7 @@
           if (cur && sameLine(cur)) { cur.i1 = i + 1; continue; }
           if (docX(q.left) > clipRight) { cur = null; continue; }
           // a new piece: chained to the one before it while they share a line
-          cur = { node, lf, i0: i, i1: i + 1, top: q.top, height: q.height, left: q.left, a, stored, sizePt,
+          cur = { node, lf, i0: i, i1: i + 1, top: q.top, height: q.height, left: q.left, a, stored, sizePt, pa,
             chain: !!(last && sameLine(last) && !drop && !last.drop), drop: !!drop };
           pieces.push(cur);
           last = cur;
@@ -462,25 +487,53 @@
     }
     pieces.forEach((p, n) => { p.baseline = docY(probes[n].getBoundingClientRect().top); });
     for (const probe of probes) probe.remove();
+    // Artistic text's first line sits on the baseline it was given, exactly —
+    // a measured one is a screen position, some 1e-5 px off at most zooms
+    if (box.textMode === 'artistic' && box._baselineOffset != null) {
+      const kept = box.y + box._baselineOffset;
+      for (const p of pieces) if (Math.abs(p.baseline - kept) < 0.01) p.baseline = kept;
+    }
     new Set(pieces.map(p => p.lf)).forEach(lf => lf.normalize());
 
     // draw them
     const drawn = [];
-    let prev = null;
+    let prev = null, spaces = null;
     for (const [n, p] of pieces.entries()) {
       const node = p.lf.firstChild, raw = node.data.slice(p.i0, p.i1);
       const upper = raw.toUpperCase();
-      const text = p.a.caps === 'all' && upper.length === raw.length ? upper : raw;
+      let text = p.a.caps === 'all' && upper.length === raw.length ? upper : raw;
       const sizePx = p.sizePt * ctx.pxPerPt;
-      const x = p.chain && prev?.res ? prev.x + prev.res.advanceW : docX(p.left);
+      const sp = spacingOf(p.a, p.pa, box, ctx, sizePx);
+      // the seam's advance stops at the last glyph; the browser puts the
+      // letter spacing after it too (a manual kern on a character of its own
+      // is all after it), so the next piece starts beyond it
+      let x = p.chain && prev?.res ? prev.x + prev.res.advanceW + prev.letterPx : docX(p.left);
+      // a piece of spaces alone (a space formatted on its own — a nudge's
+      // kern) draws nothing and the seam lays no glyph of it: it goes in front
+      // of the next piece of its line, which lays the spaces at its own
+      // spacing, and that piece's start moves by what theirs differs by; at
+      // the end of a line it places nothing
+      if (/^ +$/.test(text)) {
+        const own = text.length * ((sp.spacePx ?? sp.ownSpace) + sp.letterPx);
+        spaces = !pieces[n + 1]?.chain ? null
+          : spaces && p.chain ? { x: spaces.x, n: spaces.n + text.length, width: spaces.width + own }
+          : { x, n: text.length, width: own };
+        if (!spaces) prev = null;
+        continue;
+      }
+      if (spaces && p.chain) {
+        x = spaces.x + spaces.width - spaces.n * ((sp.spacePx ?? sp.ownSpace) + sp.letterPx);
+        text = ' '.repeat(spaces.n) + text;
+      }
+      spaces = null;
       const piece = {
         id: `${box.id}~${n}`, type: box.type, page: box.page, text,
         fontFamily: p.a.fontFamily, bold: !!p.a.bold, italic: !!p.a.italic, sizePt: p.sizePt,
-        letterSpacing: ((p.a.tracking || 0) + (p.a.manualKern || 0)) / 1000,
+        letterSpacing: sp.letterPx / sizePx,
         kerning: !!p.a.autoKern, kerningAuto: false,
         color: p.a.color || null, labelColor: null, labelAlign: null,
         underline: p.a.underline === 'single', strikethrough: p.a.strike === 'single',
-        defaultSpaceWidth: true, spaceWidth: null, baseCharPositions: null, charAdvances: {},
+        defaultSpaceWidth: sp.spacePx == null, spaceWidth: sp.spacePx, baseCharPositions: null, charAdvances: {},
         x, y: p.baseline - sizePx, w: 0, h: sizePx, lineId: null,
       };
       // kerning nobody chose follows the page, as a typed box's does
@@ -491,7 +544,7 @@
       try { res = window.utbPixelRender(piece, [x], p.baseline); } catch (e) { console.warn('utbPixelRender failed for', piece.id, e); }
       if (!res) { forgetPieces(box, [...before, ...drawn.map(d => d.id)]); return; }
       drawn.push({ id: piece.id, res });
-      prev = { x, res };
+      prev = { x, res, letterPx: sp.letterPx };
     }
 
     // all of them: show the pixels, hide the HTML (it stays for the layout,
@@ -511,11 +564,91 @@
     forgetPieces(box, before.filter(id => !box._pixelIds.includes(id)));
   }
 
+  // ── what the fitting tools read from the layout ───────────────────────────
+
+  // Every character of a story where the layout put it, on the page: [{ p, o,
+  // ch, x, y, w, h, lineStart }] in reading order — lineStart: the first
+  // character of its line. (The HTML stays laid out under the pixel view.)
+  function charBoxes(g, box) {
+    const map = flowMap(g, box);
+    if (!map) return null;
+    const out = [];
+    for (const pe of map.flow.querySelectorAll('.tt-para')) {
+      const p = +pe.dataset.p;
+      let prev = null;
+      for (const lf of pe.querySelectorAll('.tt-leaf')) {
+        const node = lf.firstChild;
+        if (!node || node.nodeType !== 3) continue;
+        for (let i = 0; i < node.length; i++) {
+          const ch = node.data[i];
+          if (ch === '\n') { prev = null; continue; }
+          const r = document.createRange();
+          r.setStart(node, i); r.setEnd(node, i + 1);
+          const q = r.getClientRects()[0];
+          if (!q) continue;
+          const lineStart = !prev || Math.abs(q.top + q.height / 2 - (prev.top + prev.height / 2)) >= Math.min(q.height, prev.height) / 2;
+          out.push({ p, o: +lf.dataset.o + i, ch, x: map.docX(q.left), y: map.docY(q.top), w: q.width / map.k, h: q.height / map.k, lineStart });
+          prev = q;
+        }
+      }
+    }
+    return out;
+  }
+
+  // Space badges (the ribbon's sp# toggle, svg-renderer.js) over every run of
+  // spaces inside a line: its width as the seam lays it — the face's space,
+  // or the paragraph's desired word spacing of it — and on a justified line
+  // as the browser stretched it, less the letter spacing.
+  function spaceBadges(g, box, ctx) {
+    if (typeof showSpaceWidthLabels === 'undefined' || !showSpaceWidthLabels || typeof _spacebadge !== 'function') return;
+    const chars = charBoxes(g, box);
+    if (!chars) return;
+    for (let n = 0; n < chars.length; n++) {
+      if (chars[n].ch !== ' ') continue;
+      let end = n;
+      while (end + 1 < chars.length && chars[end + 1].ch === ' ' && !chars[end + 1].lineStart) end++;
+      const next = chars[end + 1];
+      // trailing spaces and a line's last spaces (where it wrapped) get none
+      if (next && !next.lineStart && next.p === chars[n].p && next.ch !== '\t') {
+        const para = box.story.paragraphs[chars[n].p], pa = SC.paraOf(para.attrs);
+        let w = 0;
+        for (let m = n; m <= end; m++) {
+          const a = SC.charOf(SC.runAttrsAt(para, chars[m].o + 1));
+          const sp = spacingOf(a, pa, box, ctx, a.sizePt * ctx.pxPerPt);
+          w += pa.align.startsWith('justify') ? chars[m].w - sp.letterPx : (sp.spacePx ?? sp.ownSpace);
+        }
+        const x0 = chars[n].x, x1 = chars[end].x + chars[end].w;
+        _spacebadge(g, (x0 + x1) / 2, chars[n].y - 8, w.toFixed(1), 'rgba(255,210,0,0.92)');
+      }
+      n = end;
+    }
+  }
+
+  // Where the first line starts and sits: { x, baseline } on the page.
+  function firstLine(g, box) {
+    const map = flowMap(g, box);
+    const pe = map?.flow.querySelector('.tt-para');
+    if (!pe) return null;
+    const probe = el('span', 'tt-probe');
+    probe.setAttribute('contenteditable', 'false');
+    pe.insertBefore(probe, pe.firstChild);
+    const q = probe.getBoundingClientRect();
+    probe.remove();
+    return { x: map.docX(q.left), baseline: map.docY(q.top) };
+  }
+  const groupOf = box => document.querySelector(`.utb-group[data-id="${box.id}"]`);
+  window.storyCharBoxes = box => (box?.textMode ? charBoxes(groupOf(box), box) : null);
+  window.storyFirstLine = box => (box?.textMode ? firstLine(groupOf(box), box) : null);
+  // the face's own space of a run's attributes, in px (0.25 em while its
+  // metrics load — what the renderer uses meanwhile)
+  window.storySpacePx = attrs => { const a = SC.charOf(attrs); return SC.scaledMetrics(metricsOf(a, null), a.sizePt * GEO.docPxPerPt()).space; };
+
   function renderStoryBox(g, box) {
     if (!box.story) return;
     layoutStoryBox(g, box);
     frameHandles(g, box);
     pixelPass(g, box, { pxPerPt: GEO.docPxPerPt() });
+    spaceBadges(g, box, { pxPerPt: GEO.docPxPerPt() });
     // an editor's selection lives in the model: put it back on the new markup
     if (utbState.editingId === box.id) window.storyAfterRender?.(box);
   }
@@ -574,14 +707,19 @@
       // new or converted one puts it where it was asked to be, and a change
       // of its line (a size, a face whose metrics just arrived) keeps it
       // there — the text grows upward from it
+      // (box.y + _baselineOffset is the first baseline exactly: the offset
+      // changes only with the box's y, never by a measurement's 1e-5 px)
       const base = measureFirstBaseline(flow);
       if (box._keepBaseline != null) {
         box.y = box._keepBaseline - base;
+        box._baselineOffset = base;
         delete box._keepBaseline;
-      } else if (box._baselineOffset != null && Math.abs(box._baselineOffset - base) > 0.01) {
+      } else if (box._baselineOffset == null) {
+        box._baselineOffset = base;
+      } else if (Math.abs(box._baselineOffset - base) > 0.01) {
         box.y += box._baselineOffset - base;
+        box._baselineOffset = base;
       }
-      box._baselineOffset = base;
       fo.setAttribute('y', box.y);
       box.w = w; box.h = h;
       fo.setAttribute('width', Math.ceil(w) + 1);

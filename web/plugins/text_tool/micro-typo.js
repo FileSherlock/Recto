@@ -12,6 +12,7 @@
   // ── Enter / exit mode ─────────────────────────────────────────
 
   function enterMicroTypo(box) {
+    if (box?.textMode) { enterStoryNudge(box); return; }
     if (!utbCharsValid(box)) return; // nothing to adjust without char positions of the box's current face
     if (utbState.editingId) return; // don't enter while inline-edit is active
 
@@ -69,19 +70,25 @@
   }
 
   function showNudgePopover(box, charIdx, anchorEl) {
-    _closePopover();
+    openPopover(anchorEl, box.baseCharPositions[charIdx]?.c || '?', box.charAdvances[charIdx] || 0,
+      newDelta => applyNudge(box, charIdx, newDelta));
+    utbState.microTypoCharIdx = charIdx;
+  }
 
-    const delta = box.charAdvances[charIdx] || 0;
-    const ch    = box.baseCharPositions[charIdx]?.c || '?';
+  // The popover: the character, a slider of its x nudge in px; `apply(delta)`
+  // on every move.
+  function openPopover(anchorEl, ch, delta, apply) {
+    _closePopover();
 
     const pop = document.createElement('div');
     pop.className = 'utb-nudge-popover';
     pop.innerHTML = `
-      <div class="nudge-char-preview">${ch}</div>
+      <div class="nudge-char-preview"></div>
       <label>x nudge (px)</label>
       <input type="range" min="-20" max="20" step="0.1" value="${delta}">
       <div class="nudge-value">${delta.toFixed(1)} px</div>
     `;
+    pop.querySelector('.nudge-char-preview').textContent = ch;   // typed text, never markup
 
     const slider   = pop.querySelector('input[type=range]');
     const valLabel = pop.querySelector('.nudge-value');
@@ -89,7 +96,7 @@
     slider.addEventListener('input', e => {
       const newDelta = parseFloat(e.target.value);
       valLabel.textContent = `${newDelta.toFixed(1)} px`;
-      applyNudge(box, charIdx, newDelta);
+      apply(newDelta);
     });
 
     // Position the popover near the anchor rect
@@ -115,7 +122,6 @@
     }
 
     activePopover = pop;
-    utbState.microTypoCharIdx = charIdx;
   }
 
   // ── Apply nudge ───────────────────────────────────────────────
@@ -150,6 +156,74 @@
     window.utbUndo?.commit(step, 'nudge', `nudge:${box.id}:${charIdx}`);
   }
 
+  // ── Artistic and Frame text ───────────────────────────────────
+  // A character's nudge is the manual kerning of the pair it closes
+  // (Affinity's Kerning "Manual", ‰ of an em after the character before it):
+  // it moves the character and everything after it on its line, as a
+  // one-line box's nudge does, and the pixel view lays it like the HTML. The
+  // story's first character moves the whole text; the first character of any
+  // other line has nothing before it on its line to kern against.
+
+  function enterStoryNudge(box) {
+    if (utbState.editingId) return;
+    exitMicroTypo();
+    const group = document.querySelector(`.utb-group[data-id="${box.id}"]`);
+    const chars = window.storyCharBoxes?.(box);
+    if (!group || !chars) return;
+    utbState.microTypoId = box.id;
+    group.classList.add('micro-typo');
+    placeStoryHits(group, chars);
+  }
+
+  function placeStoryHits(group, chars) {
+    group.querySelectorAll('.utb-char-hit').forEach(r => r.remove());
+    chars.forEach((c, n) => {
+      if (c.lineStart && n > 0) return;
+      const r = document.createElementNS(SVG_NS, 'rect');
+      r.classList.add('utb-char-hit');
+      r.dataset.p = c.p;
+      r.dataset.o = c.o;
+      r.setAttribute('x', c.x);
+      r.setAttribute('y', c.y);
+      r.setAttribute('width', Math.max(c.w, 1));
+      r.setAttribute('height', c.h);
+      group.appendChild(r);
+    });
+  }
+
+  // the nudge of character (p, o) now, in px
+  function storyNudgeOf(box, p, o) {
+    if (!o) return 0;
+    const a = globalThis.StoryCore.charOf(globalThis.StoryCore.runAttrsAt(box.story.paragraphs[p], o));
+    return (a.manualKern || 0) / 1000 * a.sizePt * GEO.docPxPerPt();
+  }
+
+  function showStoryPopover(box, p, o, anchorEl) {
+    const SC = globalThis.StoryCore;
+    const ch = SC.paraText(box.story.paragraphs[p])[o] || '?';
+    const x0 = box.x;                      // the first character moves the text from here
+    openPopover(anchorEl, ch, storyNudgeOf(box, p, o), delta => applyStoryNudge(box, p, o, delta, x0));
+  }
+
+  function applyStoryNudge(box, p, o, delta, x0) {
+    const SC = globalThis.StoryCore;
+    const step = window.utbUndo?.capture([box]);
+    if (p === 0 && o === 0) {
+      box.x = x0 + delta;
+    } else {
+      const a = SC.charOf(SC.runAttrsAt(box.story.paragraphs[p], o));
+      const kern = Math.abs(delta) < 0.01 ? 0 : delta / (a.sizePt * GEO.docPxPerPt()) * 1000;
+      box.story = SC.applyChar(box.story, { start: { p, o: o - 1 }, end: { p, o } }, { manualKern: kern });
+      window.storySync?.(box);
+    }
+    renderBox(box);
+    const group = document.querySelector(`.utb-group[data-id="${box.id}"]`);
+    const chars = window.storyCharBoxes?.(box);
+    if (group && chars) placeStoryHits(group, chars);
+    window.utbUndo?.commit(step, 'nudge', `nudge:${box.id}:${p}:${o}`);
+    window.storyNotify?.();
+  }
+
   // ── Event wiring ──────────────────────────────────────────────
 
   // Click on a char hit rect → show nudge popover
@@ -164,6 +238,7 @@
     if (!group) return;
     const box = utbState.getBox(group.dataset.id);
     if (!box) return;
+    if (box.textMode) { showStoryPopover(box, +hitEl.dataset.p, +hitEl.dataset.o, hitEl); return; }
     const charIdx = parseInt(hitEl.dataset.charIdx);
     showNudgePopover(box, charIdx, hitEl);
   });
