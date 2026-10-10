@@ -185,3 +185,42 @@ test('a coloured run is its own box, in its colour; an uncertified line keeps th
   const unclean = X.pageBoxes(1, { lines: [{ ...L, clean: false }], objects: [] }, { tol: 0 }, opts()).boxes;
   assert.ok(unclean.every(b => b.data.color === X.UNCLEAN_COLOR));
 });
+
+// a page of OCR boxes for the paragraph detector: [text, x0, x1, baseline, sizePt?, more?] — a 7 px glyph a character
+const page = rows => rows.map(([text, x0, x1, bl, sizePt = 12, more = {}], k) => {
+  const h = 17, cps = [...text].map((c, i) => ({ c, x: i * 7, w: c === ' ' ? 4 : 7 }));
+  return { type: 'ocr', page: 1, lineId: `l${k + 1}`, text, x: x0, w: x1 - x0, y: bl - (h * 0.85 - 1.3), h, sizePt, fontFamily: 'Times New Roman',
+    baseCharPositions: cps, ocr: { baseline: bl, spaceAdv: 4 }, ...more };
+});
+
+test('paragraphs: word wrap joins full lines, a short line ends one; a list item hangs; a centred line', { skip }, () => {
+  // a justified paragraph with a first-line indent (lines at the margin, stretched spaces), then a list item, then a centred line
+  const boxes = page([
+    ['Title', 380, 436, 100],
+    ['aaa bbb ccc ddd', 144, 720, 140], ['eee fff ggg hhh', 96, 720, 158.4], ['iii jj', 96, 300, 176.8],
+    ['• kkk lll', 120, 400, 210],
+  ]);
+  // the justified lines' gaps are wider than the last line's: spread their words over the line
+  for (const b of boxes.slice(1, 3)) {
+    let x = 0;
+    b.baseCharPositions = [...b.text].map(c => { const cp = { c, x, w: c === ' ' ? 0 : 7 }; x += c === ' ' ? 60 : 7; return cp; });
+  }
+  // the bullet's text starts a tab further
+  boxes[4].baseCharPositions = [{ c: '•', x: 0, w: 7 }, { c: ' ', x: 7, w: 17 }, ...[...'kkk lll'].map((c, i) => ({ c, x: 24 + i * 7, w: 7 }))];
+  const P = X.paragraphs(boxes, { page: 1, w: 816 });
+  assert.deepEqual(P.map(p => p.lines), [['l1'], ['l2', 'l3', 'l4'], ['l5']]);
+  assert.deepEqual(P.map(p => p.align), ['center', 'justify', 'left']);
+  assert.deepEqual([P[1].leftIndentPt, P[1].firstIndentPt], [0, 36]);
+  assert.deepEqual([P[2].list, P[2].leftIndentPt, P[2].firstIndentPt], ['bullet', 36, -18]);
+  // 18.4 px between baselines: 13.8 pt (two gaps pooled)
+  assert.equal(P[1].leadingPt, 13.8);
+});
+
+test('paragraphs: one-line paragraphs with space after stay apart; a line in another face is another paragraph', { skip }, () => {
+  // short lines on a page whose column a long line shows (within an inch of the mirrored margin)
+  const boxes = page([['short one', 96, 300, 100], ['short two', 96, 280, 124], ['and three', 96, 290, 148], ['a long line further down the page', 96, 700, 300]]);
+  assert.equal(X.paragraphs(boxes, { page: 1, w: 816 }).length, 4);
+  // two full lines, the second bold: two paragraphs
+  const two = page([['a full line of text here', 96, 716, 100], ['another full line', 96, 716, 118.4, 12, { bold: true }]]);
+  assert.equal(X.paragraphs(two, { page: 1, w: 816 }).length, 2);
+});

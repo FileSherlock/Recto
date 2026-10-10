@@ -193,6 +193,25 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
   colour page's lines are not certified — the colour law's reading, an engine
   question); every segment as read is still the page, and the startup
   document's boxes are unchanged (its one rule is a separator).
+- **Paragraphs** (`OCRLineBoxes.paragraphs(boxes, { page, w })`, since
+  2026-10-10; nothing in the page calls it yet — a Frame text made from a
+  read paragraph would): a page's read lines as a word processor set them —
+  lines, alignment, left / first-line / right indents, leading, space before,
+  list items. A line joins the paragraph above when it is in the same size
+  and face, at the paragraph's leading, and the line above was full (word
+  wrap: the next line's first word would not have fitted after it — the
+  column's right is where long lines agree, on a ragged page the margin
+  mirroring the left one), or centred or right-set the same way, or the two
+  are an indented block. A two-line paragraph whose gap is the page's gap
+  between paragraphs is two. Justified lines end at the margin and are spaced
+  wider than the paragraph's last line. A list marker before a tab-wide gap
+  starts an item (its indents hang). The leading is pooled over the page's
+  paragraphs of a size and, within a measurement's ±1 px, taken as Word's
+  single, 1½ or double spacing for these faces (1.15 × size). Measured
+  (recto-eval, 115 synthetic paragraphs): paragraphs 114, alignment, indents
+  and leading 117 of 117. The one miss is a known limit: lines broken inside
+  a paragraph (Shift+Enter, an address block) look like paragraph ends — an
+  e-mail's header lines are set the same way and are paragraphs.
 - Line font/bold/italic/size come from the winning glyph set
   (`timesbd16` → Times New Roman bold 12 pt, `cour13` → Courier New 9.75 pt).
 - Non-byte-clean lines render in orange (`box.color` override); unreadable
@@ -327,7 +346,7 @@ segments 66.4 % → 77.1 %, 3,267 better, 3 worse and explained) and
 `render.js lineLayout`'s set change inside a word (re-laid lines 112 better,
 0 worse; the Calibri page 17 → 46 of 49); the matcher's seams' space and gaps
 (*The hypothesis seam*, above; 16 better, 0 worse); underline and colour on the
-boxes (above). Still open there: paragraphs are not detected; coloured lines
+boxes (above); paragraphs (above). Still open there: coloured lines
 the colour law leaves uncertified; the shipped Times New Roman, Courier New and
 Segoe UI files are another build than the bundle's sets in a few characters
 each (the report lists them); editing a Times 16 px e-mail line moves its pens

@@ -380,6 +380,222 @@
     return { fontFamily, sizePt: +sizePt };
   }
 
+  // ── Paragraphs ─────────────────────────────────────────────
+  // A page's read lines as paragraphs, the way a word processor set them:
+  // [{ lines: [lineId…], align: 'left'|'right'|'center'|'justify',
+  //    leftIndentPt, firstIndentPt, rightIndentPt, leadingPt, spaceBeforePt,
+  //    list: null|'bullet'|'number' }] in reading order. boxes: the page's
+  // boxes (OCR lines; a redaction box on a line counts toward its extent —
+  // a bar opening a line is not an indent). opts: { page, w } (w: the page
+  // width in px, for a centred line on a page with no full line). Geometry in
+  // viewBox px (96 dpi: × 0.75 is points), baselines where the renderer puts
+  // them.
+  //
+  // A line joins the paragraph above when it is set in the same size, at the
+  // paragraph's leading (the first gap: under three ems), and the line above
+  // was FULL: started at the column's left (or the block's) and left no room
+  // for this line's first word — word wrap; a paragraph's last line is the
+  // one with room to spare — or, centred or set right, could not have taken
+  // it either; or the two are a block starting and ending together, or with
+  // equal indents on both sides (a quote is full against its own margins).
+  // A list marker (•, a number, a letter) followed by a tab-wide gap starts
+  // an item. The column is where lines agree (below). A justified
+  // paragraph's lines end at the margin AND are spaced
+  // wider than its last line. The leading is pooled over the page's
+  // paragraphs of one size (baselines sit on whole pixels: one gap of 13.8 pt
+  // reads 13.5 or 14.25); a one-line paragraph takes its size's, else Word's
+  // single spacing for these faces (1.15 × size).
+  const PX_PT = 0.75;
+  const BULLET = /^[•◦▪‣·*–-]$/u;
+  const NUMBER = /^\(?(\d{1,3}|[a-z]|[ivxlc]{1,5})[.)]$/i;
+  function paragraphs(boxes, opts = {}) {
+    const mid = a => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+    const byId = new Map();
+    for (const b of boxes || []) {
+      if (b.type !== 'ocr' || b.ocr?.unread || !b.text || (opts.page != null && b.page !== opts.page)) continue;
+      let L = byId.get(b.lineId);
+      if (!L) byId.set(b.lineId, L = { id: b.lineId, baseline: b.y + b.h * 0.85 - 1.3, x0: Infinity, x1: -Infinity, sizePt: b.sizePt, segs: [], barStart: false, barEnd: false });
+      L.segs.push(b);
+      L.x0 = Math.min(L.x0, b.x); L.x1 = Math.max(L.x1, b.x + b.w);
+      if (b.sizePt > L.sizePt) L.sizePt = b.sizePt;
+    }
+    for (const b of boxes || []) {
+      const L = b.type === 'redaction' && byId.get(b.lineId);
+      if (!L || (opts.page != null && b.page !== opts.page)) continue;
+      if (b.x < L.x0) { L.x0 = b.x; L.barStart = true; }
+      if (b.x + b.w > L.x1) { L.x1 = b.x + b.w; L.barEnd = true; }
+    }
+    const lines = [...byId.values()].sort((a, b) => a.baseline - b.baseline);
+    if (!lines.length) return [];
+    for (const L of lines) {
+      L.segs.sort((a, b) => a.x - b.x);
+      const main = L.segs.reduce((a, b) => (b.text.length > a.text.length ? b : a));
+      L.face = `${main.fontFamily}|${!!main.bold}|${!!main.italic}`;
+      const sizePx = L.sizePt / PX_PT;
+      L.space = L.segs[0].ocr?.spaceAdv ?? sizePx * 0.25;
+      // words per segment: where each starts and its glyphs' advances
+      const words = [];
+      let gapSum = 0, gapN = 0;
+      for (const sg of L.segs) {
+        let cur = null, n = 0;
+        for (const cp of sg.baseCharPositions || []) {
+          const x = sg.x + cp.x;
+          if (!cp.c || cp.c === ' ') { if (cur) n++; continue; }
+          if (cur && n > 0) {                          // a gap: start to start, the snaps telescope
+            gapSum += x - (cur.x0 + cur.adv); gapN += n;
+            words.push(cur); cur = null;
+          }
+          if (!cur) { cur = { text: '', x0: x, adv: 0 }; n = 0; }
+          if (!cp.ligTail) cur.text += cp.lig || cp.c;
+          cur.adv += cp.w || 0;
+        }
+        if (cur) words.push(cur);
+      }
+      L.gap = gapN ? gapSum / gapN : null;
+      const w0 = words[0];
+      L.firstWordW = w0 ? w0.adv : 0;
+      L.list = null;
+      if (w0 && words[1] && L.segs[0].x <= L.x0 + 0.5 && words[1].x0 - (w0.x0 + w0.adv) > 1.5 * L.space &&
+          (BULLET.test(w0.text) || NUMBER.test(w0.text))) {
+        L.list = BULLET.test(w0.text) ? 'bullet' : 'number';
+        L.textX = words[1].x0;
+      }
+    }
+    // the column: the leftmost start two lines share. On the right, the end
+    // two long lines share (justified lines end at the margin); on a ragged
+    // page, where no line need reach it, the margin mirroring the left one —
+    // when the longest line comes within an inch of it (an e-mail wrapped at
+    // its own width keeps its longest line)
+    const sharedLeft = vals => { const s = [...vals].sort((a, b) => a - b); for (const v of s) if (vals.filter(w => Math.abs(w - v) <= 1).length >= 2) return v; return s[0]; };
+    const colLeft = sharedLeft(lines.map(l => l.x0));
+    const maxX1 = Math.max(...lines.map(l => l.x1));
+    const ends = lines.map(l => l.x1).filter(x => x >= 0.9 * maxX1);
+    const sharedRight = ends.find(x => ends.filter(y => Math.abs(y - x) <= 1.5).length >= 2);
+    const mirrored = opts.w ? opts.w - colLeft : null;
+    const colRight = sharedRight != null ? Math.max(sharedRight, maxX1)
+      : mirrored != null && mirrored > maxX1 && mirrored - maxX1 < 96 ? mirrored : maxX1;
+    const colMid = (colLeft + colRight) / 2, colW = colRight - colLeft;
+    const pageMid = opts.w ? opts.w / 2 : null;
+    const tolEnd = L => L.barEnd ? 2.5 : 1.5;          // a bar ending a line is padded past its text
+    const tolStart = L => L.barStart ? 2.5 : 1.5;      // and one opening it, before
+    const centred = L => Math.abs((L.x0 + L.x1) / 2 - colMid) <= 2 || (pageMid != null && Math.abs((L.x0 + L.x1) / 2 - pageMid) <= 2);
+
+    const paras = [];
+    let P = null;
+    for (const L of lines) {
+      const prev = P?.lines[P.lines.length - 1];
+      let join = false;
+      // a whole line in another face (a regular line after a bold one) is another paragraph
+      if (prev && !L.list && Math.abs(L.sizePt - prev.sizePt) <= 0.3 && L.face === prev.face) {
+        const gap = L.baseline - prev.baseline;
+        const gapOk = P.lead != null ? Math.abs(gap - P.lead) <= 1.5 : gap > 0 && gap <= 3 * prev.sizePt / PX_PT;
+        const room = L.firstWordW + prev.space + 1;
+        // a wrapped line starts at the column's left, a first-line or list indent from it (under an inch)
+        const flowStart = prev.x0 - colLeft <= 96 || (prev.list && prev.textX - colLeft <= 96);
+        const full = flowStart && colRight - prev.x1 < room;
+        const centreFull = centred(prev) && centred(L) && prev.x0 - colLeft > 3 && colW - (prev.x1 - prev.x0) < room;
+        const rightFull = Math.abs(prev.x1 - colRight) <= tolEnd(prev) && Math.abs(L.x1 - colRight) <= tolEnd(L) &&
+          prev.x0 - colLeft > 0.25 * colW && colW - (prev.x1 - prev.x0) < room;
+        const block = prev.x0 - colLeft > 3 && Math.abs(L.x0 - prev.x0) <= 1.5 && prev.x1 - prev.x0 > 0.5 * colW &&
+          (Math.abs(L.x1 - prev.x1) <= 1.5 || Math.abs((colRight - prev.x1) - (prev.x0 - colLeft)) <= 2.5);
+        join = gapOk && (full || centreFull || rightFull || block);
+      }
+      if (join) { P.lead ??= L.baseline - prev.baseline; P.lines.push(L); }
+      else paras.push(P = { lines: [L], lead: null });
+    }
+    // A two-line paragraph is two paragraphs when its one gap is the page's
+    // gap BETWEEN paragraphs — the gap after a line with room to spare, the
+    // leading plus the space after: a long last line of one paragraph (no
+    // room for the next word) over the first of the next. The e-mail's link
+    // line over "Thank you." is 28 px apart, as its paragraphs are; on the
+    // spacing page a double-spaced paragraph's 37 px is no paragraph gap.
+    // (only a gap clearly wider than the size's closest lines: where paragraphs
+    // have no space after, their gap is the leading itself)
+    const minGap = new Map();
+    for (let k = 1; k < lines.length; k++) {
+      const a = lines[k - 1], b = lines[k], key = Math.round(a.sizePt * 4);
+      if (Math.abs(a.sizePt - b.sizePt) <= 0.3) minGap.set(key, Math.min(minGap.get(key) ?? Infinity, b.baseline - a.baseline));
+    }
+    const paraGaps = [];
+    for (let k = 1; k < paras.length; k++) {
+      const a = paras[k - 1].lines[paras[k - 1].lines.length - 1], b = paras[k].lines[0], gap = b.baseline - a.baseline;
+      if (Math.abs(a.sizePt - b.sizePt) <= 0.3 && colRight - a.x1 >= b.firstWordW + a.space + 1 &&
+          gap > (minGap.get(Math.round(a.sizePt * 4)) ?? 0) + 1.5) paraGaps.push({ sizePt: a.sizePt, gap });
+    }
+    for (let k = paras.length - 1; k >= 0; k--) {
+      const q = paras[k];
+      if (q.lines.length !== 2) continue;
+      const gap = q.lines[1].baseline - q.lines[0].baseline;
+      if (paraGaps.some(g => Math.abs(g.sizePt - q.lines[0].sizePt) <= 0.3 && Math.abs(g.gap - gap) <= 1.5))
+        paras.splice(k, 1, { lines: [q.lines[0]], lead: null }, { lines: [q.lines[1]], lead: null });
+    }
+
+    // the leading of a size: pooled over the paragraphs that agree (start to
+    // end of each: a span's two baselines are whole rows, ±1 px over the span).
+    // Within that uncertainty of Word's single, 1½ or double spacing for these
+    // faces (1.15 × size), it is that.
+    const own = q => (q.lines[q.lines.length - 1].baseline - q.lines[0].baseline) / (q.lines.length - 1);
+    const pooled = (sizePt, near) => {
+      let span = 0, n = 0, spans = 0;
+      for (const q of paras) {
+        if (q.lines.length < 2 || Math.abs(q.lines[0].sizePt - sizePt) > 0.3) continue;
+        if (near != null && Math.abs(own(q) - near) > 1) continue;
+        span += q.lines[q.lines.length - 1].baseline - q.lines[0].baseline; n += q.lines.length - 1; spans++;
+      }
+      if (!n) return null;
+      const lead = span / n, single = 1.15 * sizePt / PX_PT;
+      const word = [1, 1.5, 2].map(k => k * single).find(c => Math.abs(c - lead) <= spans / n + 0.05);
+      return word ?? lead;
+    };
+    const r2 = v => Math.round(v * 100) / 100;
+    const snap = v => Math.abs(v) < 3 ? 0 : v;           // under 3 px: bar padding, an overhang — not an indent
+    const out = [];
+    let before = null;
+    for (const q of paras) {
+      const ls = q.lines, n = ls.length, first = ls[0], last = ls[n - 1];
+      // a one-line paragraph: the leading the page's paragraphs of its size agree on, else single spacing
+      const others = paras.filter(o => o.lines.length > 1 && Math.abs(o.lines[0].sizePt - first.sizePt) <= 0.3).map(own);
+      const agreed = others.length && Math.max(...others) - Math.min(...others) <= 1 ? pooled(first.sizePt, null) : null;
+      const lead = n > 1 ? pooled(first.sizePt, own(q)) : (agreed ?? 1.15 * first.sizePt / PX_PT);
+      const same = (vals, tol) => vals.every(v => Math.abs(v - vals[0]) <= tol);
+      let align = 'left';
+      if (n > 1) {
+        const heads = ls.slice(0, -1);
+        const body = ls.slice(1), x0s = body.map(l => l.x0);
+        const leftEdge = body.every(l => Math.abs(l.x0 - Math.min(...x0s.filter((x, k) => !body[k].barStart), Infinity) ) <= tolStart(l)) ||
+          same(x0s, 1.5);
+        // at the margin — or, for an indented block, at its own: the left indent mirrored
+        const indentR = colRight - (Math.min(...x0s) - colLeft);
+        const atRight = heads.every(l => Math.abs(l.x1 - colRight) <= tolEnd(l)) ||
+          heads.every(l => Math.abs(l.x1 - indentR) <= tolEnd(l)) || (n > 2 && same(heads.map(l => l.x1), 1.5));
+        // stretched: the full lines' gaps wider than the last line's (or, with none there, than the paragraph's narrowest)
+        const gaps = heads.map(l => l.gap).filter(g => g != null);
+        const lastGap = last.gap ?? (gaps.length ? Math.min(...gaps) : null);
+        const stretched = gaps.length && lastGap != null && mid(gaps) > lastGap + 0.15;
+        if (leftEdge && atRight && (stretched || n > 2 && last.gap != null && mid(gaps) > last.gap + 0.15)) align = 'justify';
+        else if (!same(ls.map(l => l.x0), 1.5) && ls.every(l => Math.abs(l.x1 - colRight) <= tolEnd(l))) align = 'right';
+        else if (!same(ls.map(l => l.x0), 1.5) && ls.every(centred)) align = 'center';
+        else if (leftEdge && atRight && n === 2 && stretched) align = 'justify';
+      } else if (first.x0 - colLeft > 3) {
+        if (centred(first)) align = 'center';
+        else if (Math.abs(first.x1 - colRight) <= tolEnd(first)) align = 'right';
+      }
+      let leftIndent = 0, firstIndent = 0, rightIndent = 0;
+      if (first.list) { leftIndent = first.textX - colLeft; firstIndent = first.x0 - first.textX; }
+      else if (align === 'left' || align === 'justify') {
+        const body = n > 1 ? mid(ls.slice(1).map(l => l.x0)) : colLeft;
+        leftIndent = snap(body - colLeft);
+        firstIndent = snap(first.x0 - body);
+        if (align === 'justify') rightIndent = snap(colRight - Math.max(...ls.slice(0, -1).map(l => l.x1)));
+      }
+      out.push({ lines: ls.map(l => l.id), align, leftIndentPt: r2(leftIndent * PX_PT), firstIndentPt: r2(firstIndent * PX_PT),
+        rightIndentPt: r2(Math.max(0, rightIndent) * PX_PT), leadingPt: r2(lead * PX_PT),
+        spaceBeforePt: before == null ? null : r2(Math.max(0, first.baseline - before - lead) * PX_PT), list: first.list });
+      before = last.baseline;
+    }
+    return out;
+  }
+
   root.OCRLineBoxes = { fontFromSetName, majoritySet, underlinedEntries, inkColours, charPositions, pageBoxes, lawInputs, readIsWeak, dominantTypography,
-    UNCLEAN_COLOR, UNREAD_COLOR };
+    paragraphs, UNCLEAN_COLOR, UNREAD_COLOR };
 })(globalThis);
