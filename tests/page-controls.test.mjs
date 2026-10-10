@@ -24,7 +24,7 @@ const CONTROLS = {
     'toggle-settings', 'settings-panel', 'settings-sections', 'tool-customise', 'tool-customise-list',
   ],
   text_tool: [
-    'tt-undo', 'tt-redo', 'toggle-fmt', 'tt-add-text-btn', 'tool-add-box', 'fabric-options-bar',
+    'tt-undo', 'tt-redo', 'toggle-fmt', 'tool-add-box', 'fabric-options-bar',
     'fabric-font-family', 'fabric-font-size', 'fabric-bold', 'fabric-italic', 'fabric-underline',
     'fabric-strikethrough', 'fabric-color', 'fabric-opacity', 'fabric-opacity-value', 'kerning', 'fabric-nudge-mode', 'fabric-letter-spacing',
     'fabric-default-sw', 'fabric-space-width', 'fabric-space-width-display', 'toggle-space-labels',
@@ -74,8 +74,10 @@ test('text_tool: the shaper and the catalogue load before the toolbar', { skip: 
   inOrder(['text_tool/shaping.js', 'text_tool/fonts.js', 'text_tool/toolbar.js']);
   // Text the user types is a 'harfbuzz' box, never 'embedded'/'ocr': those layers
   // are shown and hidden wholesale, and text just typed must not vanish with them.
-  const src = fs.readFileSync(path.join(WEB, 'plugins', 'text_tool', 'text-tool.js'), 'utf8');
-  assert.ok(src.slice(src.indexOf('window.handleManualAddText')).includes("type: 'harfbuzz'"));
+  for (const [file, maker] of [['artistic-tool.js', 'async function create('], ['frame-tool.js', 'function createFrames(']]) {
+    const src = fs.readFileSync(path.join(WEB, 'plugins', 'text_tool', file), 'utf8');
+    assert.ok(src.slice(src.indexOf(maker)).includes("type: 'harfbuzz'"), file);
+  }
 });
 
 test('text_tool: the story model before the box, its renderer after the SVG one, its editor before the toolbar', { skip: unlessInstalled('text_tool') }, () => {

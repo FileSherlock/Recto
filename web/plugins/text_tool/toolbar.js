@@ -504,25 +504,6 @@
     }
   });
 
-  // Add-text tool: arm "click on page to drop a new editable text box".
-  // The actual placement is handled by the viewer mousedown listener in app.js
-  // (state.activeTool === 'text' → handleManualAddText). Core no longer wires
-  // this plugin-owned button, so the toggle lives here.
-  el('tt-add-text-btn')?.addEventListener('click', () => {
-    const btn = el('tt-add-text-btn');
-    if (state.activeTool === 'text') {
-      state.activeTool = null;
-      btn.classList.remove('active');
-      els.viewer.style.cursor = 'default';
-    } else {
-      state.activeTool = 'text';
-      btn.classList.add('active');
-      // Mutually exclusive with the add-box tool
-      el('tool-add-box')?.classList.remove('active');
-      els.viewer.style.cursor = 'crosshair';
-    }
-  });
-
   // ── Artistic / Frame text: Affinity's text context toolbar ────────────
   // The ribbon groups marked .tt-story-only / .tt-frame-only show while text
   // the user added is selected; a plain one-line box becomes Artistic text the

@@ -23,7 +23,7 @@
   const btn = document.getElementById('tt-art-text-btn');
   if (!SC) return;
 
-  const OTHER_TOOLS = ['tt-add-text-btn', 'tool-add-box', 'tt-frame-text-btn'];
+  const OTHER_TOOLS = ['tool-add-box', 'tt-frame-text-btn'];
   const armed = () => state.activeTool === 'art-text';
   function arm(on) {
     if (on) {
@@ -87,7 +87,7 @@
   // A new Artistic text with its first baseline at (x, baseline). `ascentPx`
   // (a drag's height) sets the size so that the typographic ascent fills it.
   // `snap` (a click): beside a line of the page's text, the new text takes
-  // that line's face, style, size and baseline — as Recto's Add New Text does
+  // that line's face, style, size and baseline
   async function create(pageNum, x, baseline, ascentPx, dragW = 0, snap = false) {
     let family = document.getElementById('fabric-font-family')?.value || 'Times New Roman';
     let sizePt = parseFloat(document.getElementById('fabric-font-size')?.value) || 12;

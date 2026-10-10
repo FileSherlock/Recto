@@ -39,7 +39,6 @@ popover (`tool-column-more`), and keeps working there.
 |---|---|---|---|
 | Toggle Embedded Text | `toggle-embedded-text` | `embedded_text_viewer/toolbar_button.html` | `text_tool/toolbar.js` (guarded `?.`) — toggles body class `hide-embedded-text`. embedded_text_viewer contributes no bar; this toggle is its only UI |
 | Toggle WebGL Mask | `toggle-webgl` | `webgl_mask/toolbar_button.html` | `webgl_mask/webgl-mask.js` — opens `#webgl-options-bar` |
-| Add New Text (click on page) | `tt-add-text-btn` | `text_tool/toolbar_button.html` | arm the tool: `text_tool/toolbar.js`; placement on page click: `core/app.js` → `handleManualAddText` (`text_tool/text-tool.js`) |
 | Artistic Text Tool (click to type; drag sets the size; corners scale) | `tt-art-text-btn` | `text_tool/toolbar_button.html` | `text_tool/artistic-tool.js` — stays armed; a press on a story box edits it (`drag-resize.js`) |
 | Frame Text Tool (drag a frame; arrows while dragging: a grid of frames) | `tt-frame-text-btn` | `text_tool/toolbar_button.html` | `text_tool/frame-tool.js` — stays armed; a press on a story box edits it (`drag-resize.js`) |
 | Add Redaction Box (click on page) | `tool-add-box` | `text_tool/toolbar_button.html` | arm the tool: `core/app.js`; placement: `handleManualAddBox` (`text_tool/text-tool.js`) |

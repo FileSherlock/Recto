@@ -13,7 +13,7 @@ See [embedded-text-viewer.md](../frontend/embedded-text-viewer.md) for the full 
 | `embedded` | `embedded_text_viewer` — `extract.js` turns `Doc.structuredText(n)` into spans, `spanToUnified(span)` turns a span into a box | Ground-truth text of the PDF's own text layer; shown and hidden as a layer by the embedded-text toggle |
 | `ocr` | An OCR plugin (none in the baseline) | Text read from the page raster itself; behaves like `embedded` (inline-editable, counts as a text line for nearest-line/width flows). Inert when no OCR plugin is installed. |
 | `redaction` | User draws a box on the page (Add Box tool), or an analysis plugin adds one | Snaps font/size to nearest text line (`embedded`/`ocr`). Its label text is **machine-managed by whichever plugin owns it** — which is why it is not hand-editable (see below). Inert if no such plugin is installed. |
-| `harfbuzz` | The Add Text tool (`handleManualAddText` in `text-tool.js`) | Text this editor shapes, not a span extracted from the document. It is a type of its own because the extracted layers (`embedded`, `ocr`) are shown and hidden wholesale by their layer toggles, and text the user just typed must never vanish with them |
+| `harfbuzz` | The Artistic and Frame Text tools (`artistic-tool.js`, `frame-tool.js`) | Text this editor shapes, not a span extracted from the document. It is a type of its own because the extracted layers (`embedded`, `ocr`) are shown and hidden wholesale by their layer toggles, and text the user just typed must never vanish with them |
 
 Each type renders with a distinct colour (defined in `svg-renderer.js::UTB_TYPE_COLORS`):
 - `embedded` — blue

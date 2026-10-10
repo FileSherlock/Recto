@@ -20,7 +20,6 @@
           } else {
             state.activeTool = 'add-box';
             els.toolAddBoxBtn.classList.add('active');
-            document.getElementById('tt-add-text-btn')?.classList.remove('active');
             els.viewer.style.cursor = 'crosshair';
           }
         });
@@ -110,18 +109,6 @@
           state.activeTool = null;
           els.viewer.style.cursor = 'default';
           document.getElementById('tool-add-box')?.classList.remove('active');
-        }
-        else if (state.activeTool === 'text') {
-           // Create a new editable UnifiedTextBox at the click position.
-           if (typeof handleManualAddText === 'function') {
-              handleManualAddText(pageNum, pxX, pxY);
-           }
-
-           // Deselect tool after one use to avoid spam
-           state.activeTool = null;
-           els.viewer.style.cursor = 'default';
-           const toolBtn = document.getElementById('tt-add-text-btn');
-           if (toolBtn) toolBtn.classList.remove('active');
         }
       });
 

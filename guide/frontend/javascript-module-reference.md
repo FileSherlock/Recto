@@ -44,7 +44,7 @@ the order of their manifest's `order` (`embedded_text_viewer` 10, `webgl_mask` 2
 | 21 | `text_tool/toolbar.js` | `syncToolbarToBox`, `syncToolbarToSelection`, `syncStoryControls`, `getNaturalSpaceWidth` | — | `utbState`, `renderBox`, `Shaping`, `story-edit.js` |
 | 22 | `text_tool/micro-typo.js` | `enterMicroTypo`, `exitMicroTypo` | — | `utbState`, `computeXPositions`, `renderBox` |
 | 23 | `text_tool/inline-edit.js` | `enterInlineEdit`, `commitInlineEdit`, `cancelInlineEdit` | — | `utbState`, `renderBox`, `exitMicroTypo`, `enterStoryEdit` |
-| 24 | `text_tool/text-tool.js` | `handleManualAddBox`, `handleManualAddText`, `utbDeleteBox` | — | `utbState`, `renderBox`, all above |
+| 24 | `text_tool/text-tool.js` | `handleManualAddBox`, `utbDeleteBox` | — | `utbState`, `renderBox`, all above |
 | 25 | `text_tool/frame-tool.js` | `createTextFrame` — the Frame Text Tool | — | `StoryCore`, `utbState`, `enterStoryEdit` |
 | 26 | `text_tool/artistic-tool.js` | `storyScaleDrag`, `storyConvert` — the Artistic Text Tool | — | `StoryCore`, `Shaping`, `enterStoryEdit` |
 | 27 | `text_tool/text-studio.js` | `openTextStudio` — the Text panel | — | `StoryCore`, `story-edit.js`, `FontCatalog` |

@@ -25,7 +25,7 @@
   const btn = document.getElementById('tt-frame-text-btn');
   if (!btn || !SC) return;
 
-  const OTHER_TOOLS = ['tt-add-text-btn', 'tool-add-box'];
+  const OTHER_TOOLS = ['tool-add-box'];
   const armed = () => state.activeTool === 'frame-text';
 
   function arm(on) {

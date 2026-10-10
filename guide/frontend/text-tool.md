@@ -4,7 +4,7 @@
 
 `text-tool.js` handles manual box creation and deletion.
 
-Both are scripts of the `text_tool` plugin (`web/plugins/text_tool/`), listed in its `plugin.json` under `scripts_after_app`. The controls live in the plugin's own fragments: `toolbar_button.html` (the tools in the left column — **Add New Text**, **Add Redaction Box**, **Undo**, **Redo** and the **Text formatting** toggle `#toggle-fmt`), `options_bar.html` (the contextual formatting bar `#fabric-options-bar`, revealed while a box is selected) and `settings.html` (the **Redaction match** section of the Settings panel: width tolerance and letter case).
+Both are scripts of the `text_tool` plugin (`web/plugins/text_tool/`), listed in its `plugin.json` under `scripts_after_app`. The controls live in the plugin's own fragments: `toolbar_button.html` (the tools in the left column — the **Artistic Text** and **Frame Text** tools, **Add Redaction Box**, **Undo**, **Redo** and the **Text formatting** toggle `#toggle-fmt`), `options_bar.html` (the contextual formatting bar `#fabric-options-bar`, revealed while a box is selected) and `settings.html` (the **Redaction match** section of the Settings panel: width tolerance and letter case).
 
 ---
 
@@ -159,7 +159,6 @@ Double-click is a different gesture: it starts inline text editing (see `inline-
 | `change` | `#tolerance`, `#tt-name-case` | Write `box.tolerance` / `box.uppercase` on the selected `redaction` box (`applyMatchControls`); guarded calls into a matching plugin |
 | `click` | `#toggle-space-labels` | `setShowSpaceWidthLabels(active)` |
 | `click` | `#toggle-fmt` | Open / close `#fabric-options-bar` through `openSubtoolbar` |
-| `click` | `#tt-add-text-btn` | Arm `state.activeTool = 'text'` (mutually exclusive with the add-box tool) |
 | `click` | `#toggle-embedded-text` | Toggle `hide-embedded-text` on `<body>` — shows / hides every `embedded` box |
 | `click` | `#utb-delete-box` | `utbDeleteBox(utbState.selectedId)` |
 
@@ -173,10 +172,9 @@ Every handler that changes what a `redaction` box measures also calls `calculate
 
 ### Placing new boxes
 
-The click itself is caught by the core (`app.js`, a `mousedown` on the viewer), which maps it to document pixel space and calls whichever handler matches `state.activeTool` — both behind `typeof` guards.
+The click itself is caught by the core (`app.js`, a `mousedown` on the viewer), which maps it to document pixel space and, for the add-box tool, calls `handleManualAddBox` behind a `typeof` guard. Text is added with the Artistic and Frame Text tools, which catch their own presses (below).
 
 - `window.handleManualAddBox(pageNum, x, y)`: delegates to `createNewRedaction()` if a plugin supplies it, otherwise creates a `type='redaction'` box directly. Takes the nearest shown line from `utbFindNearestLine` (`unified-text-box.js`).
-- `window.handleManualAddText(pageNum, x, y)`: creates a `type='harfbuzz'` box with `autoWidth: true` at the click, on the nearest shown line when there is one (`utbFindNearestLine`: its face, bold / italic, size and baseline — of a row cut by redaction bars, the piece the click is in or nearest beside), and drops straight into inline edit. The type matters for visibility: extracted layers are shown and hidden wholesale by their toggles, and text the user just typed must never vanish with them.
 
 ### Artistic and Frame text
 

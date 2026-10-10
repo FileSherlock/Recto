@@ -46,48 +46,6 @@ function addBox(pageNum, x, y) {
 }
 
 
-// ── Tool: add editable text box ───────────────────────────────
-// Creates a UnifiedTextBox at the click point — beside a line of the page, in
-// that line's face, style and size on its baseline — and drops straight into
-// inline-edit mode so the user can type immediately.
-
-window.handleManualAddText = function (pageNum, x, y) {
-  const nearest = window.utbFindNearestLine?.(pageNum, { x, y });
-  const defaultFF = document.getElementById('fabric-font-family')?.value || 'Times New Roman';
-  // Font-size input is in POINTS — no DPI conversion.
-  const defaultSizePt = parseFloat(document.getElementById('fabric-font-size')?.value) || 12;
-
-  const newBox = utbState.addBox(new UnifiedTextBox({
-    // 'harfbuzz' — text this editor shapes, not a span extracted from the
-    // document. Type matters for visibility: the extracted layers ('embedded',
-    // 'ocr') are shown/hidden wholesale by their layer toggles, and text the
-    // user just typed must never vanish with them.
-    type: 'harfbuzz',
-    page: pageNum,
-    text: 'Text',
-    lineId: nearest ? nearest.lineId : null,
-    x: x,
-    y: nearest ? nearest.y : y - 10,
-    w: nearest ? nearest.w : 100,
-    h: nearest ? nearest.h : 20,
-    fontFamily: nearest?.font || defaultFF,
-    bold: !!nearest?.bold,
-    italic: !!nearest?.italic,
-    sizePt: nearest ? nearest.sizePt : defaultSizePt,
-    autoWidth: true,  // size to text content; no manual resize handles
-  }));
-
-  renderBox(newBox);
-  utbState.selectedId = newBox.id;
-  selectBoxInSVG(newBox.id);
-  if (typeof syncToolbarToBox === 'function') syncToolbarToBox(newBox);
-  window.utbUndo?.recordAdd([newBox], 'add text');
-
-  // Drop into inline edit so the placeholder is selected and ready to overwrite.
-  if (typeof enterInlineEdit === 'function') enterInlineEdit(newBox);
-};
-
-
 // ── Tool: delete a box ────────────────────────────────────────
 // One removal path for every box type, used by the toolbar's Delete button and
 // by the Delete / Backspace keys. Any live session on the box is torn down
