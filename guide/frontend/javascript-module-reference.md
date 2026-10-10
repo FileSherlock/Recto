@@ -30,7 +30,7 @@ the order of their manifest's `order` (`embedded_text_viewer` 10, `webgl_mask` 2
 | 7 | `core/ui-events.js` | `updateZoomLevelText`, `updateCSSZoom`, `processZoomFromText`, `renderThumbnails` | **emit:** `zoom:changed` | `state`, `els`, `Doc` |
 | 8 | `core/app.js` | IIFE — wires core listeners; `openSubtoolbar`, `registerSubtoolbar`; opens the startup document | **emit:** `ui:ready` | All above |
 | 9 | `embedded_text_viewer/extract.js` | `EtvExtract` (`extractSpans`, `leanSpan`, …) | — | — |
-| 10 | `embedded_text_viewer/etv-fetch.js` | `utbFetchSpans`, `utbConnectRedactionsToLines`, `addEmbeddedTextSpan`, `_utbFindNearestLine`, `etvSpanCache` | **on:** `document:loaded`, `page:rendered` · **emit:** `redactions:connected` | `Doc`, `EtvExtract`; `utbState`, `renderBox`, … at run time |
+| 10 | `embedded_text_viewer/etv-fetch.js` | `utbFetchSpans`, `utbConnectRedactionsToLines`, `etvSpanCache` | **on:** `document:loaded`, `page:rendered` · **emit:** `redactions:connected` | `Doc`, `EtvExtract`; `utbState`, `renderBox`, … at run time |
 | 11 | `text_tool/shaping.js` | `Shaping` (`widths`, `fontMetrics`, `faceMetrics`), `ShapingCore` | — | `assetURL` |
 | 12 | `text_tool/fonts.js` | `FontCatalog` | **on:** `document:loaded`, `typography:detected` | `Shaping` (run time) |
 | 13 | `text_tool/story-core.js` | `StoryCore` — the rich-text model of Artistic / Frame text (no DOM) | — | — |

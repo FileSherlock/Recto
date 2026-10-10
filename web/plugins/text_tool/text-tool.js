@@ -11,19 +11,15 @@ window.handleManualAddBox = function (pageNum, x, y) {
   finally { window.utbUndo?.recordAdd(utbState.boxes.filter(b => !had.has(b)), 'add box'); }
 };
 function addBox(pageNum, x, y) {
+  // the nearest shown line (unified-text-box.js): its face, style, size and band
+  const nearest = utbFindNearestLine(pageNum, { x, y });
   if (typeof createNewRedaction === 'function') {
-    const nearestLine = window._utbFindNearestLine?.(pageNum, y, 2.0);
-    const finalY = nearestLine ? nearestLine.y : y - 10;
-    const finalH = nearestLine ? nearestLine.h : 20;
-    const finalLineId = nearestLine ? nearestLine.lineId : null;
-    const lineFont = nearestLine?.font;
-    const lineSizePt = nearestLine?.sizePt;
-    createNewRedaction(pageNum, x - 50, finalY, 100, finalH, finalLineId, lineFont, lineSizePt);
+    createNewRedaction(pageNum, x - 50, nearest ? nearest.y : y - 10, 100, nearest ? nearest.h : 20,
+      nearest ? nearest.lineId : null, nearest?.font, nearest?.sizePt);
     return;
   }
 
   // Fallback: pure UTB creation, when no plugin supplies createNewRedaction()
-  const nearest = window._utbFindNearestLine?.(pageNum, y);
   const defaultFF = document.getElementById('fabric-font-family')?.value || 'Times New Roman';
   // Font-size input is in POINTS — no DPI conversion.
   const defaultSizePt = parseFloat(document.getElementById('fabric-font-size')?.value) || 12;
@@ -37,7 +33,9 @@ function addBox(pageNum, x, y) {
     y: nearest ? nearest.y : y - 10,
     w: nearest ? nearest.w : 100,
     h: nearest ? nearest.h : 20,
-    fontFamily: nearest ? nearest.fontFamily : defaultFF,
+    fontFamily: nearest ? nearest.font : defaultFF,
+    bold: !!nearest?.bold,
+    italic: !!nearest?.italic,
     sizePt: nearest ? nearest.sizePt : defaultSizePt,
   }));
 
@@ -49,13 +47,12 @@ function addBox(pageNum, x, y) {
 
 
 // ── Tool: add editable text box ───────────────────────────────
-// Creates a UnifiedTextBox of type 'embedded' at the click point and drops
-// straight into inline-edit mode so the user can type immediately. This is the
-// UTB-native replacement for the legacy etvState-based addEmbeddedTextSpan,
-// which depended on the embedded-text-viewer overlay UI that isn't present here.
+// Creates a UnifiedTextBox at the click point — beside a line of the page, in
+// that line's face, style and size on its baseline — and drops straight into
+// inline-edit mode so the user can type immediately.
 
 window.handleManualAddText = function (pageNum, x, y) {
-  const nearest = window.utbFindNearestLine?.(pageNum, y);
+  const nearest = window.utbFindNearestLine?.(pageNum, { x, y });
   const defaultFF = document.getElementById('fabric-font-family')?.value || 'Times New Roman';
   // Font-size input is in POINTS — no DPI conversion.
   const defaultSizePt = parseFloat(document.getElementById('fabric-font-size')?.value) || 12;
@@ -73,7 +70,9 @@ window.handleManualAddText = function (pageNum, x, y) {
     y: nearest ? nearest.y : y - 10,
     w: nearest ? nearest.w : 100,
     h: nearest ? nearest.h : 20,
-    fontFamily: nearest ? (nearest.font || nearest.fontFamily) : defaultFF,
+    fontFamily: nearest?.font || defaultFF,
+    bold: !!nearest?.bold,
+    italic: !!nearest?.italic,
     sizePt: nearest ? nearest.sizePt : defaultSizePt,
     autoWidth: true,  // size to text content; no manual resize handles
   }));

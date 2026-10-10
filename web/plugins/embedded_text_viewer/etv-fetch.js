@@ -380,56 +380,6 @@ function utbConnectRedactionsToLines() {
 }
 
 
-// ── Nearest-line helper (exposed so text-tool.js can use it) ──
-
-window._utbFindNearestLine = function (pageNum, y, thresholdMultiplier = 2.0) {
-  // only lines on a shown layer: a new box takes its face and size from what
-  // the user sees, never from a hidden embedded line's declared substitute
-  const cl = document.body.classList;
-  const shown = b => !(b.type === 'embedded' && cl.contains('hide-embedded-text')) &&
-                     !(b.type === 'ocr' && cl.contains('hide-ocr-text'));
-  const pageBoxes = utbState.boxes.filter(b => b.page === pageNum &&
-    (b.type === 'embedded' || b.type === 'ocr') && shown(b));
-  if (!pageBoxes.length) return null;
-
-  let nearest = null;
-  let minDist = Infinity;
-  for (const b of pageBoxes) {
-    const cy = b.y + b.h / 2;
-    const d = Math.abs(cy - y);
-    if (d < minDist) { minDist = d; nearest = b; }
-  }
-  return nearest && minDist < nearest.h * thresholdMultiplier ? nearest : null;
-};
-
-
-// ── Tool: add embedded text span ──────────────────────────────
-
-window.addEmbeddedTextSpan = function (pageNum, x, y) {
-  const nearest = window._utbFindNearestLine(pageNum, y);
-
-  const newBox = utbState.addBox(new UnifiedTextBox({
-    type: 'embedded',
-    page: pageNum,
-    text: 'Click to edit',
-    lineId: nearest ? nearest.lineId : `manual_${Date.now()}`,
-    x: x,
-    y: nearest ? nearest.y : y - 10,
-    w: 120,
-    h: nearest ? nearest.h : 20,
-    fontFamily: nearest ? nearest.fontFamily : (document.getElementById('fabric-font-family')?.value || 'Times New Roman'),
-    // Font-size input is in POINTS — no DPI conversion.
-    sizePt: nearest ? nearest.sizePt : (parseFloat(document.getElementById('fabric-font-size')?.value) || 12),
-  }));
-
-  renderBox(newBox);
-
-  utbState.selectedId = newBox.id;
-  selectBoxInSVG(newBox.id);
-  if (typeof syncToolbarToBox === 'function') syncToolbarToBox(newBox);
-};
-
-
 // ── Cross-plugin text access ──────────────────────────────────
 // Read-only view of the lean span cache for plugins that scan the whole
 // document's text. Pages the user

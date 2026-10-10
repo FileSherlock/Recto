@@ -87,28 +87,31 @@
   // A new Artistic text with its first baseline at (x, baseline). `ascentPx`
   // (a drag's height) sets the size so that the typographic ascent fills it.
   // `snap` (a click): beside a line of the page's text, the new text takes
-  // that line's face, size and baseline — as Recto's Add New Text does
+  // that line's face, style, size and baseline — as Recto's Add New Text does
   async function create(pageNum, x, baseline, ascentPx, dragW = 0, snap = false) {
     let family = document.getElementById('fabric-font-family')?.value || 'Times New Roman';
     let sizePt = parseFloat(document.getElementById('fabric-font-size')?.value) || 12;
-    const near = snap ? window.utbFindNearestLine?.(pageNum, baseline) : null;
+    let bold = false, italic = false;
+    const near = snap ? window.utbFindNearestLine?.(pageNum, { x, y: baseline }) : null;
     if (near) {
       family = near.font || family;
       sizePt = near.sizePt || sizePt;
+      bold = !!near.bold;
+      italic = !!near.italic;
       baseline = typeof computeBaseline === 'function' ? computeBaseline({ y: near.y, h: near.h }) : near.y + near.h * 0.85;
     }
     if (ascentPx) {
       let m = null;
-      try { m = await Shaping.faceMetrics({ family, bold: false, italic: false }); } catch { /* the fallback ratio */ }
+      try { m = await Shaping.faceMetrics({ family, bold, italic }); } catch { /* the fallback ratio */ }
       // Affinity's typographic ascent: max(top of 'l', cap height)
       const ratio = SC.scaledMetrics(m, 1).typoAscent || 0.75;
       sizePt = Math.max(1, Math.round(ascentPx / ratio / GEO.docPxPerPt() * 10) / 10);
     }
     const box = utbState.addBox(new UnifiedTextBox({
       type: 'harfbuzz', page: pageNum, text: '', x, y: baseline - GEO.docPtToPx(sizePt), w: 8, h: GEO.docPtToPx(sizePt),
-      fontFamily: family, sizePt, kerning: true,
+      fontFamily: family, bold, italic, sizePt, kerning: true,
       // Affinity's default fill is black
-      textMode: 'artistic', story: SC.fromText('', { fontFamily: family, sizePt, color: '#000000' }), frame: {},
+      textMode: 'artistic', story: SC.fromText('', { fontFamily: family, bold, italic, sizePt, color: '#000000' }), frame: {},
     }));
     box._keepBaseline = baseline;
     box._minW = dragW;

@@ -115,8 +115,6 @@
            // Create a new editable UnifiedTextBox at the click position.
            if (typeof handleManualAddText === 'function') {
               handleManualAddText(pageNum, pxX, pxY);
-           } else if (typeof addEmbeddedTextSpan === 'function') {
-              addEmbeddedTextSpan(pageNum, pxX, pxY);
            }
 
            // Deselect tool after one use to avoid spam

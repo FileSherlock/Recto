@@ -280,11 +280,13 @@ window.normUtbFont = normUtbFont;
 // ── Adapter functions for legacy consumers ────────────────────
 
 /**
- * Find the nearest text line (embedded span or OCR-read line) to a Y
- * coordinate on a page. Drop-in replacement for findNearestETVLine().
- * Returns { y, h, lineId, font, fontSize } or null.
+ * Find the nearest text line (embedded span or OCR-read line) to a point on a
+ * page — `at` is { x, y }, or a y alone — what a new box beside it takes: its
+ * face, style and size, its baseline (y / h, as computeBaseline reads them).
+ * Returns { y, h, w, lineId, font, bold, italic, sizePt } or null.
  */
-function utbFindNearestLine(pageNum, y, threshold = 2.0) {
+function utbFindNearestLine(pageNum, at, threshold = 2.0) {
+  const y = typeof at === 'object' ? at.y : at, x = typeof at === 'object' ? at.x : null;
   // a line on a hidden layer is not what the user clicked beside: when the
   // OCR layer is shown and the embedded one hidden, the embedded line's face
   // (the text layer's declared substitute) must not become the new box's
@@ -303,12 +305,22 @@ function utbFindNearestLine(pageNum, y, threshold = 2.0) {
     if (d < minDist) { minDist = d; nearest = b; }
   }
   if (!nearest || minDist > nearest.h * threshold) return null;
+  // a row cut by redaction bars is several lines (a bold "To: " label, then a
+  // regular address): the one the point is in, else the one nearest beside it
+  if (x != null) {
+    const cy = nearest.y + nearest.h / 2;
+    const off = b => Math.max(0, b.x - x, x - (b.x + b.w));
+    for (const b of pageBoxes) if (Math.abs(b.y + b.h / 2 - cy) < 1 && off(b) < off(nearest)) nearest = b;
+  }
 
   return {
     y: nearest.y,
     h: nearest.h,
+    w: nearest.w,
     lineId: nearest.lineId,
     font: nearest.fontFamily,
+    bold: !!nearest.bold,
+    italic: !!nearest.italic,
     sizePt: nearest.sizePt,
   };
 }

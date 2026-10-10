@@ -240,8 +240,6 @@ The `lineId` field groups all boxes that belong to the same horizontal line of t
 
 When it is done the function emits the generic `redactions:connected` event, so line-aware plugins can react without being named.
 
-`window._utbFindNearestLine(pageNum, y, thresholdMultiplier = 2.0)` returns the nearest text-line box on a **shown** layer — a new box takes its face and size from what the user sees, never from a hidden line. The Add Box tool uses it ([Toolbar & Text Tool](text-tool.md#placing-new-boxes)).
-
 ---
 
 ## Interaction Modes

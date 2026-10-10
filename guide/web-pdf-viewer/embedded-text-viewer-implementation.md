@@ -62,8 +62,6 @@ Two tiers keep huge documents affordable. **Lean** spans (text, geometry, size, 
 - **`window.etvSpanCache`** — read-only view of the lean cache (`complete() / anyText() /
   hasPage(p) / isHydrated(p) / spansFor(p)`) for plugins that scan the whole document's text.
 - **`utbConnectRedactionsToLines()`** — Links redaction boxes to their overlapping text lines by snapping `lineId`, `y`, and `h`, and lets the bar adopt the line's face, size and style. Emits the generic `redactions:connected` event when done.
-- **`window.addEmbeddedTextSpan(pageNum, x, y)`** — Creates a new `type='embedded'` box, snaps to the nearest text line, selects it, and opens the toolbar.
-- **`window._utbFindNearestLine(pageNum, y)`** — Helper used by `text_tool/text-tool.js` when placing manual boxes (optional: gracefully absent if the ETV plugin is not installed). Only lines on a layer that is currently shown are candidates.
 - **`document:loaded` subscription** — resets the hydrated set (the core reset `utbState`),
   invalidates the cache if the hash changed, kicks the background loop, and re-hydrates
   whatever page is on screen. The first page renders before `document:loaded` arrives, so

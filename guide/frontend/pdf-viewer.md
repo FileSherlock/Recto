@@ -110,8 +110,8 @@ Settings modified in this bar (Font, Size, Kerning, etc.) are applied to the cur
 **How it works:**
 1. Click the tool to activate `state.activeTool = 'add-box'`.
 2. Click anywhere on the PDF page. `app.js` maps the click to document pixel space through the SVG text layer's `getScreenCTM()` and calls `handleManualAddBox(pageNum, x, y)`.
-3. `window._utbFindNearestLine()` (from `embedded_text_viewer`) searches for a text line within 2x height proximity.
-4. If a line is found, the new box inherits that line's `y`, `height`, `lineId`, font and size.
+3. `utbFindNearestLine()` (`text_tool/unified-text-box.js`) searches for a text line on a shown layer within 2x height proximity.
+4. If a line is found, the new box inherits that line's `y`, `height`, `lineId`, font, style (bold, italic) and size.
 5. If no line is found, a default box is created at the click location.
 
 > **Note:** the box it creates carries `type: 'redaction'`. The type name is load-bearing in

@@ -175,8 +175,8 @@ Every handler that changes what a `redaction` box measures also calls `calculate
 
 The click itself is caught by the core (`app.js`, a `mousedown` on the viewer), which maps it to document pixel space and calls whichever handler matches `state.activeTool` — both behind `typeof` guards.
 
-- `window.handleManualAddBox(pageNum, x, y)`: delegates to `createNewRedaction()` if a plugin supplies it, otherwise creates a `type='redaction'` box directly. Calls `window._utbFindNearestLine?.()` — defined by `etv-fetch.js` (optional: gracefully absent if the `embedded_text_viewer` plugin is not installed). Both are optional seams; the tool works either way.
-- `window.handleManualAddText(pageNum, x, y)`: creates a `type='harfbuzz'` box with `autoWidth: true` at the click, on the nearest shown line when there is one (`utbFindNearestLine`), and drops straight into inline edit. The type matters for visibility: extracted layers are shown and hidden wholesale by their toggles, and text the user just typed must never vanish with them.
+- `window.handleManualAddBox(pageNum, x, y)`: delegates to `createNewRedaction()` if a plugin supplies it, otherwise creates a `type='redaction'` box directly. Takes the nearest shown line from `utbFindNearestLine` (`unified-text-box.js`).
+- `window.handleManualAddText(pageNum, x, y)`: creates a `type='harfbuzz'` box with `autoWidth: true` at the click, on the nearest shown line when there is one (`utbFindNearestLine`: its face, bold / italic, size and baseline — of a row cut by redaction bars, the piece the click is in or nearest beside), and drops straight into inline edit. The type matters for visibility: extracted layers are shown and hidden wholesale by their toggles, and text the user just typed must never vanish with them.
 
 ### Artistic and Frame text
 

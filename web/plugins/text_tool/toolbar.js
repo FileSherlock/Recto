@@ -506,7 +506,7 @@
 
   // Add-text tool: arm "click on page to drop a new editable text box".
   // The actual placement is handled by the viewer mousedown listener in app.js
-  // (state.activeTool === 'text' → addEmbeddedTextSpan). Core no longer wires
+  // (state.activeTool === 'text' → handleManualAddText). Core no longer wires
   // this plugin-owned button, so the toggle lives here.
   el('tt-add-text-btn')?.addEventListener('click', () => {
     const btn = el('tt-add-text-btn');

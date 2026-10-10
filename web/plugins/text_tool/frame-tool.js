@@ -144,8 +144,8 @@
       const min = 4 / (state.currentZoom || 1);
       if (!commit || !d.rect || d.rect.w < min || d.rect.h < min) return;
       const frames = cells(d.rect, d.cols, d.rows, d.gap).filter(c => c.w >= 1 && c.h >= 1);
-      // a drag that starts on a line of the page takes its face and size
-      if (frames.length) createFrames(d.pageNum, frames, window.utbFindNearestLine?.(d.pageNum, d.a.y));
+      // a drag that starts on a line of the page takes its face, style and size
+      if (frames.length) createFrames(d.pageNum, frames, window.utbFindNearestLine?.(d.pageNum, d.a));
     }
     const onUp = () => end(true);
     window.addEventListener('mousemove', onMove);
@@ -157,6 +157,7 @@
   function createFrames(pageNum, rects, near = null) {
     const family = near?.font || document.getElementById('fabric-font-family')?.value || 'Times New Roman';
     const sizePt = near?.sizePt || parseFloat(document.getElementById('fabric-font-size')?.value) || 12;
+    const bold = !!near?.bold, italic = !!near?.italic;
     const boxes = rects.map(r => {
       const box = utbState.addBox(new UnifiedTextBox({
         type: 'harfbuzz',
@@ -164,11 +165,13 @@
         text: '',
         x: r.x, y: r.y, w: Math.max(r.w, 8), h: Math.max(r.h, 8),
         fontFamily: family,
+        bold,
+        italic,
         sizePt,
         kerning: true,
         textMode: 'frame',
         // Affinity's default fill is black (a plain typed box keeps Recto's orange)
-        story: SC.fromText('', { fontFamily: family, sizePt, color: '#000000' }),
+        story: SC.fromText('', { fontFamily: family, bold, italic, sizePt, color: '#000000' }),
         frame: {},
       }));
       window.storySync?.(box);
