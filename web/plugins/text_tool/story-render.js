@@ -284,8 +284,14 @@
 
   // ── after the browser's layout ────────────────────────────────────────────
 
-  // local px per screen px of an element inside the foreignObject
-  const unitOf = node => (node.offsetWidth ? node.getBoundingClientRect().width / node.offsetWidth : 1) || 1;
+  // screen px per local px of an element inside the foreignObject: the
+  // foreignObject's own scale on screen. Not a ratio of the element's widths —
+  // offsetWidth is a whole number, which put a one-character Artistic text's
+  // baseline 1 px off (6.53 px / 7) and moved a line on every keystroke.
+  const unitOf = node => {
+    const m = node.closest?.('foreignObject')?.getScreenCTM?.();
+    return (m && Math.hypot(m.a, m.b)) || 1;
+  };
 
   // A scaled word takes the room of its scaled width.
   function passScale(flow) {
@@ -391,11 +397,20 @@
     if (typeof window.utbPixelRender !== 'function') return;
     const give_up = () => { forgetPieces(box, before); };
     if (utbState.editingId === box.id) return give_up();
-    const flow = g.querySelector('.tt-flow'), pageEl = document.getElementById(`pageContainer${box.page}`);
-    if (!flow || !pageEl) return give_up();
-    const pr = pageEl.getBoundingClientRect();
-    const k = (state.pageWidth || pr.width) / (pr.width || 1);           // doc px per screen px
-    const docX = x => (x - pr.left) * k, docY = y => (y - pr.top) * k;
+    const flow = g.querySelector('.tt-flow');
+    if (!flow) return give_up();
+    // The layout's positions are taken RELATIVE TO THE FLOW, and the flow's
+    // origin from the box's own numbers: the browser truncates the
+    // foreignObject's position to its 1/64 px layout grid (Artistic text
+    // clicked at x 63.2 started at 63.1875), which moves pens on the ¼ px
+    // lattice. So the first line of Artistic text starts at box.x on the
+    // baseline it was given (box.y + the measured first baseline).
+    const k = unitOf(flow);                                              // screen px per doc px
+    const fr = flow.getBoundingClientRect();
+    const inFrame = box.textMode === 'frame';
+    const ox = box.x + (inFrame ? parseFloat(flow.style.left) || 0 : 0);
+    const oy = box.y + (inFrame ? parseFloat(flow.style.top) || 0 : 0);
+    const docX = x => ox + (x - fr.left) / k, docY = y => oy + (y - fr.top) / k;
     const clipRight = box.textMode === 'frame' && SC.frameOf(box.frame).hideOverflow ? box.x + box.w + 1 : Infinity;
 
     // the pieces, in reading order

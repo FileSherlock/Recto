@@ -250,8 +250,11 @@ body.hide-embedded-text .utb-group[data-type="embedded"] { display: none; }
   cursor: default;
   user-select: none;
 }
-.tt-story.tt-artistic { display: inline-block; white-space: pre; }
-.tt-story.tt-artistic .tt-flow { display: inline-block; }
+/* both inline boxes at the top of their line: on the baseline of the line box's
+   strut (the UI font) they sat 3–7 px below the foreignObject's top, which the
+   first baseline is measured from (story-render.js) */
+.tt-story.tt-artistic { display: inline-block; white-space: pre; vertical-align: top; }
+.tt-story.tt-artistic .tt-flow { display: inline-block; vertical-align: top; }
 .tt-story.tt-frame .tt-flow { position: absolute; box-sizing: content-box; }
 .tt-flow { outline: none; caret-color: #1a73e8; }
 .tt-flow[contenteditable] { cursor: text; user-select: text; }
