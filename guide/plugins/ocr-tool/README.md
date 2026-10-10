@@ -301,7 +301,11 @@ how far from the neighbour's ink the refiner put that edge: a space; two after
 a sentence on a page that spaces its sentences so; none where a mark binds to
 the name (`(`, `<`, a quote, the comma after it — the refiner's punctuation
 rules, not a second copy of them); a fragment's missing letters and a space.
-An edge at the bar's ink (the neighbour is not the name's) keeps a space. The
+An edge at the bar's ink (the neighbour is not the name's — a label a tab stop
+away) gives no pen at all: the name is placed from the other side, and with no
+pen on either side the seam declines rather than draw the name a space after
+the label and contradict it (four true names on the tab-stop pages, until
+2026-10-11). The
 space between the name's words (`hvRowSpace`) is the row's, the one the
 refiner derived the bar with — from whichever side carries one: a side that
 abuts a mark carries 0, which is not the row's. With neither (a bar between
