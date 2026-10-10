@@ -123,9 +123,9 @@ async function hvFace(set) {
 // bar's edge: a space; two after a sentence on a page that spaces its
 // sentences so ("plane.  [Bledsoe] said" — one put the name a space too far
 // left, and with no word after it the truth was contradicted); none where a
-// mark binds to the name; a fragment's missing letters and a space. An edge
-// at the bar's ink (the neighbour is not the name's) or no verdict: the
-// fallback (a space, or none beside a mark that touches).
+// mark binds to the name; a fragment's missing letters and a space. No
+// verdict: the fallback (a space, or none beside a mark that touches); an
+// edge at the bar's ink gives no pen at all (ocrTestHypothesis).
 function hvGap(s, side, fallback, sx) {
   if (!s || s.kind === 'ink' || s.edge == null || s.inkEdge == null) return fallback;
   return (side === 'left' ? s.edge - s.inkEdge : s.inkEdge - s.edge) / sx;
@@ -157,8 +157,11 @@ async function ocrTestHypothesis(box, name) {
 
   const ri = box.refineInfo;
   const spaceLine = await hvRowSpace(box, span, set, sx, nb.spans);
-  const penLeft = leftChars.length ? leftChars[leftChars.length - 1].x1 / sx : null;
-  const penRight = rightChars.length ? rightChars[0].x0 / sx : null;
+  // a side the refiner put at the bar's ink has a neighbour that is not the
+  // name's (a label a tab stop away: "From:" 50 px before its field) — no pen
+  // from it; the name was drawn a space after the label and contradicted
+  const penLeft = leftChars.length && ri?.left?.kind !== 'ink' ? leftChars[leftChars.length - 1].x1 / sx : null;
+  const penRight = rightChars.length && ri?.right?.kind !== 'ink' ? rightChars[0].x0 / sx : null;
   if (penLeft == null && penRight == null) return hvReason(box, 'no pen on either side');
   // the gap the name leaves to each neighbour (hvGap): the refiner's verdict,
   // else a space, or none where the neighbour is punctuation that touches
