@@ -285,6 +285,62 @@
       "sizePx": 16,
       "plain": false
     },
+    "nimbusromlin942": {
+      "family": "Nimbus Roman",
+      "bold": false,
+      "italic": false,
+      "file": "NimbusRoman-Regular.cff",
+      "sizePx": 14.71875,
+      "plain": false
+    },
+    "nimbusromilin942": {
+      "family": "Nimbus Roman",
+      "bold": false,
+      "italic": true,
+      "file": "NimbusRoman-Italic.cff",
+      "sizePx": 14.71875,
+      "plain": false
+    },
+    "nimbusrombdlin942": {
+      "family": "Nimbus Roman",
+      "bold": true,
+      "italic": false,
+      "file": "NimbusRoman-Bold.cff",
+      "sizePx": 14.71875,
+      "plain": false
+    },
+    "nimbusromlin768": {
+      "family": "Nimbus Roman",
+      "bold": false,
+      "italic": false,
+      "file": "NimbusRoman-Regular.cff",
+      "sizePx": 12,
+      "plain": false
+    },
+    "nimbusromlin849": {
+      "family": "Nimbus Roman",
+      "bold": false,
+      "italic": false,
+      "file": "NimbusRoman-Regular.cff",
+      "sizePx": 13.265625,
+      "plain": false
+    },
+    "nimbusromilin849": {
+      "family": "Nimbus Roman",
+      "bold": false,
+      "italic": true,
+      "file": "NimbusRoman-Italic.cff",
+      "sizePx": 13.265625,
+      "plain": false
+    },
+    "nimbusrombdlin849": {
+      "family": "Nimbus Roman",
+      "bold": true,
+      "italic": false,
+      "file": "NimbusRoman-Bold.cff",
+      "sizePx": 13.265625,
+      "plain": false
+    },
     "censcbk1198": {
       "family": "Century Schoolbook",
       "bold": false,

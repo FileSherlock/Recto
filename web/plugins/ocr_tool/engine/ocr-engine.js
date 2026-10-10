@@ -328,6 +328,40 @@
           else ext.push([r.y, r.x0, r.x1]);
         }
       if (!ext.length) continue;
+      // CROSSING RULES. A thin run of rows whose raw extent is more than
+      // twice the box's on both sides of it is not a glyph glued to the bar:
+      // it is a rule crossing the box — a table's horizontal border (650 px,
+      // dark) through a redacted column (116 px, 800 rows; EFTA00173953 p24,
+      // 45 of them). The clip below rightly folds such rows into the box (the
+      // box stays whole), but then no object is left for the rule, its stub
+      // outside the box has no mask, and every cell row ends in □s there
+      // (p24: 335 □ → 49 with the rule kept). Judged on RAW extents before the
+      // clip — with 8+ borders their columns count as bar columns and the
+      // clip keeps them, with fewer it removes them; either way the rule is
+      // its own object from here. The neighbours are the nearest runs of 5+
+      // rows (the box's own segments) and must agree with each other: two
+      // stacked boxes' fused rows (`big` p339) have different boxes above and
+      // below and are not this. (Refusing the row merge upstream instead —
+      // a row within 2× of its object — cut those fused rows away from the
+      // upper box, whose body rows vouched for their columns, and a 13-px
+      // sliver of them went unmasked: `big` 0 □ → 1.)
+      {
+        const raw = [];
+        for (const [y, x0, x1] of ext) {
+          const s = raw[raw.length - 1];
+          if (s && y === s.y1 && Math.abs(x0 - s.x0) <= 2 && Math.abs(x1 - s.x1) <= 2) s.y1 = y + 1;
+          else raw.push({ y0: y, y1: y + 1, x0, x1 });
+        }
+        for (let m = 0; m < raw.length; m++) {
+          const b = raw[m];
+          if (b.y1 - b.y0 >= 5) continue;
+          let a = null, c = null;
+          for (let k = m - 1; k >= 0 && !a; k--) if (raw[k].y1 - raw[k].y0 >= 5) a = raw[k];
+          for (let k = m + 1; k < raw.length && !c; k++) if (raw[k].y1 - raw[k].y0 >= 5) c = raw[k];
+          if (a && c && Math.abs(a.x0 - c.x0) <= 2 && Math.abs(a.x1 - c.x1) <= 2 && b.x1 - b.x0 > 2 * (a.x1 - a.x0))
+            segmented.push({ y0: b.y0, y1: b.y1, x0: b.x0, x1: b.x1 });
+        }
+      }
       // Bar-body column profile. A glyph glued to the box's side — a quote
       // mark flush against a redaction bar, the tip of a '<' — is bridged
       // into that row's dark run across a ≤1px AA gap, so the row's raw
@@ -508,11 +542,30 @@
         : Math.max(0, o.y0 - 2);
       const y1 = o.type === 'box' ? (o.y1 < h && edgeRow(o.y1) ? o.y1 + 1 : o.y1)
         : Math.min(h, o.y1 + 2);
+      // A RULE's pad rows are marked 4, its own rows 1. Both are don't-care to
+      // the scan exactly as before; 4 only says "the rule may have no ink
+      // here": where a glyph's byte sits there EXACTLY as on white paper, that
+      // is evidence for the glyph (scanLine tryCand). The '.' of an underlined
+      // "gmail.com" rests on the underline — 7 of its 9 pixels in the pad — and
+      // was refused for want of evidence, on every such line of the corpus.
+      // (Shrinking the pad instead — rows that do not vote as the rule's AA —
+      // read those dots too, and broke 27 lines of 10,000 that read clean:
+      // on some pages the row over an underline IS a composite zone.)
+      // …and only for a rule that stands alone: a redaction box's thin slice is
+      // typed 'rule' too, and evidence in ITS pad tipped the clipped-glyph test
+      // into reading a ')' under a bar (EFTA00368282 p2) — LAWS §8's ground.
+      const tall = b => !b.vr && b.y1 - b.y0 > 4;
+      const lone = o.type === 'rule' && !objects.some(b => b !== o && (b.type === 'box' || (b.type === undefined && tall(b))) &&
+        b.x1 > o.x0 - 3 && b.x0 < o.x1 + 3 && b.y1 > o.y0 - 4 && b.y0 < o.y1 + 4);
       for (let y = y0; y < y1; y++) {
         mRows[y] = 1;
         (rowIvs[y] ??= []).push([x0, x1]);
-        for (let x = x0; x < x1; x++)
-          mask[y * w + x] = o.type === 'box' ? 2 : 1;
+        const pad = lone && (y < o.y0 || y >= o.y1);
+        for (let x = x0; x < x1; x++) {
+          const i = y * w + x;
+          if (pad) { if (!mask[i]) mask[i] = 4; }
+          else mask[i] = o.type === 'box' ? 2 : 1;
+        }
       }
       if (o.type === 'box') {
         // edge lines (EDGE MODEL above): from each side's padded boundary walk
@@ -639,6 +692,24 @@
         if (rX0[i] < cX0[r]) cX0[r] = rX0[i]; if (rX1[i] > cX1[r]) cX1[r] = rX1[i];
         if (rY[i] < cY0[r]) cY0[r] = rY[i]; if (rY[i] > cY1[r]) cY1[r] = rY[i];
       }
+      // GRAPHIC RESIDUE: a coloured emblem (a seal, a logo) is whitened by
+      // colourInk where no pen explains it, but its neutral parts — a black
+      // eagle, the ring's lettering — survive as components no set can read:
+      // 2,700 of a 69-page memo's 5,598 □ were one agency seal (2026-09-23).
+      // A big component whose padded bbox is ≥ 15 % whitened colour is the
+      // graphic's own and is masked (text on paper has 0 % — a blue link is
+      // CONVERTED, not whitened, so it keeps every pixel). Summed-area table
+      // over the whitened map, once per page; page.whitened is colourInk's.
+      const wh = page.whitened;
+      let sat = null;
+      if (wh) {
+        sat = new Int32Array((w + 1) * (h + 1));
+        for (let y = 1; y <= h; y++) { let row = 0; for (let x = 1; x <= w; x++) { row += wh[(y - 1) * w + x - 1]; sat[y * (w + 1) + x] = sat[(y - 1) * (w + 1) + x] + row; } }
+      }
+      const whitenedShare = (x0, x1, y0, y1) => {
+        const a = Math.max(0, x0 - 2), b = Math.min(w, x1 + 3), c = Math.max(0, y0 - 2), d = Math.min(h, y1 + 3), W1 = w + 1;
+        return (sat[d * W1 + b] - sat[c * W1 + b] - sat[d * W1 + a] + sat[c * W1 + a]) / ((b - a) * (d - c));
+      };
       // classify roots in first-run (raster) order; cls 1 = mask its pixels
       const cls = new Uint8Array(nRuns);
       for (let i = 0; i < nRuns; i++) {
@@ -646,7 +717,7 @@
         if (!cN[r] || cls[r]) continue;                   // visited via earlier run
         cls[r] = 2;                                       // classified, keep
         if (cMin[r] >= 244) cls[r] = 1;                   // ghost
-        else if (cN[r] > 12) bigs.push([cX0[r], cX1[r], cY0[r], cY1[r]]);
+        else if (cN[r] > 12) { if (sat && whitenedShare(cX0[r], cX1[r], cY0[r], cY1[r]) >= 0.15) cls[r] = 1; else bigs.push([cX0[r], cX1[r], cY0[r], cY1[r]]); }
         else if (cX1[r] - cX0[r] < 4 && cY1[r] - cY0[r] < 4)
           smalls.push({ x0: cX0[r], x1: cX1[r], y0: cY0[r], y1: cY1[r], minv: cMin[r], r });
       }
@@ -918,6 +989,10 @@
 
   // the fail flood's stack (scanLine): one typed buffer per module, grown on
   // demand — a pixel can be pushed once per neighbour before it is visited
+  const FLOOD_CACHE_PX = 32e6;               // per band: see the flood cache in scanLine
+  const FLOOD_STEP_COST = 48;                // …and what a remembered step costs beyond its pixels, in the same unit:
+                                             // a band of tiny floods is millions of steps (an object, a typed-array
+                                             // header, a key) and filled the heap with hardly a pixel in it
   let flStack = new Int32Array(1 << 12);
   const growStack = (st) => { const n = new Int32Array(st.length * 2); n.set(st); return n; };
   // probe window scratch (scanLine): canvas / skip / edge planes, the flood's
@@ -1089,7 +1164,7 @@
                 if (lin && ev >= 129 && ev !== 255) shifts[co + x] = 1;
               } else {                                 // body, rule, dust: don't-care
                 canvas[co + x] = g[po + x];
-                skip[co + x] = mask[po + x] === 2 ? 3 : 1;
+                skip[co + x] = mask[po + x] === 2 ? 3 : mask[po + x] === 4 ? 4 : 1;
               }
             } else if (judged && !okAt(po + x, 255, 0)) unexpl[x - xFrom]++;
           }
@@ -1175,7 +1250,7 @@
       if (gx < xFrom || gx + g.w > xTo || gy < y0 || gy + g.h > y1) return null;
       // must explain the anchor column itself (hoisted: cheap reject)
       if (col < gx || col >= gx + g.w) return null;
-      let exact = 0, pending = 0, skipped = 0, foreign = false;
+      let exact = 0, pending = 0, skipped = 0, foreign = false, padExact = 0, padAnchor = 0, boxN = 0;
       const linG = g.lin ?? lin;
       const { inkC, inkR, inkB, inkA } = g, nInk = inkC.length;
       const rowBase = gy * W + gx, canBase = (gy - y0) * bw + (gx - xFrom);
@@ -1185,7 +1260,11 @@
         const cc = inkC[k], rr = inkR[k];
         const pOff = rowBase + rr * W + cc;
         const ci = canBase + rr * bw + cc, sk = skip[ci];
-        if (sk) { skipped++; if (sk !== 3) foreign = true; continue; }  // object/absorbed pixel: no evidence either way
+        if (sk === 4 && okAt(pOff, inkB[k], TOL)) {          // a rule's pad row, and the glyph's byte as on white paper:
+          padExact++; if (cc === anchorRel) padAnchor++;    // held back — it counts only if the glyph touches nothing else (below)
+          continue;
+        }
+        if (sk) { skipped++; if (sk !== 3) foreign = true; if (sk === 3) boxN++; continue; }  // object/absorbed pixel: no evidence either way
         if (isEdge[ci]) edgeN++;
         else if (canvas[ci] === 0) overlap++;            // composite over black: any glyph passes, no evidence
         const gb = inkB[k], pv = page.gray[pOff], cv = canvas[canBase + rr * bw + cc];
@@ -1255,6 +1334,15 @@
       // pending is for kern overlap (a few columns) — a glyph "hiding" inside
       // solid ink shows up as mostly-pending and must not be accepted; a glyph
       // mostly inside an object mask has no evidence and is rejected too
+      // a rule's pad (mask 4): the bytes that sat there exactly as on white paper
+      // are this glyph's evidence — for a glyph that touches no box, no bar
+      // edge, no absorbed or foreign cell. Anything else keeps them what they
+      // always were: don't-care. (A clipped read under a bar must not be talked
+      // into existence by a rule's pad; the dot on an underline must be read.)
+      if (padExact) {
+        if (!boxN && !edgeN && !foreign && !overlap) { exact += padExact; anchorHit += padAnchor; }
+        else { skipped += padExact; foreign = true; }
+      }
       const considered = nInk - skipped;
       let clipped = false, shadow = false;
       // VISIBLE ink is what lies on the open page; an edge composite supports
@@ -1510,7 +1598,7 @@
           if (okDust) {
             if (fcLive) {                         // a dust step, for the flood cache's step count
               const st = fcSteps[fcK];
-              if (st === undefined) { fcSteps[fcK] = { kind: 2, col }; fcK++; }
+              if (st === undefined) { if ((fc.px = (fc.px | 0) + FLOOD_STEP_COST) <= FLOOD_CACHE_PX) { fcSteps[fcK] = { kind: 2, col }; fcK++; } else fcLive = false; }
               else if (st.kind === 2 && st.col === col) fcK++;
               else fcLive = false;
             }
@@ -1598,7 +1686,18 @@
               }
             }
           }
-          if (fcLive) { fcSteps[fcK] = { kind: 1, col, comp, right: compRight }; fcK++; }
+          // The cache is the band's, and a band nobody reads is probed by every
+          // set × phase × baseline: on a page of unread bands it grew to a
+          // gigabyte (22 sets, 2026-09 — twelve corpus workers, 11 GB). Components
+          // are kept as Int32Array (half the bytes of a JS array of the same
+          // numbers), and past FLOOD_CACHE_PX remembered pixels the cache stops
+          // growing; what it holds is still replayed, the rest is flooded live, as
+          // before there was a cache. Measured on a 3-page document no set reads:
+          // 1.32 GB / 57 s before, 0.47 GB / 66 s now.
+          if (fcLive) {
+            if ((fc.px = (fc.px | 0) + comp.length + FLOOD_STEP_COST) <= FLOOD_CACHE_PX) { fcSteps[fcK] = { kind: 1, col, comp: Int32Array.from(comp), right: compRight }; fcK++; }
+            else fcLive = false;
+          }
         }
         for (const k of comp) {
           const px = k >> 16, py = k & 0xffff;
@@ -1625,6 +1724,16 @@
               const px = k >> 16, py = k & 0xffff;
               setCan(px, py, pageAt(px, py));
               skip[(py - y0) * bw + (px - xFrom)] = 2;
+              // ABSORBED = RETIRED here too. The loop above retired the pixels
+              // up to col+2; the rest of the rule is absorbed HERE, and on a
+              // page that cannot accept the byte (an /Indexed palette, a colour
+              // band) it stayed counted: the next column of the rule came back
+              // as the anchor, flooded to nothing — everything was skip by
+              // then — recorded nothing, and the scan span on it for good,
+              // a flood-cache step a turn (EFTA00039989 p4: any set, one probe,
+              // 4 GB of heap and no end; an ordinary e-mail with a rule in it).
+              if (px > col + 2 && py >= cTop && py < cBot && !okAt(py * W + px, pageAt(px, py), 0))
+                unexpl[px - xFrom]--;
             }
             cursor = col;
             continue;
@@ -1640,6 +1749,11 @@
         // ascender tip row-glued to this band's bottom).
         if (col > failGuard) records.push({ col, comp });
         failGuard = Math.max(failGuard, compRight);
+        // LAST RESORT against the livelock above and its kin (this is the third
+        // of its kind): a fail that absorbed nothing leaves the column exactly
+        // as it found it, and the loop would come straight back. Such a column
+        // is retired by force — its ink stays unread, the scan goes on.
+        if (!comp.length && unexpl[col - xFrom] > 0) unexpl[col - xFrom] = 0;
         cursor = col;
         if (fails.length + records.length >= maxFails) break;
         continue;
@@ -1714,6 +1828,21 @@
         if (!touch && inHalo(px, py)) touch = true;
       }
       if (maxX < 0) continue;                            // fully read by later tries
+      // …or the rule's own after all (see opts.rules). At fail time a piece of
+      // an underline is judged by its whole component, and a sliver left
+      // between two descenders hangs on the one not read yet: a browser breaks
+      // a link's underline around '@' and around 'g', and what survives
+      // between them — one pixel at 3 % on the rule's row — floods into the
+      // 'g'. Once the 'g' is read the survivors ARE the piece: on the rule's OWN
+      // rows — not the ±1 the fail-time test allows: the row over an underline
+      // is the baseline row, and a glyph's unexplained foot must stay a □ —
+      // within a skip-ink gap's reach of that rule.
+      // Every underlined "…@gmail.com" of the corpus kept one □ for this.
+      if (rules) {
+        let sy0 = 1e9, sy1 = -1;
+        for (const k of dead) { const py = k & 0xffff; if (py < sy0) sy0 = py; if (py > sy1) sy1 = py; }
+        if (rules.some(q => sy0 >= q.y0 && sy1 < q.y1 && minX <= q.x1 + 24 && maxX >= q.x0 - 24)) continue;
+      }
       const frag = maxX - minX < 13 &&
         (touch || (lastFragRight >= 0 && minX - lastFragRight <= 4));
       if (frag) {
@@ -1869,6 +1998,22 @@
     // band of their own and read FIRST — the upper line lands in transcript
     // order and its ink is in `explained` before the lower line's scan
     // judges the shared rows.
+    // record a scanned line's explained ink — EXCEPT a fail blob's dead
+    // pixels: the flood absorbed them into the canvas (canvas = page there),
+    // but they are the □'s unexplained ink, not explained evidence
+    const recordExplained = (L) => {
+      const deadSet = new Set();
+      if (L.failPix) for (const dead of L.failPix.values()) for (const k of dead) deadSet.add(k);
+      const lw = L.xTo - L.xFrom;
+      for (let y = L.y0; y < L.y1; y++)
+        for (let x = L.xFrom; x < L.xTo; x++)
+          if (page.gray[y * page.w + x] < 255 &&
+              ACC.ok(y * page.w + x, L.canvas[(y - L.y0) * lw + (x - L.xFrom)], 0) &&
+              !deadSet.has(x << 16 | y)) {
+            explained[y * page.w + x] = 1;
+            explained._rows[y] = 1;
+          }
+    };
     const work = bands.map(([top, bot]) => ({ top, bot, pick: null }));
     for (let wi = 0; wi < work.length; wi++) {
       const { top, bot } = work[wi];
@@ -2176,19 +2321,7 @@
           }
         if (below > inBand) { pushUnread(); continue; }
       }
-      // record explained ink — EXCEPT a fail blob's dead pixels: the flood
-      // absorbed them into the canvas (canvas = page there), but they are the
-      // □'s unexplained ink, not explained evidence
-      const deadSet = new Set();
-      if (L.failPix) for (const dead of L.failPix.values()) for (const k of dead) deadSet.add(k);
-      for (let y = L.y0; y < L.y1; y++)
-        for (let x = L.xFrom; x < L.xTo; x++)
-          if (page.gray[y * page.w + x] < 255 &&
-              ACC.ok(y * page.w + x, L.canvas[(y - L.y0) * (L.xTo - L.xFrom) + (x - L.xFrom)], 0) &&
-              !deadSet.has(x << 16 | y)) {
-            explained[y * page.w + x] = 1;
-            explained._rows[y] = 1;
-          }
+      recordExplained(L);
       L.top = top; L.bot = bot; L.baseline = pick.yb; L.phy = pick.phy; L.set = pick.set;
       // a union pool has no per-band font identity — recover it per LINE by
       // majority vote over the byte-certified glyphs' source sets (a Times
@@ -2220,6 +2353,88 @@
       // remember this baseline's certified pick for the next page's hint
       if (carry) (carry.picks ??= new Map()).set(pick.yb, { set: pick.set, phy: pick.phy, below: pick.below });
       lines.push(L);
+      // ---- SIDE-BY-SIDE BASELINES (table cells) ----
+      // A table row is one ink band, but its cells sit on their own
+      // baselines: a two-line cell beside a vertically centred date
+      // (EFTA00173953 p20–26: ~900 □ in one memo). The band's pick reads
+      // whichever cell the probe anchor fell in and the rest of the row fails
+      // at THAT baseline, though every set in the pool reads it at its own.
+      // Each WIDE run of fails (two or more, or ≥ 14 px) is re-probed on its
+      // own x-window over the baselines its ink rows allow (bottom ink row +
+      // 1, up to maxDesc higher), every set and phase, and read as a line of
+      // its own when a probe reads and the scan over the run leaves fewer □
+      // than the run had. A run nothing reads keeps its □ and costs a few
+      // probes. Runs touching a redaction halo are the box's own (fragments).
+      // ONE glyph is not a cell — measured, not assumed: letting a lone
+      // glyph-sized fail qualify read the memo's count columns (p24 49 □ →
+      // 17) and cost the 300-document A/B two documents twice over (with
+      // and without the ±2-row guard below): a bold-only rung of the app's
+      // ladder, its side lines gone again, still won pages it used to lose,
+      // "From: Cashkim Bussue <" coming back as "From:" + 3 □. The ladder's
+      // rung choice, not the reader, is what that needs (NEXT-bulk.md).
+      if (L.fails.length && L.failPix) {
+        const runs = [];
+        for (const c of L.fails) {
+          const dead = L.failPix.get(c);
+          if (!dead || !dead.length) continue;
+          let xa = Infinity, xb = -1, ya = Infinity, yb = -1;
+          for (const k of dead) { const x = k >> 16, y = k & 0xffff; if (x < xa) xa = x; if (x > xb) xb = x; if (y < ya) ya = y; if (y > yb) yb = y; }
+          const r = runs[runs.length - 1];
+          if (r && xa <= r.x1 + 12) { r.x1 = Math.max(r.x1, xb); r.y0 = Math.min(r.y0, ya); r.y1 = Math.max(r.y1, yb); r.n++; }
+          else runs.push({ x0: xa, x1: xb, y0: ya, y1: yb, n: 1 });
+        }
+        for (const r of runs) {
+          if (r.n < 2 && r.x1 - r.x0 + 1 < 14) continue;
+          if (halos.some(hl => r.x1 >= hl[0] && r.x0 < hl[1] && r.y1 >= hl[2] && r.y0 < hl[3])) continue;
+          // a cell stands beside the line's own glyphs, never among them: a
+          // run inside the read text (a missing dot, an underline sliver, the
+          // regular words of a line a BOLD-only rung read the label of) is
+          // that line's, and re-reading it at the same baseline — or one
+          // row off, which is what another set's y-phase convention is —
+          // with another set would split the line into fragments: on the
+          // app's ladder a wrong-set rung then looked better than the union
+          // rung that read the whole line, and "To: Epstein Jeffrey <…>"
+          // came back as three lines missing "effrey" (EFTA00961975,
+          // 300-document A/B, twice: at the same baseline, then at yb − 1).
+          // A cell on its own baseline is rows away (p24: 8, p26: 9).
+          if (L.glyphs.some(g => g.pen + g.adv > r.x0 - 4 && g.pen < r.x1 + 4)) continue;
+          let side = null;
+          const pxFrom = Math.max(0, r.x0 - 2), pxTo = Math.min(page.w, r.x1 + 20);
+          for (const set of sets)
+            for (const phy of set.byPhy.keys())
+              for (let yb = r.y1 + 1; yb >= r.y1 + 1 - set.maxDesc && yb > top; yb--) {
+                if (Math.abs(yb - pick.yb) <= 2) continue;  // the line's own baseline is not a cell's — nor is it ±2: sets and y-phases differ by a row
+                const score = probeBaseline(page, mask, set, phy, yb, pxFrom, pxTo, tol, quant, top, explained, clampBot, scanOpts);
+                if (score > 0 && (!side || score > side.score)) side = { set, phy, yb, score };
+              }
+          if (!side) continue;
+          const L2 = scanLine(page, mask, side.set, side.phy, side.yb,
+            pxFrom, Math.min(page.w, r.x1 + 4), Infinity, Infinity, tol, quant, halos, top, explained, clampBot, scanOpts);
+          // the run's □s are now the side line's to report: its glyphs are
+          // byte-certified at its own baseline and its fails are honest there
+          // ("10/23/014" with one □ where the row read nothing) — accepted
+          // when it leaves fewer □ than the run had, and the run's fails
+          // leave the line so nothing is counted twice
+          if (!L2.glyphs.length || L2.fails.length >= r.n) continue;
+          L.fails = L.fails.filter(c => { const d = L.failPix.get(c); if (!d || !d.length) return true;
+            let xa = Infinity, xb = -1; for (const k of d) { const x = k >> 16; if (x < xa) xa = x; if (x > xb) xb = x; }
+            return !(xa >= r.x0 && xb <= r.x1); });
+          L.clean = L.fails.length === 0 && L.residual === 0;
+          recordExplained(L2);
+          L2.top = top; L2.bot = bot; L2.baseline = side.yb; L2.phy = side.phy; L2.set = side.set;
+          {
+            const votes = new Map();
+            for (const g of L2.glyphs) if (g.src) votes.set(g.src, (votes.get(g.src) ?? 0) + 1);
+            L2.font = votes.size ? [...votes.entries()].sort((a, b) => b[1] - a[1])[0][0] : side.set.name;
+          }
+          L2.boxes = lineBoxes(lineObjects, side.yb);
+          L2.objects = lineObjects;
+          L2.clean = L2.fails.length === 0 && L2.residual === 0;
+          L2.side = true;
+          if (HAS_ENV && process.env.BR_PICK) console.error(`  side line y${side.yb} ${side.set.name} x${r.x0}-${r.x1} in band ${top}-${bot} (line y${pick.yb}): ${L2.glyphs.map(g => g.ch).join('')}`);
+          lines.push(L2);
+        }
+      }
     }
     if (carry) carry.last = last;
     if (PROF) { console.error(`  probes ${PROF.n}, ${PROF.ms} ms: ${Object.entries(PROF.by).map(([k, v]) => k + ' ' + v + 'ms').join(', ')}`); PROF.n = 0; PROF.ms = 0; PROF.by = {}; }
@@ -2346,6 +2561,7 @@
     const penOf = new Map();                           // converted pixel -> the pen that explained it
     const orphans = [];                                // tiny whitened components, revisited below
     let removed = 0, convertedN = 0;
+    const whitened = new Uint8Array(w * h);      // colour no pen explained (a graphic's) — detectObjects reads it
     const stack = [];
     for (let s0 = 0; s0 < N; s0++) {
       if (spread[s0] < 4 || comp[s0] >= 0) continue;
@@ -2385,7 +2601,7 @@
           penOf.set(i, pens.indexOf(bestP));
         }
       } else {
-        for (const i of members) { gray[i] = 255; removed++; }
+        for (const i of members) { gray[i] = 255; removed++; whitened[i] = 1; }
         // …unless it is a DOT. The dark-core rule above needs four dark
         // pixels, and the dot of an 'i', a period or a colon has one or two:
         // on a blue link they were whitened while the word around them was
@@ -2463,7 +2679,7 @@
         else { bandLo[i] = gray[i]; bandHi[i] = gray[i]; }
       }
     }
-    return { gray, converted, convertedN, removed, bandLo, bandHi,
+    return { gray, converted, convertedN, removed, bandLo, bandHi, whitened,
       pens: pens.map(p => [p.C[0], p.C[1], p.C[2], p.c]) };
   }
 

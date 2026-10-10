@@ -107,7 +107,13 @@ here.** The workflow:
    every file a script fetches itself, with its content hash, so a synced
    file has a new URL by construction. Never pass `--allow-partial`: it
    would replace the glyph bundle with whatever subset the tol0 checkout
-   happens to hold.
+   happens to hold. The bundle itself is held since 2026-09-20 (tol0 holds
+   regenerated `tnr8` sets whose baselines sit a pixel lower on some lines;
+   the shipped read and the pixel view's exactness were made with this
+   one): until tol0's gate is re-run over it, copy the engine files by hand
+   (the last such sync, 2026-10-10: `blindocr.js`, `ocr-engine.js`,
+   `set-fonts.js` — recto-eval's full tier 12 better, 0 worse, 249 more
+   certified segments; the startup document's read unchanged byte for byte).
 3. `npm run recto-test` there — headless end-to-end smoke: serves this site
    with `node tools/serve.mjs`, uploads its certified document through the
    real file input, runs Auto OCR, asserts byte-clean boxes and a zero-diff

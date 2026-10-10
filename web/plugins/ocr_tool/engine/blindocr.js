@@ -164,7 +164,8 @@
         if (same) return page;
       }
       return { w, h, gray: Float32Array.from(c.gray), colorRemoved: c.removed, colorRead: c.convertedN,
-        converted: c.convertedN ? c.converted : null, bandLo: c.bandLo, bandHi: c.bandHi };
+        converted: c.convertedN ? c.converted : null, bandLo: c.bandLo, bandHi: c.bandHi,
+        whitened: c.removed ? c.whitened : null };          // detectObjects: neutral residue inside whitened colour is a graphic's
     }
     // no RGBA (cached page): fractional gray = non-neutral (sum-only law)
     for (let i = 0; i < n; i++) {
@@ -303,7 +304,11 @@
 
   // Run the ladder on one page: { res, pass } — the fewest-failures read at
   // the earliest pass. opts: { passHint, carry, progress(pass, done, total),
-  // onPass(pass, res, ms) — called after every rung that ran (tools/ladder-bench.mjs times the ladder with it) }.
+  // onPass(pass, res, ms) — called after every rung that ran (tools/ladder-bench.mjs times the ladder with it),
+  // passes — the caller's own rungs in place of blindPasses, in order: a corpus
+  // read that wants tolerance 0 and nothing else stops at the byte-exact rungs,
+  // and one that holds the PDF gives the palette rungs the page's TRUE map
+  // (quant: a 256-entry LUT) instead of the histogram's guess (quant: true) }.
   // A document's producer doesn't change page to page — pass the previous
   // page's winning pass back in as passHint to try it first. opts.carry is a
   // caller-owned per-DOCUMENT object for sequential whole-document reads
@@ -313,7 +318,8 @@
   async function readPageAuto(page, sets, opts) {
     const key = p => `${p.tol}|${p.quant ? 1 : 0}|${p.union ? 1 : 0}`;
     const hint = opts?.passHint;
-    const passes = hint ? [hint, ...blindPasses.filter(p => key(p) !== key(hint))] : blindPasses;
+    const ladder = opts?.passes ?? blindPasses;
+    const passes = hint ? [hint, ...ladder.filter(p => key(p) !== key(hint))] : ladder;
     const doc = opts?.carry;
     if (doc) doc.passes ??= new Map();
     // The pass that EXPLAINS THE MOST INK wins: score = glyphs read − unread
@@ -337,7 +343,7 @@
       const fails = r.lines.reduce((s, L) => s + L.fails.length, 0) +
         r.lines.filter(L => !L.set && !L.fragOnly).length;
       const glyphs = r.lines.reduce((s, L) => s + L.glyphs.length, 0);
-      const rank = blindPasses.findIndex(p => key(p) === key(pass));
+      const rank = ladder.findIndex(p => key(p) === key(pass));
       const score = glyphs - fails;
       const lastResort = pass.tol > 2;
       if (!best || (lastResort ? best.glyphs === 0 && glyphs > 0
