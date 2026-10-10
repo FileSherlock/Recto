@@ -355,8 +355,7 @@ segments 66.4 % → 77.1 %, 3,267 better, 3 worse and explained) and
 boxes (above); paragraphs (above). Still open there: coloured lines
 the colour law leaves uncertified; the shipped Times New Roman, Courier New and
 Segoe UI files are another build than the bundle's sets in a few characters
-each (the report lists them); editing a Times 16 px e-mail line moves its pens
-on ~12 % of segments, where the learned law cannot write a word.
+each (the report lists them).
 
 ## Limits
 
@@ -388,7 +387,12 @@ Two switches in the **MuPDF pixels** section of the Settings panel (`settings.ht
   records the reader pinned it to (`box.ocr.phy`, 0.5 on the legacy sets
   that carry ½-phase rasters) and judged at the tolerance of the rung it was
   read on (`box.ocr.tol`: byte-exact at 0; |Δ| ≤ tol, 2·tol on composite
-  pixels, otherwise — scanLine's rule). "Exact" in the status line means
+  pixels, otherwise — scanLine's rule). Under the linear compositor (the
+  eDiscovery producer's sets) a composite pixel the reader accepts one
+  darker than the law — the producer's junction arithmetic is 1-ambiguous
+  there — is accepted here too (`render.js diffLine`, since 2026-10-11:
+  the warrant's 17 lines where an `f` overlaps its neighbour were certified
+  at tolerance 0 and drawn 1–4 px off). "Exact" in the status line means
   exact to that standard.
 - **Both halves of the certificate.** The renderer proves one direction:
   every drawn pixel is the page. The reader proves the other: no ink in the
@@ -412,7 +416,17 @@ Two switches in the **MuPDF pixels** section of the Settings panel (`settings.ht
   one run per word, each glyph under its own set's law — broken at the set
   change, as before 2026-10-10, the word's fragments got starts of their own
   and its break a phantom space, and on a Calibri page 29 of 33 such lines
-  moved when re-laid. Every space without a measured gap of its own — all of
+  moved when re-laid. A word the law cannot write — no start lays all of its
+  pens: a Word page places one word differently by where it starts (tol0
+  LAWS §10) — is laid as the page has it, each glyph nudged off the law to
+  its own pen (`lineLayout`'s `nudges`, `layoutLine`'s `opts.nudges`); after
+  an edit the glyphs before it and after it still line up with the reader's
+  and keep theirs (`pvNudges`), so an edit leaves the words it did not touch
+  as the page has them. Before 2026-10-11 such a word came back under the
+  law, a lattice step off: re-laying moved the pens of 3,600 of the full
+  tier's 30,700 certified segments (12 % of a Times e-mail's); now 15 (words
+  with a ligature glyph, which the box's text spells as two letters).
+  Every space without a measured gap of its own — all of
   a typed box's, a new break in an edited line — is **the face's own space
   under the producer's law** (`pvSpaceAdv`: its advance quantized and scaled
   as the law lays every glyph; 600/1000 em × 13 px = 7.800 px on the startup

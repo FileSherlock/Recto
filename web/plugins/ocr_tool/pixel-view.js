@@ -309,14 +309,15 @@ function pvLayout(box, primary, byName, law) {
   // the line (the measured gaps included), letter spacing is em → px
   const manualSpace = box.spaceWidth != null && !box.defaultSpaceWidth ? +box.spaceWidth : null;
   const letterSpacing = (+box.letterSpacing || 0) * primary.sizePx;
-  let start = box.x, spaceWidths = null;
+  let start = box.x, spaceWidths = null, nudges = null;
   if (ents.length && typeof OCRRender.lineLayout === 'function') {
     const ll = OCRRender.lineLayout({ entries: ents }, primary.sizePx, law, box.ocr?.spaceAdv, bySrc);
     start = box.x + ll.delta;
     spaceWidths = manualSpace == null ? ll.spaceWidths : null;
+    nudges = letterSpacing ? null : pvNudges(ll.nudges, ents, text);
   }
   const opts = { spaceAdv: manualSpace ?? pvSpaceAdv(box, primary, law), spaceWidths, metrics: law,
-    letterSpacing, glyphSets: same ? ents.map(e => setOf(e.src)) : null, metricsBySet };
+    letterSpacing, glyphSets: same ? ents.map(e => setOf(e.src)) : null, metricsBySet, nudges };
   let lay = OCRRender.layoutLine(primary, box.text, start, opts);
   // a label its owner aligns to the box's right edge (text_tool's
   // labelAlign): laid again from the start that ends it there
@@ -326,6 +327,23 @@ function pvLayout(box, primary, byName, law) {
   }
   const glyphs = lay.glyphs.map(g => ({ ch: g.ch, pen: g.pen, set: g.set || primary }));
   return { glyphs, advanceW: lay.advanceW, missing: lay.missing, start };
+}
+// The reader's nudges (render.js lineLayout: a word the law cannot write,
+// laid as the page has it) on the box's glyphs. The text before an edit and
+// after it still lines up with the entries — a prefix and a suffix — and
+// keeps them, so an edit leaves the words it did not touch as the page has
+// them; the edited stretch takes the law, and so does the glyph after it
+// (its nudge was from a glyph that is gone). text: the box's glyphs (spaces
+// left out); ents: the reader's, □ left out — what lineLayout was given.
+function pvNudges(nudges, ents, text) {
+  if (!nudges?.some(v => v)) return null;
+  const out = new Array(text.length).fill(0);
+  let p = 0;
+  while (p < ents.length && p < text.length && ents[p].ch === text[p]) { out[p] = nudges[p]; p++; }
+  let s = 0;
+  while (s < ents.length - p && s < text.length - p && ents[ents.length - 1 - s].ch === text[text.length - 1 - s]) s++;
+  for (let k = 1; k < s; k++) out[text.length - s + k] = nudges[ents.length - s + k];
+  return out;
 }
 const pvLawLabel = law => !law ? '' :
   `${law.quant ? `1/${law.quant} em` : 'hmtx'} × ${(+law.scale).toFixed(5)}` +

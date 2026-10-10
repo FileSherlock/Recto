@@ -100,6 +100,9 @@
     // opts.letterSpacing: px added after every character, spaces included —
     // the PDF's Tc and CSS letter-spacing both work that way
     const ls = +opts?.letterSpacing || 0;
+    // opts.nudges: px added before each glyph (spaces excluded, in order) —
+    // a word the law cannot write, laid as the page has it (lineLayout)
+    const nudges = opts?.nudges ?? null;
     const glyphs = [], missing = [];
     let x = x0, prev = null, prevSet = null, si = 0, gi = 0;
     for (const ch of text) {
@@ -112,6 +115,7 @@
       }
       const gs = glyphSets?.[gi] || set;
       const gm = (bySet && gs !== set ? bySet.get(gs.name) : null) ?? m;
+      const nudge = nudges?.[gi] ?? 0;
       gi++;
       let adv = gm?.adv?.get(ch) ?? null;
       if (adv == null) {
@@ -120,6 +124,7 @@
         adv = lawAdv(adv, gs.sizePx, gm);
       }
       if (gm?.kern && prev !== null && prevSet === gs) { const k = gm.kern.get(prev + ch); if (k) x += k; }
+      x += nudge;
       glyphs.push({ ch, pen: snapX(x), penRaw: x, adv, set: gs });
       x += adv + ls; prev = ch; prevSet = gs;
     }
@@ -202,17 +207,24 @@
   // start to the 1/grid-px lattice (a producer that quantized positions).
   // Returns {delta, hit, feasible} — feasible when every glyph is satisfied.
   function solveStart(items, base, grid) {
-    const iv = items.map(({ S, p }) => [p - HALF - base - S, p + HALF - base - S]);
-    let best = { delta: 0, hit: -1 };
-    const cands = new Set();
-    if (grid) { for (let n = Math.ceil((base - 0.5) * grid); n <= Math.floor((base + 0.5) * grid); n++) cands.add(n / grid - base); }
-    else { cands.add(0); for (const [lo] of iv) cands.add(lo + EPS); }
-    for (const d of cands) {
-      let hit = 0;
-      for (const [lo, hi] of iv) if (d >= lo - EPS && d < hi) hit++;
-      if (hit > best.hit || (hit === best.hit && Math.abs(d) < Math.abs(best.delta))) best = { delta: d, hit };
-    }
-    return { delta: best.delta, hit: best.hit, feasible: best.hit === items.length };
+    const n = items.length, LO = new Float64Array(n), HI = new Float64Array(n);
+    for (let i = 0; i < n; i++) { const { S, p } = items[i]; LO[i] = p - HALF - base - S; HI[i] = p + HALF - base - S; }
+    // the intervals holding d: #{lo − EPS ≤ d} − #{hi ≤ d} (an interval
+    // ending at or before d began before it) — two binary searches instead of
+    // a pass over every interval, for a long word (a base64 line, 60 glyphs)
+    let hitsAt;
+    if (n > 16) {
+      const los = Float64Array.from(LO, v => v - EPS).sort(), his = Float64Array.from(HI).sort();
+      const upto = (arr, d) => { let a = 0, b = arr.length; while (a < b) { const m = (a + b) >> 1; if (arr[m] <= d) a = m + 1; else b = m; } return a; };
+      hitsAt = d => upto(los, d) - upto(his, d);
+    } else hitsAt = d => { let hit = 0; for (let i = 0; i < n; i++) if (d >= LO[i] - EPS && d < HI[i]) hit++; return hit; };
+    // candidates in their order — 0, then each interval's start — and a
+    // repeated one never wins (equal hits, equal distance: the first stays)
+    let bestD = 0, bestHit = -1;
+    const consider = d => { const hit = hitsAt(d); if (hit > bestHit || (hit === bestHit && Math.abs(d) < Math.abs(bestD))) { bestD = d; bestHit = hit; } };
+    if (grid) { for (let k = Math.ceil((base - 0.5) * grid); k <= Math.floor((base + 0.5) * grid); k++) consider(k / grid - base); }
+    else { consider(0); for (let i = 0; i < n; i++) consider(LO[i] + EPS); }
+    return { delta: bestD, hit: bestHit, feasible: bestHit === n };
   }
 
   // a line's words: runs of glyphs with no space between them, drawn by one
@@ -284,9 +296,21 @@
       for (const [pair, v] of table) { const lv = lawAdv(v, sizePx, { quant, scale }); if (lv) m.set(pair, lv); }
       return m;
     };
+    // a word is scored by its glyphs, advances and pens relative to its first
+    // (solveStart is the same on any start — the reader's pens are quarters,
+    // the arithmetic exact; a word with another pen keeps its own start in its
+    // key): each distinct one once, counted as often as the page has it
+    const kinds = new Map();
+    for (const w of ws) {
+      const quarters = w.every(e => Number.isInteger(e.pen * 4));
+      const key = (quarters ? '' : `${w[0].pen}\u0003`) + w.map(e => `${e.ch}\u0001${e.adv}\u0001${e.pen - w[0].pen}`).join('\u0002');
+      const k = kinds.get(key);
+      if (k) k.n++; else kinds.set(key, { w, n: 1 });
+    }
+    const distinct = [...kinds.values()];
     const score = m => {
       let hit = 0, exact = 0;
-      for (const w of ws) { const s = solveStart(wordItems(w, sizePx, m), w[0].pen); hit += s.hit; if (s.feasible) exact++; }
+      for (const { w, n } of distinct) { const s = solveStart(wordItems(w, sizePx, m), w[0].pen); hit += n * s.hit; if (s.feasible) exact += n; }
       return { hit, exact };
     };
     const better = (a, b) => !b || a.hit > b.hit || (a.hit === b.hit && Math.abs(a.scale - 1) < Math.abs(b.scale - 1) - 1e-12);
@@ -377,6 +401,26 @@
       return items;
     };
     const starts = ws.map(w => solveStart(itemsOf(w), w[0].pen));
+    // A word the law cannot write — no start lays all of its pens (a Word
+    // page places one word differently by where it starts: LAWS §10) — is
+    // laid as the page has it: from its first pen, each glyph nudged off the
+    // law to its own pen. Re-laying an unedited line then returns every pen,
+    // and an edit elsewhere on the line leaves that word as it was.
+    // nudges: per glyph (□ left out), in the entries' order; 0 in a word the
+    // law writes, which stays the law's.
+    const nudges = [];
+    for (let k = 0; k < ws.length; k++) {
+      const w = ws[k];
+      if (starts[k].feasible) { for (let g = 0; g < w.length; g++) nudges.push(0); continue; }
+      starts[k] = { ...starts[k], delta: 0 };
+      const items = itemsOf(w);
+      let prevOff = 0;
+      for (let g = 0; g < w.length; g++) {
+        const off = w[g].pen - w[0].pen - items[g].S;          // where the page has it, past the law
+        nudges.push(off - prevOff);
+        prevOff = off;
+      }
+    }
     const spaceWidths = [];
     let x = ws[0][0].pen + starts[0].delta;     // the float pen, as layoutLine carries it
     for (let k = 0; k < ws.length; k++) {
@@ -385,6 +429,7 @@
       for (let g = 0; g < w.length; g++) {
         const l = lawOf(w[g]);
         if (g && l.m?.kern && (w[g - 1].src || null) === (w[g].src || null)) { const kv = l.m.kern.get(w[g - 1].ch + w[g].ch); if (kv) x += kv; }
+        if (!starts[k].feasible && g) x += nudges[ws.slice(0, k).reduce((n, v) => n + v.length, 0) + g];
         x += lawAdv(w[g].adv, l.sizePx, l.m);
       }
       if (k + 1 < ws.length) {
@@ -395,7 +440,8 @@
         for (let i = 0; i < n; i++) spaceWidths.push(gap / n);
       }
     }
-    return { delta: starts[0].delta, hit: starts.reduce((n, s) => n + s.hit, 0), feasible: starts.every(s => s.feasible), spaceWidths, words: ws.length };
+    return { delta: starts[0].delta, hit: starts.reduce((n, s) => n + s.hit, 0), feasible: starts.every(s => s.feasible), spaceWidths, words: ws.length,
+      nudges, written: starts.filter(s => s.feasible).length };
   }
 
   // ---- compositing ----
@@ -452,6 +498,10 @@
     // the canvas keeps a per-pixel shift count (scanLine's `shifts`)
     const anyLin = placed.some(p => p.lin);
     const shifts = anyLin ? new Uint8Array(w * h) : null;
+    // composite pixels a linear glyph blended in: the reader reads them one
+    // darker than the law as well (scanLine: the producer's junction
+    // arithmetic is 1-ambiguous there) — diffLine allows the same
+    const linComp = anyLin ? new Uint8Array(w * h) : null;
     for (const { rec, gx, gy, lin: linG } of placed) {
       const { bytes, alpha, ink } = rec, rw = rec.w;
       for (const p of ink) {
@@ -463,6 +513,7 @@
         else if (linG) {
           const s0 = shifts[i];
           gray[i] = (((cv - s0) * a) / 255 | 0) + s0 + sh;
+          linComp[i] = 1;
         } else {
           const e = a + (a >> 7);
           gray[i] = (cv * (256 - e)) >> 8;
@@ -478,7 +529,7 @@
         if (hits[i] < 255) hits[i]++;
         gray[i] = (gray[i] * (256 - (a + (a >> 7)))) >> 8;
       }
-    return { x0, y0, w, h, gray, hits, missing, baseline: yb, glyphs: placed.length };
+    return { x0, y0, w, h, gray, hits, linComp, missing, baseline: yb, glyphs: placed.length };
   }
 
   // ---- the reader's don't-care zone ----
@@ -537,6 +588,8 @@
         if (mask && mask[py * page.w + px]) { masked++; continue; }
         const pOff = py * page.w + px;
         const t = T && r.hits && r.hits[i] > 1 ? 2 * T : T;
+        // a linear glyph's composite pixel read one darker than the law: the reader's allowance
+        if (r.linComp?.[i] && (quant ? quant[g] : g) - page.gray[pOff] === 1) continue;
         let d;
         if (page.converted && page.converted[pOff] && page.bandLo) {
           const lo = page.bandLo[pOff], hi = page.bandHi[pOff];
