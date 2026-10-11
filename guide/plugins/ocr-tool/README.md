@@ -143,8 +143,15 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
   only between bands, and a page in a face the sets do not carry runs the
   whole tolerance ladder — tens of seconds with the full bundle. The adapter
   therefore builds the page buffer (canvas → gray, colour whitening — that
-  part needs the DOM) and posts it to a dedicated Worker, `ocr-worker.js`,
-  which imports the same engine scripts the page loaded (their content-hashed
+  part needs the DOM) and posts it to a dedicated Worker, `ocr-worker.js` —
+  the page as `BlindOCR.whitenColored` made it, not only its grays: the
+  colour law's acceptance band (`bandLo`/`bandHi`), the `converted` and
+  `whitened` maps and the lost ink (`lost`). Until 2026-10-11 only `gray`
+  and `converted` crossed, so the app read coloured text more strictly than
+  the engine does: an e-mail page's blue links were 47 □ in the browser and
+  0 with the band (recto-eval's 12 colour pages: 203 □ against 114), and a
+  colour photo's residue came back as rows of `llll'□□□`. The worker
+  imports the same engine scripts the page loaded (their content-hashed
   URLs, read off the page's `<script>` tags, so it can never run a stale
   copy), loads the glyph bundle once (`assetURL`, made absolute — a worker
   resolves relative URLs against its own script), and

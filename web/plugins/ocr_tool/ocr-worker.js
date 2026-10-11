@@ -17,7 +17,8 @@
 // then throws and the read stops (a 'cancelled' reply, no result).
 //
 // In:  { type: 'init', scripts: [url…] }         load engine + ocr-result.js
-//      { type: 'read', id, w, h, gray: Float32Array, converted?: Uint8Array,
+//      { type: 'read', id, w, h, gray: Float32Array, converted?, bandLo?,
+//        bandHi?, whitened?, lost?: Uint8Array (BlindOCR.whitenColored's page),
 //        setUrls: [url…], passHint, carry: 'none' | 'new' | 'keep' }
 //      { type: 'cancel' }
 // Out: { type: 'ready' }
@@ -53,8 +54,10 @@ self.onmessage = async (e) => {
     }
     if (m.carry === 'none') carry = null;
     else if (m.carry === 'new' || !carry) carry = {};
+    // the page as whitenColored made it: the engine reads the colour law's
+    // band, the whitened map and the lost ink from it, as on the main thread
     const page = { w: m.w, h: m.h, gray: m.gray };
-    if (m.converted) page.converted = m.converted;
+    for (const k of ['converted', 'bandLo', 'bandHi', 'whitened', 'lost']) if (m[k]) page[k] = m[k];
     const { res, pass } = await BlindOCR.readPageAuto(page, sets, {
       passHint: m.passHint,
       carry,

@@ -120,13 +120,20 @@ function ocrWorker() {
 
 // one page through the worker → { res, pass } (slim), or null when cancelled.
 // The page buffer goes by structured clone: the main thread keeps its copy
-// (PageEngine caches it and the pixel view reads the same buffer).
+// (PageEngine caches it and the pixel view reads the same buffer). The page
+// is whitenColored's whole product — the colour law's acceptance band
+// (bandLo/bandHi), the whitened map detectObjects reads, the lost ink
+// scanLine will not certify over — not just the grays: until 2026-10-11 only
+// `converted` went, and on the corpus's colour pages the worker left 203 □
+// where the same engine on the whole page leaves 114 (an e-mail's blue
+// links: 47 on one page, 0 with the band).
 function ocrWorkerRead(w, page, opts) {
   return new Promise((resolve, reject) => {
     const id = ++ocrToolState.workerSeq;
     ocrToolState.workerJob = { id, resolve, reject, progress: opts.progress };
     w.postMessage({ type: 'read', id, w: page.w, h: page.h, gray: page.gray,
-      converted: page.converted || null, setUrls: opts.setUrls,
+      converted: page.converted || null, bandLo: page.bandLo || null, bandHi: page.bandHi || null,
+      whitened: page.whitened || null, lost: page.lost || null, setUrls: opts.setUrls,
       passHint: opts.passHint, carry: opts.carry });
   });
 }
