@@ -115,10 +115,13 @@ here.** The workflow:
    recto-eval's full tier 12 better, 0 worse, 249 more certified segments;
    the last, 2026-10-11: `ocr-engine.js` — a tall glyph glued to a bar
    stays readable, a short underline is a rule (full tier 2 better, 0
-   worse), and dark ink an underline's pad hides from every read glyph
-   keeps its line from certifying (one synthetic line in the corpus);
-   gate 19/19 byte-identical; the startup document's read unchanged byte
-   for byte each time).
+   worse), dark ink an underline's pad hides from every read glyph keeps
+   its line from certifying (one synthetic line in the corpus), a colour
+   shown fully covered 12 times is a pen (20 before; a short light-blue
+   word read), and text-shaped colour no pen explains — whitened, `lost` —
+   keeps its line from certifying (blindocr.js passes it on; 1 better, 0
+   worse); gate 19/19 byte-identical; the startup document's read
+   unchanged byte for byte each time).
 3. `npm run recto-test` there — headless end-to-end smoke: serves this site
    with `node tools/serve.mjs`, uploads its certified document through the
    real file input, runs Auto OCR, asserts byte-clean boxes and a zero-diff

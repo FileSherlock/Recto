@@ -1996,6 +1996,18 @@
       }
       if (padInk >= 2) residual += padInk;
     }
+    // …nor does colour whitening (LOST INK, colourInk): a whitened
+    // component's dark core between the line's first and last glyph, on its
+    // band's rows, is ink the line does not explain — `offices marked
+    // ████ are` with the light-blue word whitened read clean.
+    if (!pooled && page.lost && glyphs.length) {
+      const last = glyphs[glyphs.length - 1];
+      const gx0 = Math.max(xFrom, Math.floor(glyphs[0].pen)), gx1 = Math.min(xTo, Math.ceil(last.pen + last.adv));
+      let lostInk = 0;
+      // (not under an object: a bar's own edge column can carry a tint)
+      for (let y = cTop; y < cBot; y++) for (let x = gx0; x < gx1; x++) if (page.lost[y * W + x] && !mask[y * W + x]) lostInk++;
+      if (lostInk >= 4) residual += lostInk;
+    }
     return { glyphs, fails, frags, failPix, colourFails, residual, canvas, y0, y1, xFrom, xTo };
   }
 
@@ -2677,13 +2689,20 @@
         hist.set(k, (hist.get(k) || 0) + 1);
       }
     const cand = [];
-    for (const [k, c] of hist) if (c >= 20) cand.push({ C: [k >> 16, (k >> 8) & 255, k & 255], c });
+    // 12 fully covered pixels of one colour make a pen (20 until 2026-10-11:
+    // a short light-blue word, `blue` in #2e75b6 Georgia 12 pt, has 18 and
+    // was whitened from its certified line; on recto-eval's 90 colour pages
+    // no other page changes down to 4). Not lower: a thin Courier link's
+    // most repeated "fully covered" colour is a partial coverage of its pen,
+    // 9 times — a wrong pen.
+    for (const [k, c] of hist) if (c >= 12) cand.push({ C: [k >> 16, (k >> 8) & 255, k & 255], c });
     cand.sort((a, b) => (a.C[0] + a.C[1] + a.C[2]) - (b.C[0] + b.C[1] + b.C[2]));
     const pens = [];
     for (const q of cand) if (!pens.some(p => fitE(p.C, q.C[0], q.C[1], q.C[2])[1] <= 1)) pens.push(q);
     const comp = new Int32Array(N).fill(-1);           // coloured components: the whitening flood's own set
     const penOf = new Map();                           // converted pixel -> the pen that explained it
     const orphans = [];                                // tiny whitened components, revisited below
+    const lostCores = [];                              // whitened components with a text's dark core
     let removed = 0, convertedN = 0;
     const whitened = new Uint8Array(w * h);      // colour no pen explained (a graphic's) — detectObjects reads it
     const stack = [];
@@ -2726,6 +2745,7 @@
         }
       } else {
         for (const i of members) { gray[i] = 255; removed++; whitened[i] = 1; }
+        if (core.length >= 4) lostCores.push(core);
         // …unless it is a DOT. The dark-core rule above needs four dark
         // pixels, and the dot of an 'i', a period or a colon has one or two:
         // on a blue link they were whitened while the word around them was
@@ -2761,6 +2781,13 @@
         penOf.set(i, pi);
       }
     }
+    // LOST INK (2026-10-11): a whitened component with a text's dark core
+    // (four pixels or more) is colour no pen explains — a word in a colour
+    // too rare to be a pen, a thin link whose pen never shows fully covered.
+    // Whitened, it left its line certified without it; scanLine counts the
+    // core between a line's glyphs as residual (page.lost).
+    let lost = null;
+    for (const core of lostCores) for (const i of core) if (!converted[i]) (lost ??= new Uint8Array(N))[i] = 1;
     // ---- the acceptance band (see the header) ----
     let bandLo = null, bandHi = null;
     if (convertedN) {
@@ -2803,7 +2830,7 @@
         else { bandLo[i] = gray[i]; bandHi[i] = gray[i]; }
       }
     }
-    return { gray, converted, convertedN, removed, bandLo, bandHi, whitened,
+    return { gray, converted, convertedN, removed, bandLo, bandHi, whitened, lost,
       pens: pens.map(p => [p.C[0], p.C[1], p.C[2], p.c]) };
   }
 
