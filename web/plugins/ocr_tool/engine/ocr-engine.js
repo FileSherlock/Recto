@@ -390,7 +390,50 @@
           if (any) body++;
         }
         const need = Math.min(8, body);
-        const bar = x => x >= o.x0 && x < o.x1 && colDark[x - o.x0] >= need;
+        // …and a TALL glyph glued to the side is dark on more than 8 rows: a
+        // '(' against a bar (Calibri 12 pt, 2026-10-11) had two columns dark
+        // on 9 of 19, passed, went under the mask with the bar, and its line
+        // certified without it. Such a glyph is a run of those columns
+        // narrower than any bar (a one-character redaction is 9 px) cut off
+        // from the bar body by a column that is not the bar's — beyond the
+        // first or last wide run. A wider stacked box's protrusion and a
+        // skewed edge are contiguous with the body and stay; two bars side
+        // by side are both wide. Only for a BAR — a wide run holding five
+        // columns dark on every body row (one spared): a shaded table cell
+        // is light rules around dark text, its "bar" columns are letter
+        // stems, and it keeps the rule above (fbimemo: 29 header cells).
+        const isBar = new Uint8Array(bw);
+        for (let k = 0; k < bw; k++) isBar[k] = colDark[k] >= need ? 1 : 0;
+        {
+          const runs = [];
+          for (let k = 0; k < bw; ) {
+            if (!isBar[k]) { k++; continue; }
+            let e = k;
+            while (e < bw && isBar[e]) e++;
+            runs.push([k, e]); k = e;
+          }
+          const full = (a, b) => { let n = 0; for (let k = a; k < b; k++) if (colDark[k] >= body - 1) n++; return n; };
+          const wide = runs.filter(([a, b]) => b - a >= 5 && full(a, b) >= 5);
+          if (wide.length) {
+            // outward from the bar's edge, runs no wider than a glyph within
+            // two columns of it (the row runs bridge one) — further out are
+            // other things (a table's vertical line, another cell's text),
+            // which hold a crossing border's row extent as before
+            let edge = wide[0][0];
+            for (let m = runs.indexOf(wide[0]) - 1; m >= 0; m--) {
+              const [a, b] = runs[m];
+              if (b - a >= 5 || edge - b > 2) break;
+              isBar.fill(0, a, b); edge = a;
+            }
+            edge = wide[wide.length - 1][1];
+            for (let m = runs.indexOf(wide[wide.length - 1]) + 1; m < runs.length; m++) {
+              const [a, b] = runs[m];
+              if (b - a >= 5 || a - edge > 2) break;
+              isBar.fill(0, a, b); edge = b;
+            }
+          }
+        }
+        const bar = x => x >= o.x0 && x < o.x1 && isBar[x - o.x0] === 1;
         for (const e of ext) {
           while (e[1] < e[2] && !bar(e[1])) e[1]++;
           while (e[2] > e[1] && !bar(e[2] - 1)) e[2]--;
@@ -445,6 +488,57 @@
         if (o.x0 >= b.x0 - 2 && o.x1 <= b.x1 + 2)
           cov += Math.max(0, Math.min(o.y1, b.y1) - Math.max(o.y0, b.y0));
       if (cov > 0.6 * (o.y1 - o.y0)) objects.splice(i, 1);
+    }
+    // SHORT UNDERLINES (2026-10-11). An underline under one short word —
+    // `not`, 20 px of Times 12 pt — is under the 40-px run rule, so its
+    // stroke was ink no glyph explains and its line read `will □not`. A
+    // strict dark run of 9–39 px is an underline when it is one: 1–3 flat
+    // rows (each one byte ±8 along the run, as a rule's AA rows are) under
+    // a word — dark ink on 40 % of its columns in the 2–3 rows above — and
+    // apart from it: the rows just above and below are white but where a
+    // descender crosses (ink on both sides of the stroke). A letter's own
+    // horizontal (an E's foot, a z's base) joins its stem and fails the
+    // crossing test; an em dash or an underscore has no word over it.
+    {
+      const at = (x, y) => gray[y * w + x];
+      const seen = new Set();
+      for (const r of shortRuns) {
+        if (r.wide || seen.has(r.y * w + r.x0)) continue;
+        const { x0, x1 } = r;
+        // an object's own rows — or a piece of a long underline a descender
+        // broke (the `htt` of an underlined `http://` before the `p`): the
+        // long rule's business, as before (masked, it moved that e-mail
+        // line's baseline half a pixel)
+        if (objects.some(o => r.y >= o.y0 - 2 && r.y < o.y1 + 2 &&
+            x0 < o.x1 + (o.y1 - o.y0 <= 4 ? 12 : 2) && x1 > o.x0 - (o.y1 - o.y0 <= 4 ? 12 : 2))) continue;
+        // the stroke's rows: flat and not white, up and down from the run
+        const flatRow = y => {
+          if (y < 0 || y >= h) return false;
+          let mn = 255, mx = 0;
+          for (let x = x0; x < x1; x++) { const v = at(x, y); if (v < mn) mn = v; if (v > mx) mx = v; }
+          return mx - mn <= 8 && mn < 250;
+        };
+        let y0 = r.y, y1 = r.y + 1;
+        while (y0 > 0 && r.y - y0 < 2 && flatRow(y0 - 1)) y0--;
+        while (y1 < h && y1 - y0 < 3 && flatRow(y1)) y1++;
+        if (y0 < 9 || y1 >= h - 1) continue;
+        // apart: white above and below but at crossings, and few of those
+        let cross = 0, ok = true;
+        for (let x = x0; x < x1 && ok; x++) {
+          const up = at(x, y0 - 1) < 200, dn = at(x, y1) < 200;
+          if (up && dn) cross++;
+          else if (up || dn) ok = false;
+        }
+        if (!ok || cross > 0.3 * (x1 - x0)) continue;
+        // a word over it: its letters' feet in the two rows over the clean
+        // one (8 rows up also took the bar over an `=` sign's top stroke)
+        let over = 0;
+        for (let x = x0; x < x1; x++)
+          for (let y = y0 - 3; y <= y0 - 2; y++) if (at(x, y) < 160) { over++; break; }
+        if (over < 0.4 * (x1 - x0)) continue;
+        for (const q of shortRuns) if (q.y >= y0 && q.y < y1 && q.x0 < x1 && q.x1 > x0) seen.add(q.y * w + q.x0);
+        objects.push({ y0, y1, x0, x1 });
+      }
     }
     // Graphic residue (whitened-color pages): a colored emblem or rule whose
     // neutral-gray pixels survive whitening leaves (a) DUST — scattered ≤4×4

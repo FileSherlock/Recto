@@ -111,9 +111,12 @@ here.** The workflow:
    regenerated `tnr8` sets whose baselines sit a pixel lower on some lines;
    the shipped read and the pixel view's exactness were made with this
    one): until tol0's gate is re-run over it, copy the engine files by hand
-   (the last such sync, 2026-10-10: `blindocr.js`, `ocr-engine.js`,
-   `set-fonts.js` — recto-eval's full tier 12 better, 0 worse, 249 more
-   certified segments; the startup document's read unchanged byte for byte).
+   (2026-10-10: `blindocr.js`, `ocr-engine.js`, `set-fonts.js` —
+   recto-eval's full tier 12 better, 0 worse, 249 more certified segments;
+   the last, 2026-10-11: `ocr-engine.js` — a tall glyph glued to a bar
+   stays readable, a short underline is a rule; full tier 2 better, 0
+   worse, gate 19/19 byte-identical; the startup document's read unchanged
+   byte for byte both times).
 3. `npm run recto-test` there — headless end-to-end smoke: serves this site
    with `node tools/serve.mjs`, uploads its certified document through the
    real file input, runs Auto OCR, asserts byte-clean boxes and a zero-diff
@@ -181,7 +184,9 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
   anti-aliased pixel). A word drawn by a set with no face of its own (the
   bullet sets) takes its neighbour's. The underline
   is a rule the read found — `detectObjects`' thin `'rule'` objects, which the
-  slim read keeps since cache version 4 — starting below the baseline row and
+  slim read keeps since cache version 4; one under a single short word,
+  shorter than the 40-px run rule, since the engine sync of 2026-10-11
+  (`will □not` read `will not`) — starting below the baseline row and
   no deeper than the line's descent, under the glyph's middle
   (`underlinedEntries`). Not the glyphs' own feet: a run of bottom strokes
   along the baseline row (`ZzZE` in base64, the serifs of "Summary") is a rule
@@ -243,7 +248,14 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
   bridges make one run across two or three bars, the other rows make each
   bar on its own — so a box containing other boxes on its rows is replaced
   by what it covers beyond them (`deoverlap`: the first bar of a `[bar]:[bar]:[bar]`
-  line, 3 px of separator left out). Then two rules sort the boxes, applied
+  line, 3 px of separator left out), and a bar the engine cut into slices
+  — each shorter than a line, typed rule or box — is one box again
+  (`restack`: slices whose rows touch and whose columns match within 3 px,
+  over the columns they all share). The engine cut a bar so when a tall
+  glyph was glued to its side (a `(` against a Calibri bar, 2026-10-11);
+  its bar-body clip no longer takes such a glyph since the sync of that
+  date, and `restack` stays for reads made before it. Then two rules sort
+  the boxes, applied
   before the read is slimmed (the cache, payload version 3, holds only what
   stays): **black** — the interior, one pixel in from every
   side, is ≥ 90 % ≤ 48/255 (a box too thin to have an interior keeps the
