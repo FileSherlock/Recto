@@ -1182,6 +1182,9 @@
     const pageAt = (x, y) => page.gray[y * W + x];
     const convAt = page.converted ? (x, y) => page.converted[y * W + x] : () => 0;
     const masked = (x, y) => skip[(y - y0) * bw + (x - xFrom)];
+    // the pad cells an accepted glyph's own ink lies on (A PAD HIDES NO
+    // GLYPH, at the end) — final scans of a line with a lone rule only
+    const padCov = !pooled && rules ? new Uint8Array(n) : null;
     const canAt = (x, y) => canvas[(y - y0) * bw + (x - xFrom)];
     const shAt = (x, y) => (lin ? shifts[(y - y0) * bw + (x - xFrom)] : 0);
     const addSh = (x, y, s) => { if (lin) shifts[(y - y0) * bw + (x - xFrom)] += s; };
@@ -1862,6 +1865,7 @@
         const x = gx + cc, y = gy + rr;
         if (masked(x, y)) {                              // keep page bytes under objects
           const mi = (y - y0) * bw + (x - xFrom);
+          if (padCov && mask[y * W + x] === 4) padCov[mi] = 1;
           if (skip[mi] === 2) (revive ??= new Uint8Array(bw * bh))[mi] = 1;
           continue;
         }
@@ -1966,6 +1970,32 @@
     // register), so the residual is just its sum — no second full-window scan.
     let residual = 0;
     for (let x = 0; x < bw; x++) residual += unexpl[x];
+    // A PAD HIDES NO GLYPH (2026-10-11). A lone rule's pad rows are
+    // don't-care (LAWS §9), so a glyph mostly inside them that no candidate
+    // reads leaves a pixel or two outside — absorbed — and its line
+    // certified without it (`Tuesday, May 8` underlined: the comma, one byte
+    // off at its best pen, gone from a clean line). Dark pad ink that no
+    // accepted glyph's own ink lies on, on this line's underline rows (from
+    // just over the baseline down) where the pad is white along the rule
+    // rather than the rule's own AA, is residual: the line still reads, it
+    // does not certify.
+    if (padCov) {
+      let padInk = 0;
+      for (let y = Math.max(y0, baseline - 3); y < y1; y++) {
+        // the row's pad cells no glyph lies on: white there, or the rule's
+        // own anti-aliasing (then the row is the rule's, and skipped)
+        let n4 = 0, white = 0;
+        for (let x = xFrom; x < xTo; x++)
+          if (mask[y * W + x] === 4 && !padCov[(y - y0) * bw + (x - xFrom)]) { n4++; if (pageAt(x, y) >= 240) white++; }
+        if (!n4 || white < 0.6 * n4) continue;
+        for (let x = xFrom; x < xTo; x++)
+          if (mask[y * W + x] === 4 && pageAt(x, y) < 160 && !padCov[(y - y0) * bw + (x - xFrom)]) {
+            padInk++;
+            if (DBG_LINE === baseline) console.log(`    pad ink (${x},${y}) ${pageAt(x, y)}`);
+          }
+      }
+      if (padInk >= 2) residual += padInk;
+    }
     return { glyphs, fails, frags, failPix, colourFails, residual, canvas, y0, y1, xFrom, xTo };
   }
 
