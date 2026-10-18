@@ -3,6 +3,16 @@
 // Span fetching and embedded-text lifecycle are handled by etv-fetch.js (embedded_text_viewer).
 
 
+// The font and size new text takes: the Text panel's (what it shows while
+// nothing is selected — the document's face, or the user's own choice).
+function newTextFont() {
+  const t = window.TextPanel?.newText?.();
+  if (t?.fontFamily) return t;
+  return { fontFamily: document.getElementById('fabric-font-family')?.value || 'Times New Roman',
+    sizePt: parseFloat(document.getElementById('fabric-font-size')?.value) || 12 };
+}
+window.newTextFont = newTextFont;
+
 // ── Tool: add redaction box ───────────────────────────────────
 
 window.handleManualAddBox = function (pageNum, x, y) {
@@ -20,9 +30,9 @@ function addBox(pageNum, x, y) {
   }
 
   // Fallback: pure UTB creation, when no plugin supplies createNewRedaction()
-  const defaultFF = document.getElementById('fabric-font-family')?.value || 'Times New Roman';
-  // Font-size input is in POINTS — no DPI conversion.
-  const defaultSizePt = parseFloat(document.getElementById('fabric-font-size')?.value) || 12;
+  // — in the font and size new text takes (the Text panel's, in points)
+  const fresh = newTextFont();
+  const defaultFF = fresh.fontFamily, defaultSizePt = fresh.sizePt;
 
   const newBox = utbState.addBox(new UnifiedTextBox({
     type: 'redaction',
@@ -66,17 +76,13 @@ window.utbDeleteBox = function (id, { silent = false } = {}) {
   if (utbState.selectedId === box.id) {
     utbState.selectedId = null;
     deselectAllInSVG();
-    document.getElementById('fabric-options-bar')?.classList.add('hidden');
+    window.syncToolbarToSelection?.();
   }
 
   // Let whichever plugins track boxes redraw what they own.
   window.refreshRuler?.();
   if (typeof renderCandidates === 'function') renderCandidates();
 };
-
-document.getElementById('utb-delete-box')?.addEventListener('click', () => {
-  window.utbDeleteBox(utbState.selectedId);
-});
 
 // Delete / Backspace removes the selection — but never while the caret is in a
 // field (the inline-edit input, the font-size box, the tolerance box…), where

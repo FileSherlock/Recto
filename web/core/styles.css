@@ -686,11 +686,6 @@ html {
   box-shadow: 0 0 0 1px #8ab4f8;
 }
 
-/* Specific Widths. Core controls only — a plugin sizes its own inputs in its
-   own stylesheet, so the core never names a plugin's DOM. */
-#fabric-font-family { min-width: 120px; }
-#fabric-font-size, #fabric-letter-spacing { width: 44px; text-align: center; }
-
 /* Customizing Checkboxes */
 .checkbox-lbl {
   display: flex;

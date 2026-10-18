@@ -6,8 +6,8 @@
 //   1. @font-face rules for every installed style, so SVG text in
 //      font-family "Nimbus Roman" is drawn with the actual URW file — the
 //      face MuPDF rendered the scan with — instead of whatever the OS picks;
-//   2. the toolbar's font menu (#fabric-font-family), one option per family,
-//      MuPDF's own faces first;
+//   2. the Text panel's font menu (#fabric-font-family), one option per
+//      family, MuPDF's own faces first;
 //   3. window.FontCatalog for everyone else: has(), familyForPdfName(),
 //      select(family, sizePt), metrics(), fileUrl().
 //
@@ -69,8 +69,9 @@
     return best;
   }
 
-  // set the toolbar's font (and size) — the default for the next added box.
-  // source ranks the claim for this document: 'detected' (a plugin measured
+  // set the font (and size) new text takes — the Text panel shows it while
+  // nothing is selected (TextPanel.setNewText; the menu's own value without
+  // the panel). source ranks the claim for this document: 'detected' (a plugin measured
   // the page's face from its pixels) outranks 'declared' (the PDF's font
   // names) and 'layer' (the text layer's most used face), which are what a
   // producer wrote, not what the page shows; a weaker claim arriving after a
@@ -83,12 +84,13 @@
     if (rank < chosen) return false;
     if (source) chosen = rank;
     const sel = document.getElementById('fabric-font-family');
+    if (sel && family && !Array.from(sel.options).some(o => o.value === family)) {
+      const opt = document.createElement('option');
+      opt.value = family; opt.textContent = `${family} (not installed)`;
+      sel.appendChild(opt);
+    }
+    if (window.TextPanel?.setNewText) { window.TextPanel.setNewText(family, sizePt); return true; }
     if (sel && family) {
-      if (!Array.from(sel.options).some(o => o.value === family)) {
-        const opt = document.createElement('option');
-        opt.value = family; opt.textContent = `${family} (not installed)`;
-        sel.appendChild(opt);
-      }
       sel.value = family;
       if (typeof textOptions !== 'undefined') textOptions.fontFamily = family;
     }

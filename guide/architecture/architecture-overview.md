@@ -62,7 +62,7 @@ recto/
 │   │   ├── text_tool/              # Plugin (font logic & typography)
 │   │   │   ├── plugin.json         # The manifest: slots, scripts, styles, order
 │   │   │   ├── toolbar_button.html # Fragments the build inlines into the page
-│   │   │   ├── options_bar.html, settings.html
+│   │   │   ├── studio.html         # The Text panel (text-studio.js): every text setting
 │   │   │   ├── shaping.js          # HarfBuzz width measurement (window.Shaping)
 │   │   │   ├── fonts.js            # Font catalogue → @font-face + font menu (window.FontCatalog)
 │   │   │   ├── unified-text-box.js, svg-renderer.js, toolbar.js, …

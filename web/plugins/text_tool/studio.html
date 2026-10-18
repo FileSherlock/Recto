@@ -1,36 +1,66 @@
-<!-- text_tool's Text panel: Affinity's Character, Paragraph, Text Frame and
-     Typography panels in one floating panel (text-studio.js), in Affinity's
-     order and with its labels. Every control names the attribute it shows and
-     sets in data-k — "char:<key>", "para:<key>", "frame:<key>" (StoryCore's
-     attribute names, in the units the panel shows: pt, %, ‰ of an em,
-     degrees); a toggle button names its attribute in data-toggle and its
-     "on" value in data-on-value. They act on the selected text while a text
-     is edited, on all of it while its box is only selected. -->
-<div id="tt-studio" class="tt-studio hidden" role="dialog" aria-label="Text">
+<!-- text_tool's Text panel: every setting of text in one side panel, docked at
+     the right of the page (at the foot of the screen on a phone) — Affinity's
+     Character, Paragraph, Text Frame and Typography panels in Affinity's order
+     and with its labels, the tools that fit text over the page (pair kerning,
+     space width, nudge), a redaction box's match terms, and the Display
+     switches. The ¶ tool shows and hides it (text-studio.js).
+
+     Every control names the attribute it shows and sets in data-k —
+     "char:<key>", "para:<key>", "frame:<key>" (StoryCore's attribute names, in
+     the units the panel shows: pt, %, ‰ of an em, degrees); a toggle button
+     names its attribute in data-toggle and its "on" value in data-on-value.
+     They act on the selected text while a text is edited, on all of it while
+     its box is only selected, and — font and size — on new text while nothing
+     is. A setting the selected box or the drawing cannot have is locked: a
+     lock, greyed, the reason on hover (text-studio.js lockOf). -->
+<aside id="tt-studio" class="tt-studio hidden" aria-label="Text">
   <div class="tt-studio-head" id="tt-studio-head">
     <div class="tt-tabs" role="tablist">
       <button class="tt-tab-btn active" data-tab="character" role="tab">Character</button>
       <button class="tt-tab-btn" data-tab="paragraph" role="tab">Paragraph</button>
-      <button class="tt-tab-btn" data-tab="frame" role="tab">Text Frame</button>
+      <button class="tt-tab-btn" data-tab="frame" role="tab" title="Text Frame">Frame</button>
       <button class="tt-tab-btn" data-tab="typography" role="tab">Typography</button>
     </div>
-    <button id="tt-studio-close" class="icon-button" title="Close"><span class="material-symbols-outlined">close</span></button>
+    <button id="tt-studio-close" class="icon-button tt-mini" title="Hide the Text panel"><span class="material-symbols-outlined">close</span></button>
   </div>
-  <div id="tt-studio-scope" class="tt-studio-scope">Select or edit text you added (Artistic or Frame text).</div>
+  <div class="tt-studio-scope-row">
+    <span id="tt-studio-scope" class="tt-studio-scope">New text</span>
+    <button id="utb-delete-box" class="icon-button tt-mini" title="Delete the selected box (Del)" disabled><span class="material-symbols-outlined">delete</span></button>
+  </div>
 
+  <div class="tt-studio-body">
   <!-- ── Character ─────────────────────────────────────────────── -->
   <div class="tt-pane" data-pane="character">
+    <div class="tt-pane-lock hidden"><span class="material-symbols-outlined">lock</span><span class="tt-pane-lock-why"></span></div>
     <div class="tt-sec tt-sec-head">
-      <div class="tt-row"><label for="tt-ch-family">Font Family</label>
-        <select id="tt-ch-family" class="toolbar-select" data-k="char:fontFamily"></select></div>
-      <div class="tt-row"><label for="tt-ch-size">Font Size</label>
-        <input id="tt-ch-size" type="number" class="toolbar-input-small" min="0.5" max="1296" step="1" data-k="char:sizePt"><span class="tt-unit">pt</span>
+      <!-- the font menu is filled from the catalogue by fonts.js (generated/fonts.json);
+           with nothing selected, family and size are what new text takes -->
+      <div class="tt-row"><select id="fabric-font-family" class="toolbar-select tt-wide" data-k="char:fontFamily" title="Font family — MuPDF's own faces first, then the Windows faces the OCR models">
+          <option value="Times New Roman" selected>Times New Roman</option></select></div>
+      <div class="tt-row">
         <select id="tt-ch-style" class="toolbar-select" title="Font Style" data-k="char:style">
           <option value="regular">Regular</option><option value="bold">Bold</option>
           <option value="italic">Italic</option><option value="bolditalic">Bold Italic</option>
-        </select></div>
+        </select>
+        <input id="fabric-font-size" type="number" class="toolbar-input-small" min="0.5" max="1296" step="0.05" title="Font size (pt)" data-k="char:sizePt"><span class="tt-unit">pt</span>
+        <button id="tt-size-down" class="icon-button tt-mini" title="Decrease font size (Ctrl+Shift+<)"><span class="material-symbols-outlined">text_decrease</span></button>
+        <button id="tt-size-up" class="icon-button tt-mini" title="Increase font size (Ctrl+Shift+>)"><span class="material-symbols-outlined">text_increase</span></button>
+      </div>
+      <div class="tt-row tt-toggles">
+        <button id="fabric-bold" class="tt-tog" data-toggle="char:bold" title="Bold (Ctrl+B)"><b>B</b></button>
+        <button id="fabric-italic" class="tt-tog" data-toggle="char:italic" title="Italic (Ctrl+I)"><i>I</i></button>
+        <button id="fabric-underline" class="tt-tog" data-toggle="char:underline" data-on-value="single" data-off-value="none" title="Underline (Ctrl+U)"><u>U</u></button>
+        <button id="fabric-strikethrough" class="tt-tog" data-toggle="char:strike" data-on-value="single" data-off-value="none" title="Strikethrough"><s>S</s></button>
+        <select id="tt-change-case" class="toolbar-select" title="Change Case — rewrites the selected text">
+          <option value="">Aa</option>
+          <option value="upper">UPPERCASE</option>
+          <option value="lower">lowercase</option>
+          <option value="sentence">Sentence case</option>
+          <option value="title">Title Case</option>
+        </select>
+      </div>
       <div class="tt-row"><label for="tt-ch-color">Font Colour</label>
-        <input id="tt-ch-color-on" type="checkbox" title="A colour of its own (off: the colour of text you added)" data-on="char:color">
+        <input id="tt-ch-color-on" type="checkbox" title="A colour of its own (off: the colour of its kind of text)" data-on="char:color">
         <input id="tt-ch-color" type="color" value="#000000" data-k="char:color" data-nullable>
         <input id="tt-ch-opacity" type="number" class="toolbar-input-small" min="0" max="100" step="1" title="Opacity" data-k="char:opacity"><span class="tt-unit">%</span></div>
       <div class="tt-row"><label for="tt-ch-highlight">Background Colour</label>
@@ -38,20 +68,33 @@
         <input id="tt-ch-highlight" type="color" value="#fff176" data-k="char:highlight" data-nullable></div>
     </div>
 
-    <details open class="tt-sec"><summary>Position &amp; Transform</summary>
+    <!-- the spacing a page was set with: what makes typed text land on its pens -->
+    <details open class="tt-sec" id="tt-sec-spacing"><summary>Spacing</summary>
+      <div class="tt-row"><label for="kerning" title="The font's pair kerning: Yo, AV, To, Wa… set closer. Word sets text without it unless asked; a page read by the OCR says what its producer did.">Pair kerning</label>
+        <input id="kerning" type="checkbox" data-k="char:autoKern">
+        <span id="tt-kern-source" class="tt-source"></span>
+        <button id="tt-kern-page" class="icon-button tt-mini hidden" title="Kern as the page does again"><span class="material-symbols-outlined">restart_alt</span></button></div>
+      <div class="tt-row tt-sub"><label for="tt-ch-kern">Manual kerning</label>
+        <input id="tt-ch-kern" type="number" class="toolbar-input-small" step="1" title="Added after each character (‰ of an em) — Nudge sets it per pair" data-k="char:manualKern"><span class="tt-unit">‰</span></div>
+      <div class="tt-row"><label for="tt-ch-tracking">Tracking</label>
+        <input id="tt-ch-tracking" type="number" class="toolbar-input-small" min="-1000" max="10000" step="10" title="Letter spacing after every character (‰ of an em)" data-k="char:tracking"><span class="tt-unit">‰</span></div>
+      <div class="tt-row"><label for="fabric-space-width">Space width</label>
+        <input id="fabric-space-width" type="number" class="toolbar-input-small" min="0" max="200" step="0.05" title="The width of a space (px): the face's own, or one the page was set with">
+        <span class="tt-unit">px</span>
+        <label class="tt-check tt-inline" title="The face's own space"><input id="fabric-default-sw" type="checkbox"> Font's</label></div>
+      <div class="tt-row">
+        <button id="fabric-nudge-mode" class="panel-btn tt-nudge" title="Nudge characters: press one, then move it (a pair's manual kerning)">
+          <span class="material-symbols-outlined">width</span> Nudge characters</button></div>
+    </details>
+
+    <details class="tt-sec"><summary>Position &amp; Transform</summary>
       <div class="tt-grid-pt">
-        <label for="tt-ch-autokern">Kerning</label>
-        <span class="tt-pair"><select id="tt-ch-autokern" class="toolbar-select" data-k="char:autoKern" data-bool title="Auto: the font's kerning">
-            <option value="true">Auto</option><option value="false">None</option></select>
-          <input id="tt-ch-kern" type="number" class="toolbar-input-small" step="1" title="Manual kerning after each character (‰ of an em)" data-k="char:manualKern"></span>
         <label for="tt-ch-shear">Shear</label>
         <span class="tt-pair"><input id="tt-ch-shear" type="number" class="toolbar-input-small" min="-85" max="85" step="1" data-k="char:shear"><span class="tt-unit">°</span></span>
-        <label for="tt-ch-tracking">Tracking</label>
-        <span class="tt-pair"><input id="tt-ch-tracking" type="number" class="toolbar-input-small" min="-1000" max="10000" step="10" data-k="char:tracking"><span class="tt-unit">‰</span></span>
-        <label for="tt-ch-scalex">Horizontal Scale</label>
-        <span class="tt-pair"><input id="tt-ch-scalex" type="number" class="toolbar-input-small" min="1" max="1000" step="1" data-k="char:scaleX"><span class="tt-unit">%</span></span>
         <label for="tt-ch-baseline">Baseline</label>
         <span class="tt-pair"><input id="tt-ch-baseline" type="number" class="toolbar-input-small" step="0.5" data-k="char:baselineShift"><span class="tt-unit">pt</span></span>
+        <label for="tt-ch-scalex">Horizontal Scale</label>
+        <span class="tt-pair"><input id="tt-ch-scalex" type="number" class="toolbar-input-small" min="1" max="1000" step="1" data-k="char:scaleX"><span class="tt-unit">%</span></span>
         <label for="tt-ch-scaley">Vertical Scale</label>
         <span class="tt-pair"><input id="tt-ch-scaley" type="number" class="toolbar-input-small" min="1" max="1000" step="1" data-k="char:scaleY"><span class="tt-unit">%</span></span>
         <label for="tt-ch-leading-ov">Leading Override</label>
@@ -63,16 +106,16 @@
       <label class="tt-check"><input id="tt-ch-nobreak" type="checkbox" data-k="char:noBreak"> No break</label>
     </details>
 
-    <details open class="tt-sec"><summary>Decorations</summary>
+    <details class="tt-sec"><summary>Decorations</summary>
       <div class="tt-row"><label for="tt-ch-underline">Underline</label>
         <select id="tt-ch-underline" class="toolbar-select" data-k="char:underline">
-          <option value="none">No Underline</option><option value="single">Single Underline</option><option value="double">Double Underline</option>
+          <option value="none">None</option><option value="single">Single</option><option value="double">Double</option>
         </select>
         <input id="tt-ch-ul-color-on" type="checkbox" title="Underline Colour of its own (off: the text's)" data-on="char:underlineColor">
         <input id="tt-ch-ul-color" type="color" value="#000000" title="Underline Colour" data-k="char:underlineColor" data-nullable></div>
       <div class="tt-row"><label for="tt-ch-strike">Strikethrough</label>
         <select id="tt-ch-strike" class="toolbar-select" data-k="char:strike">
-          <option value="none">No Strikethrough</option><option value="single">Single Strikethrough</option><option value="double">Double Strikethrough</option>
+          <option value="none">None</option><option value="single">Single</option><option value="double">Double</option>
         </select>
         <input id="tt-ch-st-color-on" type="checkbox" title="Strikethrough Colour of its own (off: the text's)" data-on="char:strikeColor">
         <input id="tt-ch-st-color" type="color" value="#000000" title="Strikethrough Colour" data-k="char:strikeColor" data-nullable></div>
@@ -82,7 +125,7 @@
         <input id="tt-ch-stroke" type="color" value="#000000" title="Outline Colour" data-k="char:strokeColor" data-nullable></div>
     </details>
 
-    <details open class="tt-sec"><summary>Typography</summary>
+    <details class="tt-sec"><summary>Typography</summary>
       <div class="tt-quick">
         <button id="tt-q-liga" data-toggle="char:ot_liga" title="Standard ligatures">fi</button>
         <button id="tt-q-calt" data-toggle="char:ot_calt" title="Contextual alternates">ct</button>
@@ -93,7 +136,7 @@
         <button id="tt-q-allcaps" data-toggle="char:caps" data-on-value="all" data-off-value="none" title="All caps">TT</button>
         <button id="tt-q-smallcaps" data-toggle="char:caps" data-on-value="small" data-off-value="none" title="Small caps">Tᴛ</button>
       </div>
-      <button id="tt-show-typography" class="panel-btn" title="Show Typography Panel">More in Typography…</button>
+      <button id="tt-show-typography" class="panel-btn" title="Show the Typography tab">More in Typography…</button>
     </details>
 
     <details class="tt-sec"><summary>Language</summary>
@@ -105,10 +148,27 @@
           <option value="tr-TR">Turkish</option><option value="id-ID">Indonesian</option><option value="la">Latin</option>
         </select></div>
     </details>
+
+    <!-- a redaction box's match terms: the selected redaction's, or with nothing
+         selected the defaults a new redaction box takes. The ids are read by
+         whichever matching plugin is installed — inert when none is. -->
+    <details open class="tt-sec" id="tt-settings"><summary>Redaction match <span id="tt-match-scope" class="tt-source" title="Whose values these are">· new boxes</span></summary>
+      <div class="tt-row"><label for="tolerance">Width tolerance</label>
+        <input type="number" id="tolerance" value="0.7" step="0.1" min="0" class="toolbar-input-small"
+               title="How far a name's width may miss the bar's (px). A bar rebuilt from OCR pens matches to ¼ px regardless."><span class="tt-unit">px</span></div>
+      <div class="tt-row"><label for="tt-name-case">Letter case</label>
+        <select id="tt-name-case" class="toolbar-select" title="How the hidden name was written: as typed, ALL CAPITALS, or only the first or the last name in capitals">
+          <option value="">As typed</option>
+          <option value="all">UPPERCASE</option>
+          <option value="first">FIRST name uppercase</option>
+          <option value="last">LAST name uppercase</option>
+        </select></div>
+    </details>
   </div>
 
   <!-- ── Paragraph ─────────────────────────────────────────────── -->
   <div class="tt-pane hidden" data-pane="paragraph">
+    <div class="tt-pane-lock hidden"><span class="material-symbols-outlined">lock</span><span class="tt-pane-lock-why"></span></div>
     <div class="tt-sec tt-sec-head">
       <div class="tt-seg" id="tt-pa-align" data-k="para:align">
         <button data-v="left" title="Left Align"><span class="material-symbols-outlined">format_align_left</span></button>
@@ -135,10 +195,10 @@
         <span class="tt-pair"><input id="tt-pa-left" type="number" class="toolbar-input-small" step="1" data-k="para:leftIndent"><span class="tt-unit">pt</span></span>
         <label for="tt-pa-right">Right Indent</label>
         <span class="tt-pair"><input id="tt-pa-right" type="number" class="toolbar-input-small" min="0" step="1" data-k="para:rightIndent"><span class="tt-unit">pt</span></span>
-        <label for="tt-pa-before">Space Before</label>
-        <span class="tt-pair"><input id="tt-pa-before" type="number" class="toolbar-input-small" min="0" step="1" data-k="para:spaceBefore"><span class="tt-unit">pt</span></span>
         <label for="tt-pa-first">First Line Indent</label>
         <span class="tt-pair"><input id="tt-pa-first" type="number" class="toolbar-input-small" step="1" data-k="para:firstIndent"><span class="tt-unit">pt</span></span>
+        <label for="tt-pa-before">Space Before</label>
+        <span class="tt-pair"><input id="tt-pa-before" type="number" class="toolbar-input-small" min="0" step="1" data-k="para:spaceBefore"><span class="tt-unit">pt</span></span>
         <label for="tt-pa-after">Space After</label>
         <span class="tt-pair"><input id="tt-pa-after" type="number" class="toolbar-input-small" min="0" step="1" data-k="para:spaceAfter"><span class="tt-unit">pt</span></span>
       </div>
@@ -166,7 +226,7 @@
     </details>
 
     <details class="tt-sec"><summary>Justification</summary>
-      <div class="tt-grid3"><span></span><span>Minimum</span><span>Desired</span><span>Maximum</span>
+      <div class="tt-grid3"><span></span><span>Min</span><span>Desired</span><span>Max</span>
         <label>Word Spacing %</label>
         <input id="tt-pa-ws-min" type="number" class="toolbar-input-small" min="0" max="1000" step="1" data-k="para:wordSpacingMin">
         <input id="tt-pa-ws" type="number" class="toolbar-input-small" min="0" max="1000" step="1" data-k="para:wordSpacing">
@@ -245,8 +305,8 @@
 
   <!-- ── Text Frame ────────────────────────────────────────────── -->
   <div class="tt-pane hidden" data-pane="frame">
-    <p class="tt-hint tt-frame-hint" id="tt-fr-hint">These settings belong to Frame text.</p>
-    <details open class="tt-sec tt-frame-sec"><summary>General</summary>
+    <div class="tt-pane-lock hidden"><span class="material-symbols-outlined">lock</span><span class="tt-pane-lock-why"></span></div>
+    <details open class="tt-sec"><summary>General</summary>
       <div class="tt-row"><label for="tt-fr-fill">Fill</label>
         <input id="tt-fr-fill-on" type="checkbox" data-on="frame:fill">
         <input id="tt-fr-fill" type="color" value="#ffffff" data-k="frame:fill" data-nullable></div>
@@ -266,7 +326,7 @@
       <label class="tt-check" title="Recto: Affinity has no such switch"><input id="tt-fr-auto" type="checkbox" data-k="frame:autoHeight"> Height follows the text (Recto)</label>
     </details>
 
-    <details open class="tt-sec tt-frame-sec"><summary>Columns</summary>
+    <details open class="tt-sec"><summary>Columns</summary>
       <div class="tt-row"><label for="tt-fr-cols">Number of columns</label>
         <input id="tt-fr-cols" type="number" class="toolbar-input-small" min="1" max="50" step="1" data-k="frame:columns"></div>
       <div class="tt-row"><label for="tt-fr-gutter">Gutter</label>
@@ -274,7 +334,7 @@
       <label class="tt-check"><input id="tt-fr-balance" type="checkbox" data-k="frame:balance"> Balance text in columns</label>
     </details>
 
-    <details class="tt-sec tt-frame-sec"><summary>Column Rules</summary>
+    <details class="tt-sec"><summary>Column Rules</summary>
       <div class="tt-row"><label for="tt-fr-rule">Rule</label>
         <input id="tt-fr-rule-on" type="checkbox" data-on="frame:ruleColor">
         <input id="tt-fr-rule" type="color" value="#000000" data-k="frame:ruleColor" data-nullable>
@@ -288,7 +348,7 @@
         <input id="tt-fr-rule-bottom" type="number" class="toolbar-input-small" min="0" step="1" title="Gap at the bottom" data-k="frame:ruleBottom"><span class="tt-unit">pt</span></div>
     </details>
 
-    <details open class="tt-sec tt-frame-sec"><summary>Vertical Position</summary>
+    <details open class="tt-sec"><summary>Vertical Position</summary>
       <div class="tt-seg" id="tt-fr-valign" data-k="frame:valign">
         <button data-v="top" title="Top Align"><span class="material-symbols-outlined">vertical_align_top</span></button>
         <button data-v="center" title="Center Vertically"><span class="material-symbols-outlined">vertical_align_center</span></button>
@@ -315,6 +375,7 @@
 
   <!-- ── Typography (OpenType) ─────────────────────────────────── -->
   <div class="tt-pane hidden" data-pane="typography">
+    <div class="tt-pane-lock hidden"><span class="material-symbols-outlined">lock</span><span class="tt-pane-lock-why"></span></div>
     <label class="tt-check"><input id="tt-ot-hide" type="checkbox" checked> Hide irrelevant features</label>
     <details open class="tt-sec"><summary>Ligatures</summary>
       <label class="tt-check" data-feature="liga"><input id="tt-ot-liga" type="checkbox" data-k="char:ot_liga"> Standard Ligatures</label>
@@ -364,4 +425,12 @@
       <div id="tt-ot-ss" class="tt-ss-grid"></div>
     </details>
   </div>
-</div>
+  </div>
+
+  <!-- ── Display: how the page's text is drawn ───────────────────── -->
+  <div id="tt-view" class="tt-view">
+    <div class="tt-view-head">Display</div>
+    <label class="tt-check" title="The width of every run of spaces above it (px) — and beside a redaction box its gaps to the text, in that line's spaces"><input type="checkbox" id="toggle-space-labels"> Space widths</label>
+    <!-- a plugin's Settings section marked data-text-panel moves here (text-studio.js) -->
+  </div>
+</aside>

@@ -99,9 +99,9 @@ The viewer injects no box DOM. All boxes — embedded text, HarfBuzz recreations
 
 ## Unified Options Bar
 
-The viewer features a centralized options row (`#unified-options-bar-container`), into which the build inlines every plugin's `ribbon_bar` and `options_bar` fragment. `text_tool`'s formatting bar in it is shared by every plugin that puts text on the page.
+The viewer features a centralized options row (`#unified-options-bar-container`), into which the build inlines every plugin's `ribbon_bar` and `options_bar` fragment.
 
-Settings modified in this bar (Font, Size, Kerning, etc.) are applied to the currently selected box, whatever kind of box it is.
+Text is formatted in `text_tool`'s Text panel, a side panel beside the page: its settings (Font, Size, Pair kerning, …) apply to the currently selected box, whatever kind of box it is — what a box cannot have is locked, with the reason.
 
 ## Add Box to Line Tool
 

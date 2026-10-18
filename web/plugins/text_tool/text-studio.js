@@ -1,110 +1,262 @@
-// text-studio.js — the Text panel (studio.html): Affinity's Character,
-// Paragraph, Text Frame and Typography panels.
+// text-studio.js — the Text panel (studio.html): every setting of text, in
+// one side panel docked at the right of the page.
+//
+// It acts on what is selected — any box. Text the user added (Artistic and
+// Frame text, or a plain typed box, which becomes Artistic text the moment
+// the panel changes it) has every setting, through story-edit.js
+// (storyApplyChar / storyApplyPara / storyApplyFrame): the selection of the
+// text being edited, else all of the selected box's text. A box read from
+// the page or a redaction's label has one face, one size and its measured
+// glyph positions: the settings it has are set on the box itself
+// (toolbar.js utbPlainChar), the rest is locked. With nothing selected the
+// font and size are what new text takes (TextPanel.newText).
 //
 // Every control names its attribute in data-k ("char:<key>", "para:<key>",
-// "frame:<key>"); one generic pass shows the attributes of what the settings
-// act on (storyTarget: the selection of the text being edited, else all of
-// the selected box's text) and one generic handler applies a change through
-// story-edit.js (storyApplyChar / storyApplyPara / storyApplyFrame). A key
-// whose value differs inside the selection shows blank ("mixed"). A colour
-// that may be "none" has a checkbox beside it (data-on). A plain one-line
-// box you typed becomes Artistic text the moment the panel changes it; the
-// extracted layers' boxes (embedded, OCR, redaction) are not set here.
+// "frame:<key>"); one generic pass shows the attributes of the target and
+// one generic handler applies a change. A key whose value differs inside the
+// selection shows blank ("mixed"). A colour that may be "none" has a
+// checkbox beside it (data-on).
 //
-// The panel floats; drag it by its tabs' row. Where it was is kept in this
-// browser (localStorage).
+// Locks: a setting the target or the drawing cannot have is greyed, with a
+// lock and the reason on hover (lockOf) — a line read from the page has no
+// paragraph settings; while a pixel renderer draws the text (the
+// utbPixelRender seam, which says so through window.utbPixelRenderOn and the
+// 'pixels:changed' hook), what it cannot draw (StoryCore.PIXEL_LIMITS) or
+// lays past (PIXEL_IGNORES) is locked.
+//
+// Display: the switches that change how the page's text is drawn sit at the
+// panel's foot — Space widths here, and any plugin's Settings section marked
+// data-text-panel, which moves in.
+//
+// The panel is docked: it never covers the page. The ¶ tool shows and hides
+// it; whether it is shown and which tab is kept in this browser.
 (function () {
   const SC = globalThis.StoryCore;
   const panel = document.getElementById('tt-studio');
   if (!panel || !SC) return;
   const $ = id => document.getElementById(id);
   const KEY = 'recto.textStudio';
-  const DEFAULTS = { char: SC.CHAR_DEFAULTS, para: SC.PARA_DEFAULTS, frame: SC.FRAME_DEFAULTS };
+  const store = {
+    get: k => { try { return localStorage.getItem(`${KEY}.${k}`); } catch { return null; } },
+    set: (k, v) => { try { localStorage.setItem(`${KEY}.${k}`, v); } catch { /* this session only */ } },
+  };
 
-  // ── open, close, tabs, position ─────────────────────────────────────────
+  // ── showing, hiding, tabs ───────────────────────────────────────────────
 
+  const toolBtn = $('tt-studio-btn');
+  const isOpen = () => !panel.classList.contains('hidden');
   function showTab(tab) {
+    if (!panel.querySelector(`.tt-tab-btn[data-tab="${tab}"]`)) tab = 'character';
     panel.querySelectorAll('.tt-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     panel.querySelectorAll('.tt-pane').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== tab));
-    try { localStorage.setItem(`${KEY}.tab`, tab); } catch { /* fine */ }
+    store.set('tab', tab);
   }
   function open(tab) {
     panel.classList.remove('hidden');
-    $('tt-studio-btn')?.classList.add('active');
+    toolBtn?.classList.add('active');
+    store.set('open', '1');
     if (tab) showTab(tab);
     sync();
   }
   function close() {
     panel.classList.add('hidden');
-    $('tt-studio-btn')?.classList.remove('active');
+    toolBtn?.classList.remove('active');
+    store.set('open', '0');
   }
-  $('tt-studio-btn')?.addEventListener('click', () => (panel.classList.contains('hidden') ? open() : close()));
+  toolBtn?.addEventListener('click', () => (isOpen() ? close() : open()));
   $('tt-studio-close')?.addEventListener('click', close);
   panel.querySelectorAll('.tt-tab-btn').forEach(b => b.addEventListener('click', () => { showTab(b.dataset.tab); sync(); }));
-  try { const t = localStorage.getItem(`${KEY}.tab`); if (t) showTab(t); } catch { /* the first tab */ }
+  showTab(store.get('tab') || 'character');
   window.openTextStudio = open;
-
-  (function draggable() {
-    const head = $('tt-studio-head');
-    try {
-      const pos = JSON.parse(localStorage.getItem(`${KEY}.pos`));
-      if (pos) { panel.style.left = `${pos.x}px`; panel.style.top = `${pos.y}px`; panel.style.right = 'auto'; }
-    } catch { /* the default place */ }
-    head?.addEventListener('mousedown', e => {
-      if (e.target.closest('button')) return;
-      e.preventDefault();
-      const r = panel.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
-      const move = ev => {
-        panel.style.left = `${Math.max(0, Math.min(innerWidth - 80, ev.clientX - dx))}px`;
-        panel.style.top = `${Math.max(0, Math.min(innerHeight - 40, ev.clientY - dy))}px`;
-        panel.style.right = 'auto';
-      };
-      const up = () => {
-        removeEventListener('mousemove', move); removeEventListener('mouseup', up);
-        const rr = panel.getBoundingClientRect();
-        try { localStorage.setItem(`${KEY}.pos`, JSON.stringify({ x: rr.left, y: rr.top })); } catch { /* fine */ }
-      };
-      addEventListener('mousemove', move); addEventListener('mouseup', up);
-    });
-  })();
 
   // ── what the panel acts on ──────────────────────────────────────────────
 
-  // Text the user added: Artistic / Frame text, or a plain typed box (it
-  // becomes Artistic text on the first change). null for anything else.
+  // { box, editing, range, story } — story: text the user added (it has every
+  // setting); else a box with one face (a line read from the page, a
+  // redaction's label). null: nothing selected, new text.
   function target() {
     const t = window.storyTarget?.();
     if (!t?.box) return null;
-    if (!t.box.textMode && t.box.type !== 'harfbuzz') return null;
-    return t;
+    return { ...t, story: !!t.box.textMode || t.box.type === 'harfbuzz' };
   }
 
-  function states(box) {
+  // What new text takes: the font and size shown while nothing is selected.
+  // fonts.js puts the document's face here (the declared or detected one);
+  // a change made with nothing selected is the user's own default.
+  const newText = { fontFamily: $('fabric-font-family')?.value || 'Times New Roman', sizePt: parseFloat($('fabric-font-size')?.value) || 12 };
+  function setNewText(fontFamily, sizePt) {
+    if (fontFamily) newText.fontFamily = fontFamily;
+    if (sizePt > 0) newText.sizePt = Math.round(sizePt * 100) / 100;
+    if (!target()) sync();
+  }
+
+  function states(t) {
+    if (!t) return { char: { attrs: SC.charOf(newText), mixed: [] }, para: { attrs: SC.paraOf({}), mixed: [] }, frame: { attrs: SC.frameOf({}), mixed: [] } };
+    const box = t.box;
     if (box.textMode) return { char: window.storyCharState(box), para: window.storyParaState(box), frame: { attrs: SC.frameOf(box.frame), mixed: [] } };
-    // a plain box, read as the Artistic text it would become
-    const char = SC.charOf({ fontFamily: box.fontFamily, sizePt: box.sizePt, bold: !!box.bold, italic: !!box.italic, color: box.color || null,
-      underline: box.underline ? 'single' : 'none', strike: box.strikethrough ? 'single' : 'none', tracking: Math.round((+box.letterSpacing || 0) * 1000), autoKern: !!box.kerning });
-    return { char: { attrs: char, mixed: [] }, para: { attrs: SC.paraOf({}), mixed: [] }, frame: { attrs: SC.frameOf({}), mixed: [] } };
+    // a box with one face: its fields, read as character attributes
+    return { char: { attrs: SC.charOf(window.utbPlainChar?.attrs(box) || {}), mixed: [] }, para: { attrs: SC.paraOf({}), mixed: [] }, frame: { attrs: SC.frameOf({}), mixed: [] } };
+  }
+
+  // ── locks ───────────────────────────────────────────────────────────────
+
+  const KIND = {
+    ocr: 'An OCR line keeps one face and the glyph positions the reader measured',
+    embedded: 'Embedded text keeps one face and the positions the PDF gives',
+    redaction: 'A redaction box\'s label is one run of one face',
+  };
+  const kindWhy = box => KIND[box.type] || 'This box has one face';
+  // the name of the pixel renderer drawing the text now, or null
+  function pixelRenderer() {
+    try { const on = window.utbPixelRenderOn?.(); return on ? (typeof on === 'string' ? on : 'The pixel renderer') : null; }
+    catch { return null; }
+  }
+  // a setting it cannot draw at all; and one it draws some values of (the
+  // others are locked option by option)
+  const PIXEL_WHY = new Map(SC.PIXEL_LIMITS.filter(l => !l.allow).map(l => [l.key, l.why]));
+  const PIXEL_ALLOW = new Map(SC.PIXEL_LIMITS.filter(l => l.allow).map(l => [l.key, l]));
+  for (const k of SC.PIXEL_IGNORES.keys) PIXEL_WHY.set(k, SC.PIXEL_IGNORES.why);
+  PIXEL_WHY.set('style', null);
+  // what the pixel renderer cannot draw of a paragraph or a frame: it draws
+  // the text, the HTML around it is not shown
+  const PIXEL_PARA_WHY = {
+    list: 'draws the text alone: no list markers', listChar: 'draws the text alone: no list markers', listSuffix: 'draws the text alone: no list markers',
+    fill: 'draws the text alone: no paragraph fill', ruleAbove: 'draws the text alone: no rules', ruleBelow: 'draws the text alone: no rules',
+    ruleColor: 'draws the text alone: no rules', ruleWeight: 'draws the text alone: no rules',
+  };
+  const PIXEL_FRAME_WHY = {
+    ruleColor: 'draws the text alone: no column rules', ruleWeight: 'draws the text alone: no column rules',
+    ruleStyle: 'draws the text alone: no column rules', ruleTop: 'draws the text alone: no column rules', ruleBottom: 'draws the text alone: no column rules',
+  };
+  const PLAIN_KEYS = () => new Set([...(window.utbPlainChar?.keys || []), 'style']);
+
+  // Why `scope:key` cannot be set on the target now, or null.
+  function lockOf(t, scope, key) {
+    if (!t) return null;                                     // new text: the idle state greys it
+    if (!t.story) {
+      if (scope !== 'char' || !PLAIN_KEYS().has(key)) return `${kindWhy(t.box)} — this is for Artistic and Frame text.`;
+    } else if (scope === 'frame' && t.box.textMode !== 'frame') {
+      return 'These settings belong to Frame text — Convert to Text Frame at the foot of this tab.';
+    }
+    const px = pixelRenderer();
+    if (px) {
+      const why = scope === 'char' ? PIXEL_WHY.get(key) : scope === 'para' ? PIXEL_PARA_WHY[key] : PIXEL_FRAME_WHY[key];
+      if (why) return `${px} ${why}. Turn ${px} off below to set it.`;
+    }
+    return null;
+  }
+  // a whole tab locked for the target: one notice instead of a lock per row
+  function paneLock(t, pane) {
+    if (!t) return null;
+    if (!t.story && pane !== 'character') return `${kindWhy(t.box)}: paragraph, frame and OpenType settings are for Artistic and Frame text.`;
+    if (pane === 'frame' && t.box.textMode !== 'frame') return 'These settings belong to Frame text.';
+    return null;
+  }
+
+  // The lockable controls: every data-k / data-toggle / data-on control, and
+  // the fitting tools that are not attributes.
+  const ACTIONS = {
+    'tt-size-up': 'char:sizePt', 'tt-size-down': 'char:sizePt', 'tt-change-case': 'char:case',
+    'fabric-space-width': 'char:space', 'fabric-default-sw': 'char:space', 'fabric-nudge-mode': 'char:nudge',
+    'tt-kern-page': 'char:autoKern', 'tt-show-typography': null,
+    'tt-pa-tab-pos': 'para:tabs', 'tt-pa-tab-align': 'para:tabs', 'tt-pa-tab-leader': 'para:tabs', 'tt-pa-tab-add': 'para:tabs',
+  };
+  const keyOfCtrl = c => c.dataset.k || c.dataset.toggle || c.dataset.on || (c.dataset.ss ? 'char:ot_ss' : null) ||
+    (c.dataset.dropEnable !== undefined ? 'para:dropLines' : null) || (c.id && ACTIONS[c.id]) || null;
+  const parseKey = k => { const i = k.indexOf(':'); return [k.slice(0, i), k.slice(i + 1)]; };
+
+  function lockReason(t, ctrl) {
+    const k = keyOfCtrl(ctrl);
+    if (!k) return null;
+    const [scope, key] = parseKey(k);
+    if (key === 'case') return t && !t.story ? `${kindWhy(t.box)} — Change Case rewrites Artistic and Frame text.` : null;
+    if (key === 'space' || key === 'nudge') return null;   // every box has them (nudge: see syncFitting)
+    const why = lockOf(t, scope, key);
+    if (why) return why;
+    // a toggle whose value the pixel renderer cannot draw (Small caps)
+    const px = pixelRenderer(), lim = scope === 'char' && PIXEL_ALLOW.get(key);
+    if (px && lim && ctrl.dataset.toggle && ctrl.dataset.onValue !== undefined && !lim.allow.includes(ctrl.dataset.onValue))
+      return `${px} ${lim.why}. Turn ${px} off below to set it.`;
+    return null;
+  }
+
+  const LOCK_ICON = 'lock';
+  // the label a control's row is named by: its <label for>, the check label
+  // it sits in, or the first label of its row
+  function rowOf(ctrl) {
+    const grid = ctrl.closest('.tt-grid-pt');
+    if (grid && ctrl.id) {
+      const lab = grid.querySelector(`label[for="${ctrl.id}"]`);
+      if (lab) return { label: lab, row: lab };
+    }
+    const check = ctrl.closest('label.tt-check');
+    if (check && !check.closest('.tt-row')) return { label: check, row: check };
+    const row = ctrl.closest('.tt-row');
+    if (row) return { label: row.querySelector(':scope > label:first-child') || null, row };
+    return { label: null, row: null };
+  }
+  // with nothing selected: what new text takes, and a new redaction box's terms
+  const NEW_TEXT = new Set(['fabric-font-family', 'fabric-font-size', 'tt-size-up', 'tt-size-down', 'tolerance', 'tt-name-case']);
+  function setLocks(t) {
+    const px = pixelRenderer();
+    // the options of a select a target cannot have — a double line on a box
+    // with one face, what the pixel renderer cannot draw: why, per select
+    const partly = new Map();
+    for (const sel of panel.querySelectorAll('.tt-pane select[data-k^="char:"]')) {
+      const key = parseKey(sel.dataset.k)[1], lim = PIXEL_ALLOW.get(key);
+      for (const o of sel.options) {
+        const why = (key === 'underline' || key === 'strike') && o.value === 'double' && t && !t.story ? `${kindWhy(t.box)}: single lines only.`
+          : px && lim && !lim.allow.includes(o.value) ? `${px} ${lim.why}.` : null;
+        o.disabled = !!why;
+        o.title = why || '';
+        if (why) partly.set(sel, why);
+      }
+    }
+    const rows = new Map();                                  // row → { label, whys, n, locked, last }
+    for (const c of panel.querySelectorAll('.tt-pane [data-k], .tt-pane [data-toggle], .tt-pane [data-on], .tt-pane [data-ss], .tt-pane [data-drop-enable], .tt-pane button, .tt-pane input, .tt-pane select')) {
+      if (c.closest('.tt-seg') && c.tagName === 'BUTTON') continue;       // with their .tt-seg
+      if (c.id === 'tt-ot-hide' || c.closest('.tt-tabs-list')) continue;   // the panel's own view, a tab stop's remove
+      const why = lockReason(t, c);
+      const idle = !t && !NEW_TEXT.has(c.id);
+      const ctrls = c.classList.contains('tt-seg') ? [...c.querySelectorAll('button')] : [c];
+      for (const x of ctrls) {
+        if (x.dataset.t0 === undefined) x.dataset.t0 = x.title || '';
+        x.disabled = !!why || idle || (x === c && c.dataset.busy === '1');
+        x.classList.toggle('tt-locked', !!why);
+        x.classList.toggle('tt-off', idle);
+        x.title = why || partly.get(c) || x.dataset.t0;
+      }
+      const { label, row } = rowOf(c);
+      if (!row) continue;
+      if (!rows.has(row)) rows.set(row, { label, whys: new Set(), n: 0, locked: 0, last: null });
+      const r = rows.get(row);
+      r.n++;
+      if (why) { r.locked++; r.whys.add(why); r.last = c; }
+      else if (partly.has(c)) { r.whys.add(partly.get(c)); r.last ??= c; }
+    }
+    for (const [row, r] of rows) {
+      row.classList.toggle('tt-row-locked', r.locked > 0 && r.locked === r.n);
+      // the lock goes on the row's label — or, in a row without one, after
+      // the locked control
+      const host = r.label || row;
+      let icon = host.querySelector(':scope > .tt-lock') || (r.label ? null : row.querySelector(':scope > .tt-lock'));
+      if (r.whys.size) {
+        if (!icon) { icon = document.createElement('span'); icon.className = 'tt-lock material-symbols-outlined'; icon.textContent = LOCK_ICON; }
+        if (r.label) { if (icon.parentNode !== host) host.appendChild(icon); }
+        else if (r.last && icon.previousElementSibling !== r.last) r.last.after(icon);
+        icon.title = [...r.whys].join('\n');
+      } else icon?.remove();
+    }
+    // the tabs locked as a whole: their notice
+    for (const pane of panel.querySelectorAll('.tt-pane')) {
+      const why = paneLock(t, pane.dataset.pane);
+      pane.classList.toggle('tt-pane-locked', !!why);
+      const note = pane.querySelector(':scope > .tt-pane-lock');
+      if (note) { note.classList.toggle('hidden', !why); note.querySelector('.tt-pane-lock-why').textContent = why || ''; }
+    }
   }
 
   // ── the controls ────────────────────────────────────────────────────────
-
-  // the font menu: the catalogue's families
-  async function fillFonts() {
-    const sel = $('tt-ch-family');
-    if (!sel) return;
-    try { await window.FontCatalog?.ready; } catch { /* the fallback */ }
-    const fams = window.FontCatalog?.families?.() || [];
-    sel.innerHTML = '';
-    for (const f of fams) {
-      const o = document.createElement('option');
-      o.value = f.family; o.textContent = f.present?.regular ? f.family : `${f.family} (not installed)`;
-      o.disabled = !f.present?.regular;
-      sel.appendChild(o);
-    }
-    sync();
-  }
-  fillFonts();
 
   // the twenty stylistic sets
   (function stylisticSets() {
@@ -120,7 +272,6 @@
   })();
 
   const controls = () => [...panel.querySelectorAll('[data-k]')];
-  const parseKey = k => { const i = k.indexOf(':'); return [k.slice(0, i), k.slice(i + 1)]; };
 
   function show(ctrl, value, mixed) {
     if (ctrl.classList.contains('tt-seg')) {
@@ -134,32 +285,39 @@
     if (mixed) { ctrl.value = ''; return; }
     if (ctrl.tagName === 'SELECT') {
       const v = value === null || value === undefined ? '' : String(value);
-      if (![...ctrl.options].some(o => o.value === v) && ctrl.dataset.k === 'char:fontFamily') {
+      if (![...ctrl.options].some(o => o.value === v) && ctrl.dataset.k === 'char:fontFamily' && v) {
+        // the menu must SHOW the box's family even when the catalogue lacks it
         const o = document.createElement('option'); o.value = v; o.textContent = `${v} (not installed)`; ctrl.appendChild(o);
       }
       ctrl.value = v;
       return;
     }
-    ctrl.value = value === null || value === undefined ? '' : value;
+    ctrl.value = value === null || value === undefined ? '' : (typeof value === 'number' ? Math.round(value * 100) / 100 : value);
   }
 
+  const SCOPE_LINE = {
+    ocr: 'This OCR line', embedded: 'This embedded line', redaction: 'This redaction box\'s label', harfbuzz: 'This text (it becomes Artistic text)',
+  };
   function sync() {
-    if (panel.classList.contains('hidden')) return;
+    if (!isOpen()) return;
     const t = target();
     const scope = $('tt-studio-scope');
-    panel.classList.toggle('tt-disabled', !t);
-    if (!t) {
-      if (scope) scope.textContent = 'Select or edit text you added (Artistic or Frame text) — or type some with a text tool.';
-      return;
+    panel.classList.toggle('tt-idle', !t);
+    if (scope) {
+      scope.textContent = !t ? `New text — ${newText.fontFamily} ${newText.sizePt} pt. Select a text to change it.`
+        : t.editing ? (t.range && SC.collapsed(t.range) ? 'The text typed next at the caret' : 'The selected text')
+        : t.box.textMode ? `All of this ${t.box.textMode === 'frame' ? 'frame\'s' : 'artistic'} text`
+        : SCOPE_LINE[t.box.type] || 'This text';
     }
-    if (scope) scope.textContent = t.editing ? (t.range && SC.collapsed(t.range) ? 'Applies to the text typed next at the caret' : 'Applies to the selected text')
-      : t.box.textMode ? `Applies to all of this ${t.box.textMode === 'frame' ? 'frame\'s' : 'artistic'} text` : 'Applies to this text (it becomes Artistic text)';
-    const st = states(t.box);
+    const del = $('utb-delete-box');
+    if (del) del.disabled = !t;
+    const st = states(t);
     for (const ctrl of controls()) {
       const [scopeKey, key] = parseKey(ctrl.dataset.k);
       const s = st[scopeKey];
       if (!s) continue;
       if (key === 'style') { show(ctrl, (s.attrs.bold ? 'bold' : '') + (s.attrs.italic ? 'italic' : '') || 'regular', s.mixed.includes('bold') || s.mixed.includes('italic')); continue; }
+      if (key === 'autoKern') continue;                      // syncKerning
       show(ctrl, s.attrs[key], s.mixed.includes(key));
     }
     // a colour that may be none: its checkbox says whether it is set
@@ -168,11 +326,11 @@
       const s = st[scopeKey];
       if (s) { on.checked = s.attrs[key] != null && !s.mixed.includes(key); on.indeterminate = s.mixed.includes(key); }
     }
-    // the quick toggles: on when the attribute has their value
+    // the toggles: on when the attribute has their value
     panel.querySelectorAll('[data-toggle]').forEach(b => {
       const [sk, key] = parseKey(b.dataset.toggle);
       const v = st[sk]?.attrs[key], onV = b.dataset.onValue;
-      b.classList.toggle('active', onV !== undefined ? v === onV : !!v);
+      b.classList.toggle('active', !st[sk]?.mixed.includes(key) && (onV !== undefined ? v === onV : !!v));
     });
     const drop = $('tt-pa-drop-on');
     if (drop) { drop.checked = st.para.attrs.dropLines >= 2; drop.indeterminate = st.para.mixed.includes('dropLines'); }
@@ -181,19 +339,176 @@
     panel.querySelectorAll('[data-ss]').forEach(cb => { cb.checked = !ssMixed && !!(ss & (1 << (cb.dataset.ss - 1))); cb.indeterminate = ssMixed; });
     // leading value: what its type counts in
     const lt = st.para.attrs.leadingType, lv = $('tt-pa-leading');
-    if (lv) { lv.disabled = lt === 'default'; lv.title = { multiple: '× the default leading', percent: '% of the font size', atLeast: 'pt — at least', exact: 'pt — exactly' }[lt] || 'The face\'s own leading'; }
-    // the Text Frame tab belongs to frames
-    const isFrame = t.box.textMode === 'frame';
-    panel.querySelectorAll('.tt-frame-sec').forEach(s => s.classList.toggle('tt-off', !isFrame));
-    $('tt-fr-hint')?.classList.toggle('hidden', isFrame);
-    $('tt-convert-frame')?.toggleAttribute('disabled', isFrame);
-    $('tt-convert-art')?.toggleAttribute('disabled', t.box.textMode === 'artistic' || !t.box.textMode);
+    if (lv) { lv.dataset.busy = lt === 'default' ? '1' : ''; lv.dataset.t0 = { multiple: '× the default leading', percent: '% of the font size', atLeast: 'pt — at least', exact: 'pt — exactly' }[lt] || 'The face\'s own leading'; }
+    const isFrame = t?.box.textMode === 'frame';
+    const cf = $('tt-convert-frame'), ca = $('tt-convert-art');
+    if (cf) cf.dataset.busy = !t?.story || isFrame ? '1' : '';
+    if (ca) ca.dataset.busy = !t?.story || !t.box.textMode || t.box.textMode === 'artistic' ? '1' : '';
     tabsList(st.para.attrs.tabs, st.para.mixed.includes('tabs'));
     features(st.char.attrs);
+    syncKerning(t, st.char);
+    syncFitting(t, st.char);
+    syncMatch(t);
+    setLocks(t);
+    if (lv && lt === 'default') lv.disabled = true;
   }
 
-  // the font's OpenType features: what it does not carry is hidden, as
-  // Affinity's "Hide irrelevant features" does (greyed with it off)
+  // ── pair kerning ────────────────────────────────────────────────────────
+
+  // The checkbox shows the kerning as drawn; beside it, where that comes
+  // from: the page's producer (as read), off because nothing is known, or
+  // the user's choice — which ↺ gives back to the page.
+  function pageKernOf(t, attrs) {
+    if (!t) return undefined;
+    if (t.box.textMode) return window.storyPageKern?.(t.box, attrs);
+    if (typeof window.utbAutoKerning !== 'function') return undefined;
+    try { const k = window.utbAutoKerning({ ...t.box, kerningAuto: true }); return typeof k === 'boolean' ? k : undefined; } catch { return undefined; }
+  }
+  function syncKerning(t, cs) {
+    const cb = $('kerning'), src = $('tt-kern-source'), reset = $('tt-kern-page');
+    if (!cb) return;
+    const mixed = cs.mixed.includes('autoKern');
+    const choice = cs.attrs.autoKern;                        // true / false / null (as the page)
+    const page = pageKernOf(t, cs.attrs);
+    const drawn = typeof choice === 'boolean' ? choice : SC.resolveKern(cs.attrs, page).autoKern;
+    cb.checked = !mixed && drawn;
+    cb.indeterminate = mixed;
+    let text = '', tip = '';
+    if (!t) { text = 'as the page'; tip = 'New text kerns as the page it is typed on: as its producer did, where a reader learned it — else not at all, as Word sets text.'; }
+    else if (mixed) { text = 'mixed'; tip = 'Some of the selected text kerns, some does not.'; }
+    else if (choice == null) {
+      text = page === undefined ? 'unread page: off' : `as the page: ${page ? 'on' : 'off'}`;
+      tip = page === undefined
+        ? 'Nobody has read how this page\'s producer set this face, so the text is set as Word sets it: without pair kerning.'
+        : `The page's producer set this face ${page ? 'with' : 'without'} pair kerning (learned from the page's pixels).`;
+    } else {
+      text = page === undefined ? 'yours' : `yours (page: ${page ? 'on' : 'off'})`;
+      tip = `Set here${page === undefined ? '' : ` — the page's producer set this face ${page ? 'with' : 'without'} pair kerning`}. ↺ follows the page again.`;
+    }
+    if (src) { src.textContent = text; src.title = tip; }
+    reset?.classList.toggle('hidden', !t || mixed || choice == null);
+  }
+  $('kerning')?.addEventListener('change', e => apply('char', { autoKern: e.target.checked }));
+  $('tt-kern-page')?.addEventListener('click', () => apply('char', { autoKern: null }));
+
+  // ── space width, nudge ──────────────────────────────────────────────────
+
+  // The width of a space: a story's paragraphs' desired word spacing (% of
+  // the face's space, Affinity's Justification ▸ Word Spacing) in px of the
+  // face's space of the selection's first character; a plain box's manual
+  // space width. "Font's" is 100 % / no manual width.
+  function syncFitting(t, cs) {
+    const sw = $('fabric-space-width'), dflt = $('fabric-default-sw'), nudge = $('fabric-nudge-mode');
+    if (sw && dflt && !t) { sw.value = ''; sw.placeholder = ''; dflt.checked = true; dflt.indeterminate = false; }
+    if (sw && dflt && t) {
+      if (t.box.textMode) {
+        const ps = window.storyParaState?.(t.box);
+        const ws = ps?.attrs.wordSpacing ?? 100, mixed = !!ps?.mixed.includes('wordSpacing');
+        const space = window.storySpacePx?.(cs.attrs);
+        dflt.checked = ws === 100 && !mixed;
+        dflt.indeterminate = mixed;
+        if (document.activeElement !== sw) sw.value = space > 0 && !mixed ? +(space * ws / 100).toFixed(3) : '';
+      } else {
+        const own = t.box.spaceWidth != null && !t.box.defaultSpaceWidth;
+        dflt.checked = !own;
+        dflt.indeterminate = false;
+        if (document.activeElement !== sw) sw.value = own ? +(+t.box.spaceWidth).toFixed(3) : '';
+        if (!own && document.activeElement !== sw) {
+          sw.placeholder = '…';
+          window.getNaturalSpaceWidth?.(t.box).then(w => { if (w > 0 && !(t.box.spaceWidth != null && !t.box.defaultSpaceWidth) && document.activeElement !== sw) sw.placeholder = (+w.toFixed(3)).toString(); });
+        }
+      }
+    }
+    if (nudge) {
+      const on = !!t && utbState.microTypoId === t.box.id;
+      nudge.classList.toggle('active', on);
+      // the nudge moves measured glyph positions (a plain box's, while they
+      // hold) or a story's pairs (not while it is edited)
+      const why = !t ? 'Select a text to nudge its characters.'
+        : t.box.textMode ? (window.storyEditing?.() === t.box ? 'Not while the text is edited — press Escape first.' : null)
+        : !utbCharsValid(t.box) ? 'This box is laid afresh in its current face: it has no measured glyph positions to nudge.' : null;
+      nudge.dataset.busy = why ? '1' : '';
+      nudge.dataset.t0 = why || 'Nudge characters: press one, then move it (a pair\'s manual kerning)';
+    }
+  }
+  $('fabric-default-sw')?.addEventListener('change', async e => {
+    const t = target();
+    if (!t) return;
+    if (t.box.textMode) {
+      if (e.target.checked) window.storyApplyPara?.(t.box, { wordSpacing: 100 });
+      else sync();                                           // the field holds the face's space; moving it sets another
+      return;
+    }
+    if (e.target.checked) await window.utbPlainChar?.setSpaceWidth(t.box, null);
+    else {
+      const w = await window.getNaturalSpaceWidth?.(t.box);
+      if (w > 0) await window.utbPlainChar?.setSpaceWidth(t.box, w);
+    }
+    sync();
+  });
+  function applySpaceWidth(raw, live) {
+    const t = target();
+    const px = parseFloat(raw);
+    if (!t || !(px >= 0)) return;
+    if (t.box.textMode) {
+      const space = window.storySpacePx?.(window.storyCharState?.(t.box)?.attrs || {});
+      if (space > 0) window.storyApplyPara?.(t.box, { wordSpacing: px / space * 100 }, live ? `space:${t.box.id}` : null);
+      return;
+    }
+    window.utbPlainChar?.setSpaceWidth(t.box, px, live ? `space:${t.box.id}` : null);
+  }
+  $('fabric-space-width')?.addEventListener('input', e => applySpaceWidth(e.target.value, true));
+  $('fabric-space-width')?.addEventListener('change', e => { applySpaceWidth(e.target.value, true); sync(); });
+  $('fabric-nudge-mode')?.addEventListener('click', () => {
+    const t = target();
+    if (!t) return;
+    if (utbState.microTypoId === t.box.id) window.exitMicroTypo?.();
+    else if ((t.box.textMode || utbCharsValid(t.box)) && typeof enterMicroTypo === 'function') enterMicroTypo(t.box);
+    sync();
+  });
+
+  // ── a redaction's match terms ───────────────────────────────────────────
+
+  // The selected redaction's tolerance and letter case; with nothing
+  // selected the defaults a new redaction box takes (the matching plugin reads
+  // these fields). Shown for a redaction box and for new boxes.
+  function syncMatch(t) {
+    const sec = $('tt-settings');
+    const box = t?.box.type === 'redaction' ? t.box : null;
+    sec?.classList.toggle('hidden', !!t && !box);
+    if (box) {
+      const tol = $('tolerance'); if (tol && document.activeElement !== tol) tol.value = box.tolerance;
+      const cs = $('tt-name-case'); if (cs) cs.value = utbCaseValue(box.uppercase);
+    }
+    const scope = $('tt-match-scope');
+    if (scope) {
+      scope.textContent = box ? '· this box' : '· new boxes';
+      scope.title = box ? 'The selected redaction box' : 'No redaction box selected — the defaults for new boxes';
+    }
+  }
+  function applyMatch(changed) {
+    const box = target()?.box;
+    if (!box || box.type !== 'redaction') return;
+    const step = window.utbUndo?.capture([box]);
+    box.tolerance = parseFloat($('tolerance')?.value) || 0;
+    const caseSel = $('tt-name-case');
+    if (caseSel) box.uppercase = utbCaseMode(caseSel.value);
+    window.utbUndo?.commit(step, changed);
+    if (changed === 'tolerance') {
+      // the width is unchanged by tolerance — only which candidates pass
+      if (typeof updateAllMatchesView === 'function') updateAllMatchesView(box.id);
+    } else {
+      renderBox(box);
+      if (typeof calculateWidthsForRedaction === 'function') calculateWidthsForRedaction(box.id);
+    }
+  }
+  $('tolerance')?.addEventListener('change', () => applyMatch('tolerance'));
+  $('tt-name-case')?.addEventListener('change', () => applyMatch('letter case'));
+
+  // ── the font's OpenType features ────────────────────────────────────────
+
+  // what the font does not carry is hidden, as Affinity's "Hide irrelevant
+  // features" does (greyed with it off)
   function features(a) {
     const m = window.storyFaceMetrics?.(a);
     const have = new Set(m?.features || []);
@@ -208,9 +523,17 @@
 
   // ── changes ─────────────────────────────────────────────────────────────
 
-  function apply(scopeKey, patch, key) {
+  function apply(scopeKey, patch, key = null) {
     const t = target();
-    if (!t) return;
+    if (!t) {
+      // nothing selected: the font and size new text takes
+      if (scopeKey === 'char' && ('fontFamily' in patch || 'sizePt' in patch)) setNewText(patch.fontFamily, patch.sizePt);
+      return;
+    }
+    if (!t.story) {
+      if (scopeKey === 'char') window.utbPlainChar?.apply(t.box, patch, key);
+      return;
+    }
     if (scopeKey === 'char') window.storyApplyChar?.(t.box, patch, key);
     else if (scopeKey === 'para') window.storyApplyPara?.(t.box, patch, key);
     else if (scopeKey === 'frame' && t.box.textMode === 'frame') window.storyApplyFrame?.(t.box, patch, key);
@@ -230,20 +553,20 @@
 
   function onChange(ctrl, live) {
     const [scopeKey, key] = parseKey(ctrl.dataset.k);
+    if (key === 'autoKern') return;                          // its own handler
     const t = target();
-    if (!t) return;
     if (key === 'style') { const v = ctrl.value; apply('char', { bold: v.startsWith('bold'), italic: v.endsWith('italic') }); return; }
     const v = valueOf(ctrl);
     if (v === undefined) return;
     if (ctrl.tagName === 'SELECT' && v === '' && key !== 'lang') return;
-    const undoKey = live ? `${scopeKey}:${key}:${t.box.id}` : null;
+    const undoKey = live && t ? `${scopeKey}:${key}:${t.box.id}` : null;
     // a linked inset sets all four
-    if (ctrl.dataset.inset !== undefined && SC.frameOf(t.box.frame).linkInsets) {
+    if (t && ctrl.dataset.inset !== undefined && SC.frameOf(t.box.frame).linkInsets) {
       apply('frame', { insetLeft: v, insetRight: v, insetTop: v, insetBottom: v }, undoKey);
       return;
     }
     // a new leading type starts from a value that counts in its own unit
-    if (key === 'leadingType') {
+    if (t && key === 'leadingType') {
       const size = window.storyCharState?.(t.box)?.attrs.sizePt || t.box.sizePt || 12;
       apply('para', { leadingType: v, leading: { multiple: 1.2, percent: 120, atLeast: Math.round(size * 12) / 10, exact: Math.round(size * 12) / 10 }[v] ?? 0 });
       return;
@@ -268,7 +591,6 @@
       return;
     }
     if (t.dataset.dropEnable !== undefined) {
-      const tg = target(); if (!tg) return;
       apply('para', { dropLines: t.checked ? 3 : 0 });           // Affinity: 3 lines when enabled
       return;
     }
@@ -281,22 +603,43 @@
     }
     const c = t.closest('[data-k]');
     if (c && !(c.type === 'number' || c.type === 'color' || c.type === 'text')) onChange(c, false);
+    else if (c && c.type === 'number') sync();
   });
   panel.addEventListener('click', e => {
     const q = e.target.closest('[data-toggle]');
     if (q) {
+      if (q.disabled) return;
       const [sk, key] = parseKey(q.dataset.toggle);
-      const t = target(); if (!t) return;
-      const on = q.classList.contains('active');
-      const onV = q.dataset.onValue, offV = q.dataset.offValue;
+      // on or off as the target has it now (not as the button was last drawn:
+      // a hidden panel is not kept up to date)
+      const st = states(target())[sk];
+      const v = st?.attrs[key], onV = q.dataset.onValue, offV = q.dataset.offValue;
+      const on = !st?.mixed.includes(key) && (onV !== undefined ? v === onV : !!v);
       apply(sk, { [key]: onV !== undefined ? (on ? offV : onV) : !on });
       return;
     }
     const b = e.target.closest('.tt-seg button');
-    if (!b) return;
+    if (!b || b.disabled) return;
     const [scopeKey, key] = parseKey(b.closest('.tt-seg').dataset.k);
     apply(scopeKey, { [key]: b.dataset.v });
   });
+
+  // Size steps: Affinity steps each run's own size by a point
+  function stepSize(by) {
+    const t = target();
+    if (!t) { setNewText(null, Math.max(1, newText.sizePt + by)); return; }
+    if (t.story) { window.storyMapChar?.(t.box, a => ({ sizePt: Math.max(1, Math.round((a.sizePt + by) * 100) / 100) })); return; }
+    window.utbPlainChar?.apply(t.box, { sizePt: Math.max(1, Math.round((t.box.sizePt + by) * 100) / 100) }, `size:${t.box.id}`);
+  }
+  $('tt-size-up')?.addEventListener('click', () => stepSize(1));
+  $('tt-size-down')?.addEventListener('click', () => stepSize(-1));
+  $('tt-change-case')?.addEventListener('change', e => {
+    const mode = e.target.value;
+    e.target.value = '';
+    const t = target();
+    if (mode && t?.story) window.storyChangeCase?.(t.box, mode);
+  });
+  $('utb-delete-box')?.addEventListener('click', () => window.utbDeleteBox?.(utbState.selectedId));
 
   // ── tab stops ───────────────────────────────────────────────────────────
 
@@ -313,7 +656,7 @@
       x.className = 'icon-button tt-mini'; x.title = 'Remove this tab stop';
       x.innerHTML = '<span class="material-symbols-outlined">close</span>';
       x.addEventListener('click', () => {
-        const t = target(); if (!t) return;
+        const t = target(); if (!t?.story) return;
         const cur = window.storyParaState?.(t.box)?.attrs.tabs || [];
         apply('para', { tabs: cur.filter(s => !(s.pos === tab.pos && s.align === tab.align)) });
       });
@@ -322,7 +665,7 @@
     });
   }
   $('tt-pa-tab-add')?.addEventListener('click', () => {
-    const t = target(); if (!t) return;
+    const t = target(); if (!t?.story) return;
     const pos = parseFloat($('tt-pa-tab-pos')?.value);
     if (!(pos >= 0)) return;
     const cur = (t.box.textMode ? window.storyParaState?.(t.box)?.attrs.tabs : []) || [];
@@ -334,16 +677,37 @@
 
   // ── converting ──────────────────────────────────────────────────────────
 
-  $('tt-convert-frame')?.addEventListener('click', () => { const t = target(); if (t) window.storyConvert?.(t.box, 'frame'); });
-  $('tt-convert-art')?.addEventListener('click', () => { const t = target(); if (t) window.storyConvert?.(t.box, 'artistic'); });
+  $('tt-convert-frame')?.addEventListener('click', () => { const t = target(); if (t?.story) window.storyConvert?.(t.box, 'frame'); });
+  $('tt-convert-art')?.addEventListener('click', () => { const t = target(); if (t?.story) window.storyConvert?.(t.box, 'artistic'); });
+
+  // ── Display ─────────────────────────────────────────────────────────────
+
+  const view = $('tt-view');
+  $('toggle-space-labels')?.addEventListener('change', e => window.setShowSpaceWidthLabels?.(e.target.checked));
+  // A plugin's Settings section marked data-text-panel is about how text is
+  // drawn: it moves to the panel's foot (its controls and listeners with it).
+  for (const sec of document.querySelectorAll('#settings-sections [data-text-panel]')) view?.appendChild(sec);
 
   // ── keeping up ──────────────────────────────────────────────────────────
 
-  window.onStoryChange?.(sync);
+  let queued = false;
+  const soon = () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; sync(); }); };
+  window.onStoryChange?.(soon);
   // a selection made or dropped anywhere (drag-resize.js, the undo stack…)
-  document.addEventListener('mouseup', () => requestAnimationFrame(sync));
-  document.addEventListener('keyup', () => requestAnimationFrame(sync));
-  window.utbUndo?.onChange(() => requestAnimationFrame(sync));
+  document.addEventListener('mouseup', soon);
+  document.addEventListener('keyup', soon);
+  window.utbUndo?.onChange(soon);
+  // the pixel renderer switched on or off: what it cannot draw is locked
+  PDFHooks.on('pixels:changed', soon);
+  PDFHooks.on('document:loaded', soon);
+
+  window.TextPanel = { open, close, sync: () => soon(), newText: () => ({ ...newText }), setNewText };
+
+  // Shown at first on a screen wide enough for a side panel (a phone gets the
+  // page first), then as the user left it.
+  const kept = store.get('open');
+  if (kept === '1' || (kept === null && innerWidth > 900)) open();
+
   // hyphenation needs the browser's dictionary: say so where it has none
   (function hyphenationNote() {
     const d = document.createElement('div');

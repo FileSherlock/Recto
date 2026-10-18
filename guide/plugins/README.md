@@ -169,9 +169,10 @@ at call time, inside event handlers.
   behind a `typeof Shaping !== 'undefined'` guard, and `ocr_tool` reads a face's kern table
   through `FontCatalog.metrics` (→ `Shaping.fontMetrics`). Without `text_tool` nothing is
   measured and nothing throws.
-- **The Match controls** live in `text_tool`: Kerning in its formatting ribbon (`#kerning`),
-  the width tolerance and the letter case in its section of the Settings panel
-  (`#tolerance`, `#tt-name-case` — as typed / UPPERCASE / FIRST name / LAST name; the box
+- **The Match controls** live in `text_tool`'s Text panel: Pair kerning (`#kerning`, a
+  checkbox — the effective kerning of the selected box), the width tolerance and the letter
+  case in its Redaction match section (`#tolerance`, `#tt-name-case` — as typed / UPPERCASE /
+  FIRST name / LAST name; the box
   field `uppercase` is `false | true | 'first' | 'last'`, applied through `utbApplyCase`).
   `redaction_matching` reads them if present and no-ops if not.
 

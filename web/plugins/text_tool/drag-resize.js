@@ -189,7 +189,6 @@
       if (utbState.selectedId) {
         utbState.selectedId = null;
         deselectAllInSVG();
-        document.getElementById('fabric-options-bar')?.classList.add('hidden');
         if (typeof syncToolbarToSelection === 'function') syncToolbarToSelection();
         if (typeof syncNameSettingsUI === 'function') syncNameSettingsUI();
         if (typeof renderCandidates === 'function') renderCandidates();
@@ -228,7 +227,6 @@
   document.addEventListener('mousedown', e => {
     if (e.target.closest('svg.text-layer')) return;
     if (e.target.closest('svg.ruler-layer')) return; // ruler marker drag must not deselect
-    if (e.target.closest('#fabric-options-bar')) return;
     if (e.target.closest('#unified-options-bar-container')) return;
     if (e.target.closest('#tool-column')) return;
     if (e.target.closest('.floating-panel')) return;
@@ -238,7 +236,6 @@
     if (utbState.selectedId) {
       utbState.selectedId = null;
       deselectAllInSVG();
-      document.getElementById('fabric-options-bar')?.classList.add('hidden');
       if (typeof syncToolbarToSelection === 'function') syncToolbarToSelection();
       if (typeof syncNameSettingsUI === 'function') syncNameSettingsUI();
       if (typeof renderCandidates === 'function') renderCandidates();

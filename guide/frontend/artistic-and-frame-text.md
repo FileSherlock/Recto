@@ -19,8 +19,8 @@ own paragraph attributes.
 
 | Affinity | Recto (tool column) | What it does |
 |---|---|---|
-| Frame Text Tool | **Frame Text Tool** `#tt-frame-text-btn` | A **drag** draws a frame and puts the caret in it (a drag that starts on a line of the page takes that line's face, bold / italic and size). **Shift** keeps it square, **Ctrl** draws it from the centre. While dragging, the **arrow keys** make a grid of frames (Left/Right: one column fewer/more, Down/Up: one row more/fewer), **Ctrl+arrows** widen or narrow the gap between them. A **press without a drag** creates nothing — on an object it selects it, on the page it deselects. A press on Artistic or Frame text puts the caret there. |
-| Artistic Text Tool | **Artistic Text Tool** `#tt-art-text-btn` | A **click** starts Artistic text with its baseline at the point, in the ribbon's font and size — or, beside a line of the page's text, in **that line's face, bold / italic and size on its baseline** — of a row cut by redaction bars, the piece the click is in. An empty one is half an em wide (a drag's: the drag's width), so it can be seen and pressed. A **drag** sets the size: the font's typographic ascent is the drag's height, the baseline its lower edge. Artistic text breaks only at its returns; its box is its text's extent. Its **corner handles scale** it — every size in the story by the same factor, the opposite corner fixed. |
+| Frame Text Tool | **Frame Text Tool** `#tt-frame-text-btn` | A **drag** draws a frame and puts the caret in it (a drag that starts on a line of the page takes that line's face, bold / italic and size — over the page's own lines it draws, it never moves them). **Shift** keeps it square, **Ctrl** draws it from the centre. While dragging, the **arrow keys** make a grid of frames (Left/Right: one column fewer/more, Down/Up: one row more/fewer), **Ctrl+arrows** widen or narrow the gap between them. A **press without a drag** creates nothing — on a redaction box it selects it, on the page it deselects. A press on Artistic or Frame text puts the caret there. |
+| Artistic Text Tool | **Artistic Text Tool** `#tt-art-text-btn` | A **click** starts Artistic text with its baseline at the point, in the font and size new text takes (the Text panel's, with nothing selected) — or, on or beside a line of the page's text, in **that line's face, bold / italic and size on its baseline** — of a row cut by redaction bars, the piece the click is in; a click within half an em of where that line starts **starts at its first glyph**, so the new text lines up with the page's. An empty one is half an em wide (a drag's: the drag's width), so it can be seen and pressed. A **drag** sets the size: the font's typographic ascent is the drag's height, the baseline its lower edge. Artistic text breaks only at its returns; its box is its text's extent. Its **corner handles scale** it — every size in the story by the same factor, the opposite corner fixed. |
 
 Both Affinity tools stay armed, as Affinity's do, until clicked again or another placing tool
 is chosen. **Escape** leaves the text being edited (the box stays selected), then deselects,
@@ -34,21 +34,24 @@ the Text Frame tab: the story stays, and so does the text on the page — the bo
 the first line starts and sits where it did (a frame puts its first baseline at its Initial
 advance, Artistic text hangs from it); a converted Artistic text's frame is its text's extent.
 
-**Fitting text over the page** — the ribbon's Spacing and Style tools a one-line box has work on
-Artistic and Frame text too, through attributes Affinity already has:
+**Fitting text over the page** — the Text panel's Spacing section works on Artistic and Frame
+text through attributes Affinity already has:
 
-- **Space W.** (`fabric-space-width`, px) sets the paragraphs' desired **Word Spacing**
+- **Pair kerning** (`kerning`) — nobody chose: **as the page**, the way the page's producer set
+  this face (`utbAutoKerning`, when an analysis plugin answers it), and on a page nobody has
+  read, **off**, as Word sets text. Ticked or unticked it is the text's own (`autoKern` true /
+  false), in both directions; ↺ follows the page again.
+- **Space width** (`fabric-space-width`, px) sets the paragraphs' desired **Word Spacing**
   (Paragraph ▸ Justification, % of the face's space) so that a space is that wide in the face of
-  the selection's first character; **Default** (`fabric-default-sw`) is 100 % — the face's own
-  space. The pixel view lays the spaces at that width, and the paragraph's desired letter spacing
-  after every glyph, as the HTML does.
-- **sp#** (`toggle-space-labels`) badges every run of spaces inside a line with its width.
-- **Nudge** (`fabric-nudge-mode`) puts a hit area on every character; a character's x nudge is the
-  **manual kerning** of the pair it closes (Kerning ▸ Manual on the character before it), so it
-  moves that character and the rest of its line. The story's first character moves the whole
-  text; the first character of another line has nothing to kern against and has no hit area.
-
-Kerning nobody chose follows the page, as a typed box's does (`utbAutoKerning`, when an analysis plugin answers it).
+  the selection's first character; **Font's** (`fabric-default-sw`) is 100 % — the face's own
+  space. A pixel renderer lays the spaces at that width, and the paragraph's desired letter
+  spacing after every glyph, as the HTML does.
+- **Space widths** (`toggle-space-labels`, in the panel's Display section) badges every run of
+  spaces inside a line with its width.
+- **Nudge characters** (`fabric-nudge-mode`) puts a hit area on every character; a character's x
+  nudge is the **manual kerning** of the pair it closes (Kerning ▸ Manual on the character before
+  it), so it moves that character and the rest of its line. The story's first character moves the
+  whole text; the first character of another line has nothing to kern against and has no hit area.
 
 New Artistic and Frame text is **black**, Affinity's default fill. (A plain typed box keeps
 Recto's orange for text the user added.)
@@ -78,15 +81,16 @@ Affinity. While a box is only **selected**, every setting applies to all of its 
 
 ## Where the settings are
 
-- **The ribbon** (`#fabric-options-bar`, the text context toolbar) — in Affinity's order: Font
-  family and size, **+/−** size, **B I U S**, **Font Colour** with its **Opacity**,
-  **Change Case** (UPPERCASE / lowercase / Sentence case / Title Case — rewrites the text),
-  **Superscript / Subscript**, **Highlight Colour**, **Align**, **Vertical Align** (frames),
-  **Paragraph Leading**, **Bulleted / Numbered List**, **Number of columns** and **Gutter**
-  (frames), and buttons that open the panels.
-- **The Text panel** (`#tt-studio`, the ¶ button in the tool column) — Character, Paragraph,
-  Text Frame, Typography tabs. It floats; drag it by its tabs. A setting that differs inside
-  the selection shows blank.
+All of them are in the **Text panel** (`#tt-studio`, the ¶ tool in the tool column): Character,
+Paragraph, Text Frame and Typography tabs, in Affinity's order and with its labels — the
+Character tab opens with Affinity's text context toolbar (font family, style and size with
+**−/+**, **B I U S**, **Change Case**), then Font and Background Colour with Opacity, the
+Spacing section (pair kerning, manual kerning, tracking, space width, nudge), Position &
+Transform, Decorations, the quick Typography toggles and Language. The panel is docked at the
+right of the page, beside any other side panel, never over the page; on a phone it is a sheet at
+the foot of the screen. A setting that differs inside the selection shows blank. A setting the
+selection or the drawing cannot have is greyed with a lock, the reason on hover — see
+[The Text panel](text-tool.md#what-the-panel-acts-on).
 
 ---
 
@@ -100,7 +104,7 @@ em, as Affinity's panel shows them.
 | Font Family, Font Size, Font Style | `fontFamily`, `sizePt`, `bold`, `italic` | Faces from the font catalogue; Recto's catalogue has Regular, Bold, Italic, Bold Italic |
 | Font Colour (+ opacity) | `color`, `opacity` | The fill; opacity is the fill colour's alpha (decorations without a colour of their own follow it, the highlight does not) |
 | Background Colour | `highlight` | Behind the glyphs |
-| Kerning: Auto | `autoKern` | The font's GPOS `kern`, else its `kern` table. Affinity has no optical kerning |
+| Kerning: Auto — **Pair kerning** | `autoKern` | The font's GPOS `kern`, else its `kern` table: `true`, `false`, or `null` — **as the page** (the default): as the page's producer set the face where an analysis plugin knows it, else off (`StoryCore.resolveKern`). Affinity has no optical kerning |
 | Kerning: Manual | `manualKern` | ‰ added after each character, on top of tracking |
 | Tracking | `tracking` | ‰ of the run's size after every glyph |
 | Baseline | `baselineShift` | Raises the text; leading unchanged |
@@ -170,6 +174,13 @@ as Affinity's panel does; untick it to see them all greyed).
   Unicase (`unic`); Case-Sensitive Forms (`case`), Capital Spacing (`cpsp`), Titling Alternates
 - **Stylistic Sets** — `ss01` … `ss20`
 
+**Standard ligatures, contextual ligatures and contextual alternates are off by default**
+(Affinity's are on): text typed over a page must be set as the page was, and Word applies none
+of them unless asked — no page of the corpus Recto is measured on has a ligature (0 of 30,836
+certified lines), and the browser's default ligatures put a Calibri line's glyphs off the
+page's (a typed line within ½ px of the page's pens: 22 of 51 with them, 37 of 51 without, on
+the FBI summary's page 2). Tick them in this tab or with the quick toggles.
+
 All Caps is always synthesised (upper case). **Small caps** and **caps to small caps** come
 from the font, and are synthesised as Affinity synthesises them when it has neither: the
 letters drawn as capitals at the font's xHeight / capHeight (OS/2; 0.714 without). All small
@@ -203,13 +214,17 @@ alternates, ordinals, fractions, superior and inferior figures, all caps, small 
 - **Editing** — `story-edit.js` makes that markup editable. Every leaf `<span data-o>` holds one
   text node and says where in its paragraph it starts, so a DOM position maps to the model
   exactly; every `beforeinput` becomes a StoryCore edit and the story is drawn again.
-- **A pixel renderer** — when a plugin defines the `utbPixelRender` seam, a story is drawn through it as one-line pieces: each line cut into one piece per run (a justified line at its spaces too); the browser's layout gives a line's start and baseline relative to the flow, the flow's origin comes from the box's own numbers (the browser truncates a foreignObject's position to a 1/64 px grid, which would move pens on the ¼ px lattice), the seam lays each piece's glyphs and its advance places the next piece. So the first line of Artistic text starts at `box.x` on the baseline it was given — measured on the startup document (2026-10-10), the same text typed at the same click as Artistic text and as Recto's former one-line Add New Text box drew the same pixels, at every zoom. Only while every piece can be drawn (no highlight, stroke, scale, shear, synthetic super/subscript or small caps, opacity, double lines) and not while the story is edited; otherwise it stays HTML.
-- **The panels** — `text-studio.js` binds every control by its `data-k` attribute name;
-  `toolbar.js` routes the ribbon to the story while a story box is selected.
+- **A pixel renderer** — when a plugin defines the `utbPixelRender` seam, a story is drawn through it as one-line pieces: each line cut into one piece per run (a justified line at its spaces too); the browser's layout gives a line's start and baseline relative to the flow, the flow's origin comes from the box's own numbers (the browser truncates a foreignObject's position to a 1/64 px grid, which would move pens on the ¼ px lattice), the seam lays each piece's glyphs and its advance places the next piece. So the first line of Artistic text starts at `box.x` on the baseline it was given — measured on the startup document (2026-10-10), the same text typed at the same click as Artistic text and as Recto's former one-line Add New Text box drew the same pixels, at every zoom. Only while every piece can be drawn (`StoryCore.PIXEL_LIMITS`: no highlight, stroke, scale, shear, synthetic super/subscript or small caps, opacity, double lines) and not while the story is edited; otherwise it stays HTML. While the renderer draws (`window.utbPixelRenderOn()`, the `pixels:changed` hook) the Text panel locks what it cannot draw, and what it lays past (`StoryCore.PIXEL_IGNORES`, the OpenType features), with the reason. Typed over the page's own lines, a story's pieces are the pieces a typed one-line box gives: the same glyph set, law and pens, the same pixels (measured 2026-10-18 on the FBI summary's page 2: 8 of 8 lines).
+- **The panel** — `text-studio.js` binds every control by its `data-k` attribute name, and
+  sets a box that is not a story through `toolbar.js` (`utbPlainChar`).
 
 ---
 
 ## Not like Affinity (yet)
+
+- **Defaults set as Word sets text**: pair kerning follows the page (off where the page is not
+  known) and the ligatures and contextual alternates are off — Affinity kerns and ligates by
+  default; the documents Recto opens were mostly made in Word, which does neither unless asked.
 
 - **Text flow between frames** (linking, autoflow), **text wrap** around other objects, the
   **baseline grid**, **optical alignment**, **initial words**, **character and paragraph
@@ -230,6 +245,6 @@ alternates, ordinals, fractions, superior and inferior figures, all caps, small 
 ## Files
 
 `web/plugins/text_tool/`: `story-core.js`, `story-render.js`, `story-edit.js`,
-`frame-tool.js`, `artistic-tool.js`, `text-studio.js`, `studio.html` (the panel),
-`options_bar.html` (the ribbon groups); `shaping.js` (`faceMetrics`). Tests:
+`frame-tool.js`, `artistic-tool.js`, `text-studio.js`, `studio.html` (the Text panel),
+`toolbar.js` (a box that is not a story); `shaping.js` (`faceMetrics`). Tests:
 `tests/story.test.mjs`, `tests/page-controls.test.mjs`.

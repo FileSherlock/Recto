@@ -19,7 +19,8 @@ API. Everything else is a plugin.
   service.
 - **`web/plugins/text_tool/`** — edit and add text with real font metrics (HarfBuzz-shaped
   widths), and Affinity's Artistic and Frame text: rich text with the Character, Paragraph,
-  Text Frame and Typography settings, columns, drop caps, OpenType features.
+  Text Frame and Typography settings, columns, drop caps, OpenType features — every setting in
+  one Text panel docked beside the page, with pair kerning and ligatures set as the page was.
 - **`web/plugins/embedded_text_viewer/`** — inspect the text already embedded in the PDF.
 - **`web/plugins/webgl_mask/`** — find the blacked-out regions of a scanned page and tint
   them on the GPU.

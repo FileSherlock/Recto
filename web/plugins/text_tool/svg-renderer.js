@@ -440,7 +440,9 @@ function _updateSpaceLabels(g, box) {
   }
 
   // ── All boxes with text positions ─────────────────────────────────
-  if (!box.baseCharPositions?.length) {
+  // (measured positions that no longer apply — the box was set in another
+  // face — are not where the spaces are: the drawn text says that)
+  if (!box.baseCharPositions?.length || !utbCharsValid(box)) {
     if (!box.text || typeof box.text !== 'string' || !box.text.includes(' ')) return;
 
     const textEl = g.querySelector('.utb-text');

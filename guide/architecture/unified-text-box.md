@@ -36,7 +36,7 @@ All five modules live in `web/plugins/text_tool/` and are loaded, in this order,
 | `inline-edit.js` | Double-click WYSIWYG editing for `embedded` and `harfbuzz` boxes | `enterInlineEdit(box)`, `commitInlineEdit()`, `cancelInlineEdit()` |
 | `story-core.js` | The rich-text model of Artistic and Frame text (no DOM) | `StoryCore` |
 | `story-render.js` | Draws a story box as HTML in its group | `renderStoryBox(g, box)`, `storySync(box)`, `ensureStory(box)` |
-| `story-edit.js` | Edits a story in place; what the ribbon and the Text panel write through | `enterStoryEdit`, `commitStoryEdit`, `storyApplyChar`, `storyApplyPara`, `storyApplyFrame`, `storyTarget` |
+| `story-edit.js` | Edits a story in place; what the Text panel writes through | `enterStoryEdit`, `commitStoryEdit`, `storyApplyChar`, `storyApplyPara`, `storyApplyFrame`, `storyTarget` |
 | `frame-tool.js`, `artistic-tool.js` | Affinity's Frame Text and Artistic Text tools | `createTextFrame`, `storyScaleDrag`, `storyConvert` |
 | `text-studio.js` | The Text panel (Character, Paragraph, Text Frame, Typography) | `openTextStudio(tab)` |
 

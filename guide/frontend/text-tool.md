@@ -1,91 +1,134 @@
-# Unified Toolbar — `toolbar.js` + `text-tool.js`
+# The Text panel — `text-studio.js` + `toolbar.js`
 
-`toolbar.js` manages the formatting toolbar and is the single code path for reading and writing typography properties on any `UnifiedTextBox`. There is no branching on `box.type` — `embedded`, `redaction`, and `harfbuzz` boxes are all handled identically.
+Every setting of text is in one place: the **Text panel** (`#tt-studio`, the fragment
+`studio.html`), a side panel docked at the right of the page — beside any other side panel,
+never over the page — and on a phone a sheet at the foot of the screen. The ¶ tool
+(`#tt-studio-btn`) shows and hides it; whether it is shown and which tab is open are kept in
+this browser (localStorage `recto.textStudio.*`); a screen wider than 900 px shows it at
+first. There is no formatting ribbon: the ribbon row (`#unified-options-bar-container`) holds
+other plugins' bars.
 
-`text-tool.js` handles manual box creation and deletion.
-
-Both are scripts of the `text_tool` plugin (`web/plugins/text_tool/`), listed in its `plugin.json` under `scripts_after_app`. The controls live in the plugin's own fragments: `toolbar_button.html` (the tools in the left column — the **Artistic Text** and **Frame Text** tools, **Add Redaction Box**, **Undo**, **Redo** and the **Text formatting** toggle `#toggle-fmt`), `options_bar.html` (the contextual formatting bar `#fabric-options-bar`, revealed while a box is selected) and `settings.html` (the **Redaction match** section of the Settings panel: width tolerance and letter case).
-
----
-
-## Toolbar Controls
-
-| Control ID | Property | Notes |
-|------------|----------|-------|
-| `#fabric-font-family` | `box.fontFamily` | Catalogue family name (e.g. `"Nimbus Roman"`, `"Times New Roman"`); the menu is filled from the catalogue by `fonts.js` |
-| `#fabric-font-size` | `box.sizePt` | Displayed, entered, and stored in **points** — no conversion |
-| `#fabric-bold` | `box.bold` | Toggle button (`.active` class = on) |
-| `#fabric-italic` | `box.italic` | Toggle button |
-| `#fabric-underline` | `box.underline` | Toggle button |
-| `#fabric-strikethrough` | `box.strikethrough` | Toggle button |
-| `#fabric-color` | `box.color` | Hex color; `null` = per-type default |
-| `#fabric-opacity`, `#fabric-opacity-value` | `box.opacity` | The text colour's opacity, 0–100 % (slider and number show one value; double-click the slider for 100 %). The glyphs only (`fill-opacity`); on Artistic / Frame text the selected characters' `opacity` (the fill colour's alpha) |
-| `#kerning` | `box.kerning` (+ clears `box.kerningAuto`) | Checkbox. `box.kerning` is always the effective boolean; until the user touches the box it **follows the page** (`kerningAuto`, see below) and the label's tooltip says so |
-| `#fabric-nudge-mode` | — | Toggle button; enters/exits micro-typography nudge mode on the selected span. Disabled unless the span's measured positions still apply (`utbCharsValid(box)`). |
-| `#fabric-letter-spacing` | `box.letterSpacing` | em units |
-| `#fabric-default-sw` | `box.defaultSpaceWidth` | Toggle button labelled **Default** (`.active` = on); when on, the font's native space width is used. Turn it off for manual slider control. |
-| `#fabric-space-width` | `box.spaceWidth` | Slider; applies only while `#fabric-default-sw` is off. `#fabric-space-width-display` shows the value |
-| `#toggle-space-labels` | — | Toggle button; shows the numeric width above each space (`setShowSpaceWidthLabels`) and, beside a redaction box, its gap to the text on either side in that line's spaces and px (`utbBarGaps` in `svg-renderer.js`; no badge where the bar touches the text) |
-| `#utb-delete-box` | — | Deletes the selected box (`utbDeleteBox`); Delete / Backspace do the same outside a text field |
-| `#tolerance`, `#tt-name-case` | `box.tolerance`, `box.uppercase` | The **Redaction match** section of the Settings panel (`settings.html`): the selected redaction's values, or the defaults for new boxes when none is selected (`#tt-match-scope` says which). Letter case is `false` (as typed), `true` (UPPERCASE), `'first'` or `'last'` (that name in capitals) — `utbApplyCase(text, mode)` in `unified-text-box.js` applies it. The values are read by whichever matching plugin is installed and are inert when none is |
+`text-studio.js` is the panel. `toolbar.js` maps its character settings onto a box that is not
+a story (`window.utbPlainChar`), and keeps what every box shares: `getNaturalSpaceWidth` and
+the calls that tell the panel the selection changed (`syncToolbarToBox`,
+`syncToolbarToSelection` — names kept from the ribbon they once drove). `text-tool.js` adds and
+deletes redaction boxes. All are scripts of the `text_tool` plugin (`web/plugins/text_tool/`).
+Its fragments: `toolbar_button.html` (the tools in the left column — **Artistic Text**,
+**Frame Text**, **Add Redaction Box**, **Undo**, **Redo** and the **Text panel** ¶) and
+`studio.html` (the panel).
 
 ---
 
-### Artistic and Frame text
+## What the panel acts on
 
-While the selected box carries a story (`box.textMode`), the Font and Style controls do not
-write the box: they apply to the story — to the selected characters while it is edited, to all
-of its text otherwise — through `storyApplyChar` (`story-edit.js`), and `syncToolbarToBox` shows
-the selection's attributes (blank where they are mixed). The ribbon's story groups (Text,
-Paragraph, Columns, Panels) show for story boxes and typed (`harfbuzz`) boxes; using one on a
-typed box makes it Artistic text first (`ensureStory`). Everything about stories — the tools,
-the keys, every setting and how it is computed — is in
-[Artistic and Frame Text](artistic-and-frame-text.md).
+The panel shows and sets the formatting of what is selected — any box — and its scope line
+(`#tt-studio-scope`) says which:
+
+| Selected | What can be set |
+|---|---|
+| **Artistic or Frame text** (`box.textMode`) | Everything — the selection of the text being edited, else all of the box's text (`storyApplyChar` / `storyApplyPara` / `storyApplyFrame`, [Artistic and Frame Text](artistic-and-frame-text.md)). A plain typed `harfbuzz` box becomes Artistic text on its first change (`ensureStory`) |
+| **A box with one face** — an OCR line, embedded text, a redaction box's label | Its own fields (`utbPlainChar`, below): font family, size, style, **B I U S** (single lines), colour and opacity, pair kerning, tracking, space width, nudge; a redaction box also its match terms. Everything else is **locked** — greyed, a lock, the reason on hover; the Paragraph, Frame and Typography tabs say so once, at their top |
+| **Nothing** | The font family and size **new text** takes (`TextPanel.newText()`; fonts.js puts the document's face there, a change made here is the user's own default), and the match terms a new redaction box takes |
+
+A setting the target or the drawing cannot have is locked (`lockOf` in `text-studio.js`):
+a box with one face has no paragraph, frame, OpenType or decoration-colour settings; the Frame
+tab belongs to Frame text (its **Convert to Text Frame** stays usable); and while a **pixel
+renderer** draws the text (below), what it cannot draw.
+
+### The Character tab
+
+| Control | Story attribute | A box with one face |
+|---|---|---|
+| `#fabric-font-family` (filled from the catalogue by `fonts.js`), `#fabric-font-size` (pt), `#tt-ch-style`, `#tt-size-down` / `#tt-size-up` | `fontFamily`, `sizePt`, `bold`, `italic` | `box.fontFamily`, `box.sizePt` (points, stored and shown as they are), `box.bold`, `box.italic` |
+| **B I U S** `#fabric-bold`, `#fabric-italic`, `#fabric-underline`, `#fabric-strikethrough` | `bold`, `italic`, `underline`, `strike` (`single`) | `box.bold`, `box.italic`, `box.underline`, `box.strikethrough` |
+| `#tt-change-case` | rewrites the text (`storyChangeCase`) | locked |
+| Font Colour `#tt-ch-color` (+ `#tt-ch-color-on`), Opacity `#tt-ch-opacity` (%) | `color`, `opacity` | `box.color` (none: the type's colour), `box.opacity` |
+| **Pair kerning** `#kerning` (+ `#tt-kern-source`, ↺ `#tt-kern-page`) | `autoKern`: `true`, `false`, `null` = as the page | `box.kerning` + `box.kerningAuto` |
+| Manual kerning `#tt-ch-kern`, Tracking `#tt-ch-tracking` (‰ of an em) | `manualKern`, `tracking` | Tracking: `box.letterSpacing` (em) = ‰ ÷ 1000 |
+| **Space width** `#fabric-space-width` (px) + **Font's** `#fabric-default-sw` | the paragraphs' desired Word Spacing (% of the face's space) | `box.spaceWidth` / `box.defaultSpaceWidth` |
+| **Nudge characters** `#fabric-nudge-mode` | the pair's manual kerning (`micro-typo.js`) | `box.charAdvances` (while `utbCharsValid(box)`) |
+| Background, Position & Transform, Decorations, Typography, Language | see [Artistic and Frame Text](artistic-and-frame-text.md) | locked |
+| **Redaction match** `#tt-settings`: `#tolerance` (px), `#tt-name-case` (`#tt-match-scope` says whose) | — | a redaction box's `box.tolerance`, `box.uppercase` (`utbApplyCase`); shown for a redaction box and with nothing selected. The ids are read by whichever matching plugin is installed |
+
+`#utb-delete-box` (beside the scope line) deletes the selected box (`utbDeleteBox`); Delete /
+Backspace do the same outside a text field.
+
+### Pair kerning
+
+The font's pair kerning — **Yo**, **AV**, **To**, **Wa** set closer — is a checkbox showing the
+kerning as drawn, and beside it where that comes from:
+
+- **as the page: on / off** — nothing was chosen: the text kerns as the page's producer set
+  this face, which an analysis plugin learns from the page's pixels and answers through the
+  guarded seam `window.utbAutoKerning(box)` (`true` / `false` / nothing known);
+- **unread page: off** — nobody has read the page: the text is set as Word sets text,
+  **without** pair kerning (`StoryCore.resolveKern`; Word kerns only when asked);
+- **yours (page: on / off)** — set with the checkbox, in both directions; ↺ follows the page
+  again.
+
+A story keeps the choice per character (`autoKern` `true` / `false`, `null` = as the page); a
+box with one face in `box.kerning` + `box.kerningAuto` (true = as the page). A box that follows
+the page is drawn again when a reader learns the page's kerning.
+
+Measured over the eval harness's corpus (recto-eval, 2026-10-18 — 43 documents, 30,836 lines
+read and certified): every page Word made, and every synthetic page set like Word, is set
+**without** pair kerning; the Times e-mail printouts are kerned. 47 % of the lines hold a kern
+pair of their face, so the choice decides them: text typed with the page's kerning reproduces
+77.1 % of the lines pixel for pixel; with kerning always on (the old default for an unread
+page) Word's Calibri page drops from 62.7 % to 15.7 %; with it always off the kerned e-mails
+drop from 84.1 % to 33.1 %.
+
+### Space width, Nudge
+
+**Space width** sets the width of a space in px: a story's paragraphs' desired word spacing,
+shown in px of the face's space of the selection's first character, or a plain box's manual
+space width (its measured positions are moved by the difference). **Font's** is the face's own
+space (100 %; a plain box: `box.spaceWidth = null`); unticking it starts from the face's space
+measured by HarfBuzz (`getNaturalSpaceWidth`).
+
+**Nudge characters** enters micro-typography mode (`enterMicroTypo`): every character gets a
+hit area, and a character's x nudge is the manual kerning of the pair it closes (a story) or
+its `charAdvances` delta (a plain box, while its measured positions hold — `utbCharsValid`;
+otherwise the button is disabled and says why). Pressing it again or Escape leaves it.
+Double-click is a different gesture: it starts inline text editing (`inline-edit.js`).
+
+### Display
+
+The panel's foot holds the switches that change how the page's text is drawn, for every box:
+**Space widths** (`#toggle-space-labels` → `setShowSpaceWidthLabels`: the width of every run
+of spaces, and beside a redaction box its gaps to the text, in `utbBarGaps`' terms) — and any
+plugin's Settings section marked `data-text-panel`, which moves here from the Settings panel
+when the Text panel is installed (and stays in Settings when it is not).
+
+### A pixel renderer, and what it cannot draw
+
+A plugin that draws text as raster pixels (the `utbPixelRender` seam, see
+[Artistic and Frame Text](artistic-and-frame-text.md#how-it-is-drawn)) says whether it is
+drawing through `window.utbPixelRenderOn()` (its name, or null) and the `pixels:changed` hook.
+While it draws, the panel locks what it cannot draw — `StoryCore.PIXEL_LIMITS`: opacity, a
+background colour, an outline, scales, shear, synthesised super/subscript and OpenType figure
+positions, small caps (All Caps can be drawn), double lines (single ones can) — and what it lays
+past, `StoryCore.PIXEL_IGNORES`: the OpenType features (one glyph per character, as the page's
+producer set them). A paragraph's list markers, fill and rules and a frame's column rules are
+HTML around the text and are locked too. The reason names the renderer and how to unlock:
+turn it off in the Display section.
+
+---
 
 ## Font Size Units
 
-Font size has a single canonical unit — **points** — stored on `box.sizePt`.
-The toolbar reads and writes that value directly, with no DPI conversion:
+Font size has a single canonical unit — **points** — stored on `box.sizePt`. The panel reads
+and writes that value directly, with no DPI conversion. Points are converted to image pixels
+exactly once, at the SVG render boundary (`GEO.docPtToPx(box.sizePt)` in `svg-renderer.js`).
+There is no separate px `fontSize` field. The conversion helpers live on `window.GEO`, defined
+by the core's `web/core/geometry.js` — the coordinate contract.
 
-```
-toolbar input  =  box.sizePt        (points, both directions)
-```
-
-Points are converted to image pixels exactly once, at the SVG render boundary
-(`GEO.docPtToPx(box.sizePt)` in `svg-renderer.js`). There is no separate px
-`fontSize` field. The conversion helpers live on `window.GEO`, defined by the core's
-`web/core/geometry.js` — the coordinate contract.
+The font menu **shows the box's family even when the catalogue lacks it** (an option marked
+"not installed" is added), so a menu left on another family never re-fonts a box.
 
 ---
 
-## `syncToolbarToBox(box)`
-
-Reads from the `UnifiedTextBox` and pushes values into the toolbar UI. Called whenever a box is selected (from `drag-resize.js`) or when the selection changes.
-
-```js
-fsInput.value = Math.round(box.sizePt * 100) / 100;  // points, shown directly
-```
-
-Also sets font family, bold/italic/underline/strikethrough active states, letter spacing, color, kerning, the Default space-width button, space-width slider, and nudge button state (active if micro-typo mode is active for this box, disabled unless `utbCharsValid(box)`). It reveals `#fabric-options-bar` — every selection path routes through here, so this is the single reveal point — and shows the Match group only for a `redaction` box.
-
-The font menu is made to **show the box's family even when the catalogue lacks it** (an option marked "not installed" is added): every toolbar change writes the menu's value back into the box, so a menu left on another family would silently re-font the box the next time Bold is clicked.
-
----
-
-## `persistFromToolbar(box)`
-
-Reads the current toolbar state and writes it directly to the box, then calls `renderBox(box)`.
-
-```js
-const inputSize = parseFloat(el('fabric-font-size').value);   // points
-box.sizePt = inputSize > 0 ? inputSize : box.sizePt;          // never 0, negative or NaN
-```
-
-Kerning is **not** read here — it has its own `change` handler, because
-reading the checkbox on every toolbar change would turn a box that follows the
-page into one with a fixed choice.
-
-### Settings and measured positions
+## Settings and measured positions
 
 A box read from a PDF or by an analysis plugin carries `baseCharPositions`,
 measured under one typography (`box.baseFace`: family, style, size, letter
@@ -100,17 +143,20 @@ brings the positions back.
 analysis plugin decide the default: before rendering, `svg-renderer.js` asks
 the guarded seam `window.utbAutoKerning?.(box)` and, on a boolean, writes it to
 `box.kerning` — so SVG `font-kerning`, `Shaping.widths` requests and any pixel renderer
-all read one effective value. The Kerning checkbox clears the flag for good.
+all read one effective value. The Pair kerning checkbox clears the flag; ↺ sets it again.
 
-If the Default button is off and the box has text, the manual `box.spaceWidth` from the slider is used.
-
-If `box.type === 'redaction'`, `calculateWidthsForRedaction(box.id)` is called to recalculate the candidate-word width map. `text_tool` does not define that function — the call is `typeof`-guarded, so it resolves when a plugin supplies it and no-ops when none does. See [Optional Plugins](../plugins/).
+Every change to a `redaction` box's typography also calls
+`calculateWidthsForRedaction(box.id)` behind a `typeof` guard: `text_tool` does not define
+that function — it resolves when a plugin supplies it and no-ops when none does. See
+[Optional Plugins](../plugins/).
 
 ---
 
 ## Natural Space Width
 
-When the Default button is turned off, the slider is initialized to the font's natural space advance by measuring a single space with HarfBuzz — a call into `shaping.js` in the same plugin, in the page ([Text Measurement](width-calculator.md)):
+When **Font's** is unticked on a plain box, the space width starts from the font's natural
+space advance, measured by HarfBuzz — a call into `shaping.js` in the same plugin, in the page
+([Text Measurement](width-calculator.md)):
 
 ```js
 const data = await Shaping.widths({
@@ -125,44 +171,39 @@ const data = await Shaping.widths({
 // → { results: [{ text: ' ', width, chars }] }    width = the natural space advance
 ```
 
-The result is written to `box.spaceWidth` and `box.nativeSpaceWidth`, and cached per face, size, kerning and scale. When the button is turned on again, `box.spaceWidth` is set to `null` (native font spacing). The helper is exposed as `window.getNaturalSpaceWidth(box)` for plugins that need the same number.
-
----
-
-## Nudge Button
-
-The **Nudge** button (`#fabric-nudge-mode`) in the Style group enters micro-typography mode on the selected span:
-
-- **Click** when a span is selected and its measured positions apply (`utbCharsValid(box)`) → calls `enterMicroTypo(box)`.
-- **Click** again (or press Escape) → calls `exitMicroTypo()`.
-- The button is **disabled** when no span is selected or the span lacks valid per-character positions.
-
-Double-click is a different gesture: it starts inline text editing (see `inline-edit.js`).
+The result is written to `box.spaceWidth` and `box.nativeSpaceWidth`, and cached per face, size,
+kerning and scale. Ticking **Font's** again sets `box.spaceWidth` to `null` (native font
+spacing). The helper is exposed as `window.getNaturalSpaceWidth(box)` for plugins that need
+the same number.
 
 ---
 
 ## Event Wiring
 
+The data-k controls go through one handler (`onChange` → `apply`): a story's through
+`storyApplyChar` / `storyApplyPara` / `storyApplyFrame`, a plain box's through
+`utbPlainChar.apply(box, patch, key)` — one undo step, a `key` collapsing a field's live
+changes (`char:sizePt:<id>`, …) — and with nothing selected the font and size of new text.
+
 | Event | Element | Action |
 |-------|---------|--------|
-| `change` | `#fabric-font-family` | `persistFromToolbar` |
-| `input` | `#fabric-font-size` | Live `box.sizePt` + `renderBox` |
-| `change` | `#fabric-font-size` | Full `persistFromToolbar` |
-| `click` | bold/italic/underline/strikethrough buttons | Toggle `.active`, `persistFromToolbar` |
-| `change` | `#fabric-letter-spacing` | `persistFromToolbar` |
-| `input` | `#fabric-color` | `box.color = value`, `renderBox` |
-| `input` / `change` | `#fabric-opacity` / `#fabric-opacity-value` | `box.opacity = value` (one undo step per drag), `renderBox`; a story box: `storyApplyChar({ opacity })` |
-| `change` | `#kerning` | `box.kerning = checked`, `box.kerningAuto = false`, `renderBox` |
-| `click` | `#fabric-default-sw` | Toggle native vs manual space width; measure the natural width via `Shaping.widths` when turning it off |
-| `input` | `#fabric-space-width` | Live `box.spaceWidth = value`, `renderBox`, update display label |
-| `click` | `#fabric-nudge-mode` | Toggle micro-typography mode on selected span |
-| `change` | `#tolerance`, `#tt-name-case` | Write `box.tolerance` / `box.uppercase` on the selected `redaction` box (`applyMatchControls`); guarded calls into a matching plugin |
-| `click` | `#toggle-space-labels` | `setShowSpaceWidthLabels(active)` |
-| `click` | `#toggle-fmt` | Open / close `#fabric-options-bar` through `openSubtoolbar` |
+| `change` / `input` | any `[data-k]` control | `apply(scope, { key: value })` as above |
+| `click` | a `[data-toggle]` button (B I U S, the quick Typography toggles) | its attribute to its on / off value |
+| `change` | `#kerning` | `apply('char', { autoKern: checked })` |
+| `click` | `#tt-kern-page` | `apply('char', { autoKern: null })` — as the page again |
+| `change` | `#fabric-default-sw` | the face's space (`wordSpacing: 100` / `spaceWidth = null`), or the measured natural width to start from |
+| `input` / `change` | `#fabric-space-width` | a story's word spacing (% of its face's space), a plain box's `spaceWidth` |
+| `click` | `#fabric-nudge-mode` | `enterMicroTypo` / `exitMicroTypo` on the selected box |
+| `click` | `#tt-size-up` / `#tt-size-down` | every run's size ± 1 pt (`storyMapChar`), a plain box's `sizePt` ± 1, new text's size |
+| `change` | `#tt-change-case` | `storyChangeCase` |
+| `change` | `#tolerance`, `#tt-name-case` | the selected redaction box's `tolerance` / `uppercase`; guarded calls into a matching plugin |
+| `change` | `#toggle-space-labels` | `setShowSpaceWidthLabels(checked)` |
+| `click` | `#tt-studio-btn`, `#tt-studio-close` | show / hide the panel |
 | `click` | `#toggle-embedded-text` | Toggle `hide-embedded-text` on `<body>` — shows / hides every `embedded` box |
 | `click` | `#utb-delete-box` | `utbDeleteBox(utbState.selectedId)` |
 
-Every handler that changes what a `redaction` box measures also calls `calculateWidthsForRedaction(box.id)` behind a `typeof` guard.
+`window.TextPanel` = `{ open, close, sync, newText, setNewText }`; `window.openTextStudio(tab)`
+opens it on a tab.
 
 ---
 
@@ -174,7 +215,7 @@ Every handler that changes what a `redaction` box measures also calls `calculate
 
 The click itself is caught by the core (`app.js`, a `mousedown` on the viewer), which maps it to document pixel space and, for the add-box tool, calls `handleManualAddBox` behind a `typeof` guard. Text is added with the Artistic and Frame Text tools, which catch their own presses (below).
 
-- `window.handleManualAddBox(pageNum, x, y)`: delegates to `createNewRedaction()` if a plugin supplies it, otherwise creates a `type='redaction'` box directly. Takes the nearest shown line from `utbFindNearestLine` (`unified-text-box.js`).
+- `window.handleManualAddBox(pageNum, x, y)`: delegates to `createNewRedaction()` if a plugin supplies it, otherwise creates a `type='redaction'` box directly. Takes the nearest shown line from `utbFindNearestLine` (`unified-text-box.js`); without one, the font and size new text takes (`newTextFont()`, the Text panel's).
 
 ### Artistic and Frame text
 
@@ -184,7 +225,7 @@ story boxes; `storyConvert(box, 'frame' | 'artistic')` converts between them. Se
 
 ### Deleting a box
 
-`window.utbDeleteBox(id)` is the one removal path for every box type — the toolbar's Delete button and the Delete / Backspace keys both use it. A live inline-edit or micro-typo session on the box is torn down first, so no id in `utbState` outlives the box it points at. The keys are ignored while the caret is in a field, where they mean "erase a character". `utbDeleteBox(id, { silent: true })` is the undo stack taking a box out again — not a step of its own.
+`window.utbDeleteBox(id)` is the one removal path for every box type — the Text panel's Delete button and the Delete / Backspace keys both use it. A live inline-edit or micro-typo session on the box is torn down first, so no id in `utbState` outlives the box it points at. The keys are ignored while the caret is in a field, where they mean "erase a character". `utbDeleteBox(id, { silent: true })` is the undo stack taking a box out again — not a step of its own.
 
 ## Label seams — `labelColor`, `labelAlign`
 
@@ -228,7 +269,7 @@ Two consumers, one source:
 
 - **`fonts.js`** (loaded right after `shaping.js`) fetches it, injects an `@font-face` rule per
   installed style (`assets/fonts/<file>?v=<hash>`, weight/style set so bold and italic
-  resolve to the right file), fills `#fabric-font-family`, and exposes
+  resolve to the right file), fills the Text panel's font menu `#fabric-font-family`, and exposes
   `window.FontCatalog` (`ready`, `default`, `families()`, `has`, `familyForPdfName`,
   `select(family, sizePt, source)`,
   `metrics(family, bold, italic, sizePx)` — the face's own advances and kern
@@ -246,9 +287,10 @@ Two consumers, one source:
 
 ### Choosing the default face
 
-`fonts.js` listens to two generic `PDFHooks` events and sets the menu (and
-the size input) from them, so the core keeps no font list and no plugin is
-named:
+`fonts.js` listens to two generic `PDFHooks` events and sets the font and size
+new text takes from them (`TextPanel.setNewText`; the panel shows them while
+nothing is selected — without the panel, the menu's own value), so the core
+keeps no font list and no plugin is named:
 
 | Event | Emitted by | Effect |
 |---|---|---|

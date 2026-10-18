@@ -4,8 +4,10 @@
 // "|DRAG| or |CLICK| to create Art text." Armed from the tool column
 // (#tt-art-text-btn) it stays armed like the Frame Text Tool:
 //
-//   - a click puts a new Artistic text's baseline at the point, in the
-//     ribbon's font and size;
+//   - a click puts a new Artistic text's baseline at the point, in the font
+//     and size new text takes (the Text panel's) — beside or on a line of the
+//     page, in that line's face and size, on its baseline, and from its first
+//     glyph when the click is within half an em of where it starts;
 //   - a drag sets the size: the font's typographic ascent is the drag's
 //     height, the baseline its lower edge (Affinity's rule);
 //   - a press on Artistic or Frame text puts the caret there (drag-resize.js).
@@ -45,7 +47,6 @@
     if (utbState.selectedId) {
       utbState.selectedId = null;
       deselectAllInSVG();
-      document.getElementById('fabric-options-bar')?.classList.add('hidden');
       window.syncToolbarToSelection?.();
       return;
     }
@@ -54,13 +55,21 @@
 
   const toDoc = (svg, e) => { const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); };
 
+  // the page's own lines: a press on one starts text there (typing over the
+  // page's line), not a select-and-drag of the line
+  const READ_LAYER = new Set(['ocr', 'embedded']);
+
   els.viewer.addEventListener('mousedown', e => {
     if (!armed() || e.button !== 0) return;
-    if (e.target.closest('.utb-group')) return;
+    // Artistic / Frame text: the caret goes there, a redaction box is
+    // selected (drag-resize.js)
+    const hit = e.target.closest('.utb-group');
+    if (hit && !READ_LAYER.has(hit.dataset.type)) return;
     const pageEl = e.target.closest('.page-container');
     const svg = pageEl?.querySelector('svg.text-layer');
     if (!svg) return;
     e.preventDefault();
+    if (hit) e.stopPropagation();
     window.commitStoryEdit?.();
     const pageNum = parseInt(pageEl.id.replace('pageContainer', ''), 10);
     const a = toDoc(svg, e);
@@ -89,8 +98,9 @@
   // `snap` (a click): beside a line of the page's text, the new text takes
   // that line's face, style, size and baseline
   async function create(pageNum, x, baseline, ascentPx, dragW = 0, snap = false) {
-    let family = document.getElementById('fabric-font-family')?.value || 'Times New Roman';
-    let sizePt = parseFloat(document.getElementById('fabric-font-size')?.value) || 12;
+    const fresh = window.newTextFont?.() || { fontFamily: 'Times New Roman', sizePt: 12 };
+    let family = fresh.fontFamily;
+    let sizePt = fresh.sizePt;
     let bold = false, italic = false;
     const near = snap ? window.utbFindNearestLine?.(pageNum, { x, y: baseline }) : null;
     if (near) {
@@ -99,6 +109,9 @@
       bold = !!near.bold;
       italic = !!near.italic;
       baseline = typeof computeBaseline === 'function' ? computeBaseline({ y: near.y, h: near.h }) : near.y + near.h * 0.85;
+      // a click within half an em of where the line starts starts there: the
+      // text lines up with the page's (its first pen, not where the mouse was)
+      if (near.x != null && Math.abs(x - near.x) <= GEO.docPtToPx(sizePt) / 2) x = near.x;
     }
     if (ascentPx) {
       let m = null;

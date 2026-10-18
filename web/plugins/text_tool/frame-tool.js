@@ -5,20 +5,22 @@
 // column (#tt-frame-text-btn) it stays armed, as Affinity's tools do, until
 // it is clicked again or another placing tool is chosen:
 //
-//   - a drag on the page draws a frame and puts the caret in it. Shift keeps
-//     it square, Ctrl draws it from the centre (Affinity's modifiers on
-//     Windows); the arrow keys during the drag make a grid of frames — Left /
-//     Right one column fewer / more, Down / Up one row more / fewer — and with
-//     Ctrl held they widen or narrow the gap between them;
+//   - a drag on the page — over the page's own lines too — draws a frame
+//     and puts the caret in it. Shift keeps it square, Ctrl draws it from the
+//     centre (Affinity's modifiers on Windows); the arrow keys during the drag
+//     make a grid of frames — Left / Right one column fewer / more, Down / Up
+//     one row more / fewer — and with Ctrl held they widen or narrow the gap
+//     between them;
 //   - a press that does not drag creates nothing (Affinity makes no frame of
-//     zero size): on an object it selects it, on the page it deselects;
+//     zero size): on a redaction box it selects it, on the page it deselects;
 //   - a press on Artistic or Frame text puts the caret there (drag-resize.js);
 //   - Escape leaves the text being edited (story-edit.js), then deselects, and
 //     with nothing selected puts the tool down.
 //
 // A frame is a 'harfbuzz' box (text the user added — never hidden with the
 // extracted layers) with textMode 'frame'; its first characters take the
-// ribbon's font and size, as the Add Text tool's do.
+// font and size new text takes (the Text panel's) — or, drawn from a line of
+// the page, that line's.
 (function () {
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const SC = globalThis.StoryCore;
@@ -50,7 +52,6 @@
     if (utbState.selectedId) {
       utbState.selectedId = null;
       deselectAllInSVG();
-      document.getElementById('fabric-options-bar')?.classList.add('hidden');
       window.syncToolbarToSelection?.();
       return;
     }
@@ -100,13 +101,20 @@
     }
   }
 
+  // the page's own lines: a drag over one draws a frame there (and takes its
+  // face), not a select-and-drag of the line
+  const READ_LAYER = new Set(['ocr', 'embedded']);
+
   els.viewer.addEventListener('mousedown', e => {
     if (!armed() || e.button !== 0) return;
-    if (e.target.closest('.utb-group')) return;              // an object: drag-resize.js selects / edits it
+    // Artistic / Frame text: drag-resize.js edits it; a redaction box: selects it
+    const hit = e.target.closest('.utb-group');
+    if (hit && !READ_LAYER.has(hit.dataset.type)) return;
     const pageEl = e.target.closest('.page-container');
     const svg = pageEl?.querySelector('svg.text-layer');
     if (!svg) return;
     e.preventDefault();
+    if (hit) e.stopPropagation();
     window.commitStoryEdit?.();
     const preview = document.createElementNS(SVG_NS, 'g');
     svg.appendChild(preview);
@@ -155,8 +163,9 @@
 
   // One frame per rectangle; the caret goes into the first.
   function createFrames(pageNum, rects, near = null) {
-    const family = near?.font || document.getElementById('fabric-font-family')?.value || 'Times New Roman';
-    const sizePt = near?.sizePt || parseFloat(document.getElementById('fabric-font-size')?.value) || 12;
+    const fresh = window.newTextFont?.() || { fontFamily: 'Times New Roman', sizePt: 12 };
+    const family = near?.font || fresh.fontFamily;
+    const sizePt = near?.sizePt || fresh.sizePt;
     const bold = !!near?.bold, italic = !!near?.italic;
     const boxes = rects.map(r => {
       const box = utbState.addBox(new UnifiedTextBox({

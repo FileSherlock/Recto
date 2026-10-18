@@ -25,7 +25,7 @@ Core chrome only: `web/core/index.template.html`, wired in `web/core/app.js`. In
 | Previous / Next Page, page number | `prev-page`, `next-page`, `page-input` | `core/index.template.html` | `core/app.js` |
 | Zoom out / in, zoom % (also Ctrl+wheel) | `zoom-out`, `zoom-in`, `zoom-input` | `core/index.template.html` | `core/app.js` |
 | Upload PDF (and drag-and-drop) | `upload-pdf-btn` + hidden `pdf-file` input | `core/index.template.html` | inline onclick + `core/app.js` |
-| Settings | `toggle-settings` | `core/index.template.html` | `core/app.js` — opens `#settings-panel`; hidden when no plugin contributes a section |
+| Settings | `toggle-settings` | `core/index.template.html` | `core/app.js` — opens `#settings-panel`; hidden while no section is in it (a section a plugin moves elsewhere — into the Text panel's Display — no longer counts) |
 
 ## Tool column (`#tool-column`, left of the page)
 
@@ -43,18 +43,16 @@ popover (`tool-column-more`), and keeps working there.
 | Frame Text Tool (drag a frame; arrows while dragging: a grid of frames) | `tt-frame-text-btn` | `text_tool/toolbar_button.html` | `text_tool/frame-tool.js` — stays armed; a press on a story box edits it (`drag-resize.js`) |
 | Add Redaction Box (click on page) | `tool-add-box` | `text_tool/toolbar_button.html` | arm the tool: `core/app.js`; placement: `handleManualAddBox` (`text_tool/text-tool.js`) |
 | Undo / Redo (Ctrl+Z, Ctrl+Shift+Z) | `tt-undo`, `tt-redo` | `text_tool/toolbar_button.html` | `text_tool/undo.js` — the tooltip names the step |
-| Text formatting | `toggle-fmt` | `text_tool/toolbar_button.html` | `text_tool/toolbar.js` — opens/closes `#fabric-options-bar` via `openSubtoolbar` |
-| Text panel — Character, Paragraph, Text Frame, Typography | `tt-studio-btn` | `text_tool/toolbar_button.html` | `text_tool/text-studio.js` — opens/closes `#tt-studio` |
+| Text panel — font, spacing, kerning, paragraph, frame, typography and display | `tt-studio-btn` | `text_tool/toolbar_button.html` | `text_tool/text-studio.js` — shows / hides the docked `#tt-studio` |
 | Customise tools… | `tool-column-customise` | `core/index.template.html` | `core/app.js` |
 | More tools | `tool-column-more` | `core/index.template.html` | `core/app.js` — shown only while some tool is hidden |
 
 ## Settings panel (`#settings-panel`)
 
-One panel; each plugin's `settings` fragment is a section of it (`#settings-sections`).
-
-| Section | Controls (id) | Template (owner) | Wired in |
-|---|---|---|---|
-| Redaction match (`tt-settings`; `tt-match-scope` says whether the fields are the selected box's or the defaults for new boxes) | `tolerance` (width tolerance, px), `tt-name-case` (letter case: as typed / UPPERCASE / FIRST name / LAST name) | `text_tool/settings.html` | `text_tool/toolbar.js` (`applyMatchControls`, `syncMatchSettings`); the ids are also read by whichever matching plugin is installed — inert when none is |
+One panel; each plugin's `settings` fragment is a section of it (`#settings-sections`). The
+baseline contributes none: text_tool's settings are in its Text panel, and a section marked
+`data-text-panel` moves into the Text panel's Display section (`text_tool/text-studio.js`).
+With no section left the Settings button is hidden.
 
 ## Ribbon row (`#unified-options-bar-container`, below the toolbar)
 
@@ -63,30 +61,6 @@ The core hosts this row (`index.html`); plugins inject bars into it. A
 time, coordinated by `openSubtoolbar` in `core/app.js`. The row never scrolls:
 groups that do not fit move under **More options** (`ribbon-more` →
 `#ribbon-overflow`, `core/app.js`) and come back when there is room.
-
-### Formatting bar — `#fabric-options-bar` (text_tool, contextual)
-
-Same template. Revealed when a text/redaction box is selected
-(`syncToolbarToBox` in `toolbar.js`), hidden on deselect (`drag-resize.js`),
-or toggled manually via `toggle-fmt`.
-
-| Group | Controls (id) | Wired in |
-|---|---|---|
-| Font | `fabric-font-family` (menu filled from the font catalogue by `text_tool/fonts.js`; preselected from the document's declared fonts or a plugin's `typography:detected`), `fabric-font-size` | `text_tool/toolbar.js` |
-| Style | `fabric-bold` / `fabric-italic` / `fabric-underline` / `fabric-strikethrough`, `fabric-color`, **Opacity** `fabric-opacity` (slider) + `fabric-opacity-value` (%), `kerning`, `fabric-nudge-mode` | `text_tool/toolbar.js` (nudge mode itself lives in `micro-typo.js`) |
-| Text *(Artistic / Frame text and typed boxes only)* | `tt-text-group`: `tt-size-up`, `tt-size-down`, `tt-change-case`, `tt-superscript`, `tt-subscript`, `tt-highlight-btn` + `tt-highlight` | `text_tool/toolbar.js` (`syncStoryControls`) → `story-edit.js` |
-| Paragraph *(same)* | `tt-para-group`: `tt-align`, `tt-valign` (frames), `tt-leading-type` + `tt-leading`, `tt-bullets`, `tt-numbers` | `text_tool/toolbar.js` → `story-edit.js` |
-| Columns *(frames)* | `tt-columns-group`: `tt-columns`, `tt-gutter` | `text_tool/toolbar.js` → `storyApplyFrame` |
-| Panels *(story text)* | `tt-panels-group`: `tt-open-character`, `tt-open-paragraph`, `tt-open-frame`, `tt-open-typography` | `text_tool/text-studio.js` (`openTextStudio`) |
-| Spacing | `fabric-letter-spacing`, `fabric-default-sw`, `fabric-space-width` (+ `-display`), `toggle-space-labels` | `text_tool/toolbar.js` |
-| Box | `utb-delete-box` — removes the selected box of any type (also bound to Delete / Backspace, ignored while a field has the caret) | `utbDeleteBox` in `text_tool/text-tool.js` |
-
-The redaction-only match terms (tolerance, letter case) are in the Settings panel above.
-While Artistic or Frame text is selected, Font, Style and the story groups act on the
-selected characters when it is edited, on all of its text otherwise. Space W. / Default set the
-paragraphs' desired word spacing (shown in px of the face's space), sp# badges their spaces, and
-Nudge kerns the pair before the pressed character (`micro-typo.js`, disabled while the text is
-edited) — see `guide/frontend/artistic-and-frame-text.md`.
 
 ### WebGL Masks bar — `#webgl-options-bar` (webgl_mask, contextual)
 
@@ -98,21 +72,32 @@ Template: `web/plugins/webgl_mask/options_bar.html`
 
 ## Text panel — `#tt-studio` (text_tool)
 
-Template: `web/plugins/text_tool/studio.html`; wired in `text_tool/text-studio.js` by each
-control's `data-k` (`char:` / `para:` / `frame:` + a StoryCore attribute). Floating; drag it by
-its tabs (`tt-studio-head`), close `tt-studio-close`; `tt-studio-scope` says what it acts on.
-All of it is described in [Artistic and Frame Text](frontend/artistic-and-frame-text.md).
+Template: `web/plugins/text_tool/studio.html`; wired in `text_tool/text-studio.js` (a box that
+is not a story: `text_tool/toolbar.js` `utbPlainChar`). Every setting of text: a side panel
+docked at the right of the page, beside any other side panel (a sheet at the foot of the screen
+on a phone); shown / hidden with `tt-studio-btn`, closed with `tt-studio-close`. `tt-studio-scope`
+says what it acts on — the selected text, all of a box's text, a line read from the page, or new
+text; `utb-delete-box` beside it deletes the selected box (also Delete / Backspace outside a
+field). Controls are bound by their `data-k` (`char:` / `para:` / `frame:` + a StoryCore
+attribute). A setting the selection or the drawing cannot have is greyed with a lock (`.tt-lock`,
+the reason on hover); a tab locked as a whole says why at its top (`.tt-pane-lock`). Described in
+[The Text panel](frontend/text-tool.md) and [Artistic and Frame Text](frontend/artistic-and-frame-text.md).
 
-| Tab | Controls (id prefix) |
+| Tab / section | Controls (id) |
 |---|---|
-| Character | `tt-ch-*`: family, size, style, colour + opacity, background colour; Position & Transform (kerning, shear, tracking, scales, baseline, leading override, super/subscript, no break); Decorations (underline, strikethrough, outline stroke); Typography quick toggles `tt-q-*` and `tt-show-typography`; language |
+| Character — font | `fabric-font-family` (filled by `text_tool/fonts.js`; with nothing selected: the font new text takes), `tt-ch-style`, `fabric-font-size`, `tt-size-down` / `tt-size-up`; `fabric-bold` / `fabric-italic` / `fabric-underline` / `fabric-strikethrough`, `tt-change-case`; colour `tt-ch-color` + `tt-ch-color-on`, opacity `tt-ch-opacity`, background `tt-ch-highlight` + `tt-ch-highlight-on` |
+| Character — Spacing | **Pair kerning** `kerning` with its source `tt-kern-source` and ↺ `tt-kern-page` (follow the page again); manual kerning `tt-ch-kern`; tracking `tt-ch-tracking`; **Space width** `fabric-space-width` (px) + **Font's** `fabric-default-sw`; **Nudge characters** `fabric-nudge-mode` (`text_tool/micro-typo.js`) |
+| Character — the rest | Position & Transform (`tt-ch-shear`, `tt-ch-baseline`, `tt-ch-scalex`, `tt-ch-scaley`, `tt-ch-leading-ov`, `tt-ch-position`, `tt-ch-nobreak`); Decorations (`tt-ch-underline`, `tt-ch-strike`, `tt-ch-stroke`); Typography quick toggles `tt-q-*` and `tt-show-typography`; language `tt-ch-lang` |
+| Character — Redaction match (`tt-settings`; `tt-match-scope` says whether the fields are the selected box's or the defaults for new boxes) | `tolerance` (width tolerance, px), `tt-name-case` (letter case: as typed / UPPERCASE / FIRST name / LAST name) — shown for a redaction box and with nothing selected; the ids are also read by whichever matching plugin is installed |
 | Paragraph | `tt-pa-*`: alignment `tt-pa-align`; spacing (leading, indents, space before / after, use space before, sum); tab stops (`tt-pa-deftabs`, `tt-pa-tabs`, `tt-pa-tab-add`); justification; flow options; hyphenation; bullets & numbering; drop caps (`tt-pa-drop-on`); decorations |
-| Text Frame | `tt-fr-*`: fill, stroke, insets (`tt-fr-link`), Hide Overflow, height follows the text; columns, gutter, balance; column rules; vertical position (`tt-fr-valign`, max paragraph space, initial advance, minimum); `tt-convert-frame`, `tt-convert-art` |
+| Frame (Text Frame) | `tt-fr-*`: fill, stroke, insets (`tt-fr-link`), Hide Overflow, height follows the text; columns, gutter, balance; column rules; vertical position (`tt-fr-valign`, max paragraph space, initial advance, minimum); `tt-convert-frame`, `tt-convert-art` |
 | Typography | `tt-ot-*`: hide irrelevant features `tt-ot-hide`; ligatures; alternates; figures; capitals (`tt-ch-caps`); stylistic sets `tt-ot-ss` |
+| Display (`tt-view`, the panel's foot) | **Space widths** `toggle-space-labels` (`setShowSpaceWidthLabels`); a plugin's Settings section marked `data-text-panel` lands here |
 
 ## Panels
 
 - **Left thumbnails sidebar** — `#sidebar` in `core/index.template.html`, toggled
   by `toggle-sidebar` (`app.js`).
-- **Right panel** — none in the baseline. A plugin that wants one supplies its
-  own container, CSS, and toggle wiring (see `tool-expansion-guide.md`).
+- **Right panels** — the core hosts none. A plugin that wants one supplies its
+  own container, CSS, and toggle wiring (see `tool-expansion-guide.md`); text_tool's
+  Text panel (above) is one.

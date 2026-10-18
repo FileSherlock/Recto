@@ -5,8 +5,7 @@
     "styles.css"
   ],
   "toolbar_button": "toolbar_button.html",
-  "options_bar": "options_bar.html",
-  "settings": "settings.html",
+  "options_bar": null,
   "ribbon_bar": null,
   "sidebar": "studio.html",
   "scripts_before_viewer": [],

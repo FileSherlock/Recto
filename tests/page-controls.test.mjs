@@ -24,26 +24,25 @@ const CONTROLS = {
     'toggle-settings', 'settings-panel', 'settings-sections', 'tool-customise', 'tool-customise-list',
   ],
   text_tool: [
-    'tt-undo', 'tt-redo', 'toggle-fmt', 'tool-add-box', 'fabric-options-bar',
-    'fabric-font-family', 'fabric-font-size', 'fabric-bold', 'fabric-italic', 'fabric-underline',
-    'fabric-strikethrough', 'fabric-color', 'fabric-opacity', 'fabric-opacity-value', 'kerning', 'fabric-nudge-mode', 'fabric-letter-spacing',
-    'fabric-default-sw', 'fabric-space-width', 'fabric-space-width-display', 'toggle-space-labels',
-    'utb-delete-box', 'tt-settings', 'tt-match-scope', 'tolerance', 'tt-name-case',
-    // Affinity's text tools, the text context toolbar's groups, the Text panel
-    'tt-art-text-btn', 'tt-frame-text-btn', 'tt-studio-btn',
-    'tt-text-group', 'tt-size-up', 'tt-size-down', 'tt-change-case', 'tt-superscript', 'tt-subscript', 'tt-highlight-btn', 'tt-highlight',
-    'tt-para-group', 'tt-align', 'tt-valign', 'tt-leading-type', 'tt-leading', 'tt-bullets', 'tt-numbers',
-    'tt-columns-group', 'tt-columns', 'tt-gutter', 'tt-panels-group', 'tt-open-character', 'tt-open-paragraph', 'tt-open-frame', 'tt-open-typography',
-    'tt-studio', 'tt-studio-head', 'tt-studio-close', 'tt-studio-scope',
-    'tt-ch-family', 'tt-ch-size', 'tt-ch-style', 'tt-ch-color', 'tt-ch-highlight', 'tt-ch-autokern', 'tt-ch-kern', 'tt-ch-tracking',
+    // the tools in the column
+    'tt-undo', 'tt-redo', 'tool-add-box', 'tt-art-text-btn', 'tt-frame-text-btn', 'tt-studio-btn',
+    // the Text panel: every setting of text, docked at the side
+    'tt-studio', 'tt-studio-head', 'tt-studio-close', 'tt-studio-scope', 'utb-delete-box',
+    'fabric-font-family', 'fabric-font-size', 'tt-ch-style', 'tt-size-up', 'tt-size-down',
+    'fabric-bold', 'fabric-italic', 'fabric-underline', 'fabric-strikethrough', 'tt-change-case',
+    'tt-ch-color', 'tt-ch-opacity', 'tt-ch-highlight',
+    'kerning', 'tt-kern-source', 'tt-kern-page', 'tt-ch-kern', 'tt-ch-tracking', 'fabric-space-width', 'fabric-default-sw', 'fabric-nudge-mode',
     'tt-ch-baseline', 'tt-ch-leading-ov', 'tt-ch-shear', 'tt-ch-scalex', 'tt-ch-scaley', 'tt-ch-position', 'tt-ch-nobreak',
     'tt-ch-underline', 'tt-ch-strike', 'tt-ch-stroke', 'tt-ch-lang', 'tt-ch-caps',
+    'tt-settings', 'tt-match-scope', 'tolerance', 'tt-name-case',
     'tt-pa-align', 'tt-pa-leading-type', 'tt-pa-leading', 'tt-pa-left', 'tt-pa-right', 'tt-pa-first', 'tt-pa-before', 'tt-pa-after',
     'tt-pa-sbmode', 'tt-pa-deftabs', 'tt-pa-tabs', 'tt-pa-tab-add', 'tt-pa-ws', 'tt-pa-ls', 'tt-pa-start', 'tt-pa-hyph', 'tt-pa-list',
     'tt-pa-drop-on', 'tt-pa-drop-lines', 'tt-pa-fill',
     'tt-fr-in-l', 'tt-fr-hide', 'tt-fr-cols', 'tt-fr-gutter', 'tt-fr-balance', 'tt-fr-rule', 'tt-fr-valign', 'tt-fr-maxpara',
     'tt-fr-baseline', 'tt-fr-min', 'tt-convert-frame', 'tt-convert-art',
     'tt-ot-liga', 'tt-ot-numform', 'tt-ot-position', 'tt-ot-ss', 'tt-ot-hide',
+    // the panel's Display switches
+    'tt-view', 'toggle-space-labels',
   ],
   webgl_mask: [
     'toggle-webgl', 'webgl-options-bar', 'edge-subtract',

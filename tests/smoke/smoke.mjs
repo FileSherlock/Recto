@@ -47,7 +47,8 @@ if (!PUPPETEER || !CHROME) {
 }
 const { default: puppeteer } = await import(pathToFileURL(PUPPETEER).href);
 
-const SWITCHES = ['fabric-bold', 'fabric-italic', 'fabric-underline', 'fabric-strikethrough', 'kerning', 'fabric-nudge-mode',
+// (the Text panel's, and the panel itself shown and hidden with a box selected)
+const SWITCHES = ['tt-studio-btn', 'fabric-bold', 'fabric-italic', 'fabric-underline', 'fabric-strikethrough', 'kerning', 'fabric-nudge-mode',
                   'fabric-default-sw', 'toggle-space-labels', 'edge-subtract'];
 
 // the smoke steps of the plugins that are installed and bring some

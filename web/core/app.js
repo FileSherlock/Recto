@@ -39,11 +39,9 @@
       // Only `.options-bar` (contextual) bars are switched; a plugin's
       // `.ribbon-bar` is persistent and is never hidden here.
       window.openSubtoolbar = function openSubtoolbar(barToShow, btnToActivate) {
-        const toggleFmt = document.getElementById('toggle-fmt');
         document.querySelectorAll('#unified-options-bar-container .options-bar')
           .forEach(bar => bar.classList.add('hidden'));
         _subtoolbarButtons.forEach(btn => btn.classList.remove('active'));
-        toggleFmt?.classList.remove('active');
         if (barToShow) {
           barToShow.classList.remove('hidden');
           btnToActivate?.classList.add('active');
@@ -384,7 +382,9 @@
 
 // ── The Settings panel ─────────────────────────────────────
 // One panel, a section per plugin (its `settings` fragment). Without any
-// section there is nothing to open, and the button goes.
+// section there is nothing to open, and the button goes — also when a plugin
+// later moves its section somewhere of its own (a panel of another plugin's
+// that hosts it), so it is watched.
 function closePanels() {
   document.querySelectorAll('.floating-panel').forEach(p => p.classList.add('hidden'));
 }
@@ -393,7 +393,13 @@ function closePanels() {
   const panel = document.getElementById('settings-panel');
   const sections = document.getElementById('settings-sections');
   if (!btn || !panel) return;
-  if (!sections?.children.length) { btn.classList.add('hidden'); return; }
+  const shown = () => {
+    const any = !!sections?.children.length;
+    btn.classList.toggle('hidden', !any);
+    if (!any) { panel.classList.add('hidden'); btn.classList.remove('active'); }
+  };
+  shown();
+  if (sections) new MutationObserver(shown).observe(sections, { childList: true });
   btn.addEventListener('click', () => {
     const open = panel.classList.contains('hidden');
     closePanels();

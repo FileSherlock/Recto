@@ -282,8 +282,9 @@ window.normUtbFont = normUtbFont;
 /**
  * Find the nearest text line (embedded span or OCR-read line) to a point on a
  * page — `at` is { x, y }, or a y alone — what a new box beside it takes: its
- * face, style and size, its baseline (y / h, as computeBaseline reads them).
- * Returns { y, h, w, lineId, font, bold, italic, sizePt } or null.
+ * face, style and size, its baseline (y / h, as computeBaseline reads them),
+ * where it starts (x: its first glyph's pen).
+ * Returns { x, y, h, w, lineId, font, bold, italic, sizePt } or null.
  */
 function utbFindNearestLine(pageNum, at, threshold = 2.0) {
   const y = typeof at === 'object' ? at.y : at, x = typeof at === 'object' ? at.x : null;
@@ -314,6 +315,7 @@ function utbFindNearestLine(pageNum, at, threshold = 2.0) {
   }
 
   return {
+    x: nearest.x,
     y: nearest.y,
     h: nearest.h,
     w: nearest.w,

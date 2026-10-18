@@ -9,8 +9,10 @@ A reference for adding new plugins to Recto. Read the architecture section first
 > hidden. Set where your bar sits in the ribbon's reading order with `order:` in your own
 > stylesheet; the core deliberately never names a plugin's bar in its CSS, and ribbon groups
 > that do not fit the width move under the ribbon's "More" button by themselves. `settings`
-> is a section of the **Settings** panel (the gear in the top toolbar). No *baseline* plugin
-> fills the `ribbon_bar` slot — see [Optional Plugins](./plugins/) for a worked example.
+> is a section of the **Settings** panel (the gear in the top toolbar) — or, marked
+> `data-text-panel`, of the Text panel's Display section, where switches about how text is
+> drawn belong. No *baseline* plugin fills the `ribbon_bar` slot — see
+> [Optional Plugins](./plugins/) for a worked example.
 
 ---
 
@@ -106,7 +108,10 @@ which plugins' scripts yours must follow within a bucket.
 Both bars of a plugin land in `#text-toolbar-row`, its `ribbon_bar` before its `options_bar`.
 A `settings` fragment is a `<section class="settings-section">` with an `<h3>` and
 `.settings-row` / `.settings-check` rows (the core's classes); it lands in `#settings-sections`
-and the gear button (`#toggle-settings`) shows up as soon as one plugin has a section.
+and the gear button (`#toggle-settings`) shows up while one section is there. A section about
+how text is drawn may carry `data-text-panel`: `text_tool`'s Text panel then moves it into its
+Display section (with its controls and their listeners), and it stays in Settings where
+`text_tool` is not installed. The gear goes when no section is left.
 
 ### Global JavaScript Objects
 
@@ -587,7 +592,7 @@ confirm the console is clean and the rest of the app works.
 
 | Folder | Type | `order` | Toggle Button ID | Bar / Panel ID |
 |---|---|---|---|---|
-| `web/plugins/text_tool` | Subtoolbar | 70 | `toggle-fmt` (+ the Insert, Undo and Redo tools) | `fabric-options-bar`; a Settings section (`tt-settings`) |
+| `web/plugins/text_tool` | Side panel | 70 | `tt-studio-btn` (+ the Artistic Text, Frame Text, Add Redaction Box, Undo and Redo tools) | `tt-studio` (the Text panel: every text setting, the redaction match terms `tt-settings`, the Display section `tt-view`) |
 | `web/plugins/webgl_mask` | Subtoolbar | 20 | `toggle-webgl` | `webgl-options-bar` |
 | `web/plugins/embedded_text_viewer` | Toolbar toggle only | 10 | `toggle-embedded-text` | — |
 | `web/core` | Core (always on) | — | — | `unified-options-bar-container` (bar host) |
