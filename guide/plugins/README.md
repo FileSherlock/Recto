@@ -33,7 +33,7 @@ Nothing else in the repo or the guide has to change:
 
 Verified by `tests/index-page.test.mjs` for every installed plugin: built without it, the
 page holds no reference to `plugins/<name>/` and the asset map no entry for it. With
-`redaction_matching` removed, no candidates sidebar (`#tools-sidebar`) or its toggle button
+`redaction_matching` removed, no Name matching panel (`#tools-sidebar`) or its toggle button
 appears in the page — the panel, its CSS, and its wiring all live in the plugin.
 
 ## Testing
@@ -82,15 +82,16 @@ download/view.
 
 ## Redaction matching
 
-Candidate-name matching against redaction bars: it owns the candidates right panel (the
-`#tools-sidebar` host, its toggle button, CSS, and wiring) plus the name pool, name-format
-settings, and matches table. It does **not** detect bars itself — it matches names against
+Candidate-name matching against redaction bars: it owns the *Name matching* right panel (the
+`#tools-sidebar` host, its toggle button, CSS, and wiring — sharing the right side with the Text
+panel one at a time, through the `sidepanel:shown` convention) plus the name lists, the bars'
+name formats and the fits of the selected bar. It does **not** detect bars itself — it matches names against
 whatever `redaction` boxes exist on the page, so it needs a detector installed to have
 anything to work on.
 
 | Plugin | Docs | What it does | Data it keeps |
 |---|---|---|---|
-| `redaction_matching` | [redaction-matching/](redaction-matching/) | Candidate-name → redaction-bar width matching in the bar's own face; owns the candidates sidebar (name format, starts-with / ends-with filter, matches table). Names that tie on width are all listed — click one or press `[` / `]` to choose the bar's label; page-pixel verdicts (`✓ ✗ –`) rank them when a hypothesis tester is present. Two bars that are one name (a space apart, or split over a line break) are read as one person: first name on one bar, last name on the other | The name pool, `web/plugins/redaction_matching/names.json` (fetched once) |
+| `redaction_matching` | [redaction-matching/](redaction-matching/) | Candidate-name → redaction-bar width matching in the bar's own face; owns the *Name matching* panel (the selected bar's fits, a name field, the bar's format, a starts-with / ends-with filter, the name lists). Names that tie on width are all listed — click one or press `[` / `]` to choose the bar's label; page-pixel verdicts (`✓ ✗ –`) rank them when a hypothesis tester is present. Two bars that are one name (a space apart, or split over a line break) are read as one person: first name on one bar, last name on the other | The name lists, `web/plugins/redaction_matching/names.json` (People) and `contacts-businesses.json` (Businesses), fetched once |
 
 - **Developed in its own repository**, `redaction-matching` (`Desktop/redaction-matching`, beside
   this one, like tol0). `web/plugins/redaction_matching/`, `tests/plugins/redaction_matching/` and
