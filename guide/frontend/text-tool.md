@@ -1,12 +1,15 @@
 # The Text panel — `text-studio.js` + `toolbar.js`
 
 Every setting of text is in one place: the **Text panel** (`#tt-studio`, the fragment
-`studio.html`), a side panel docked at the right of the page — beside any other side panel,
-never over the page — and on a phone a sheet at the foot of the screen. The ¶ tool
-(`#tt-studio-btn`) shows and hides it; whether it is shown and which tab is open are kept in
-this browser (localStorage `recto.textStudio.*`); a screen wider than 900 px shows it at
-first. There is no formatting ribbon: the ribbon row (`#unified-options-bar-container`) holds
-other plugins' bars.
+`studio.html`), a side panel docked at the right of the page — never over the page — and on a
+phone a sheet at the foot of the screen; its edge (`.tt-resize`) is dragged to make it wider (on
+a phone, taller), a double click gives the default size back. It shares the right side with any
+other side panel **one at a time**: shown, it emits `sidepanel:shown` `{ id }` and hides when
+another panel's arrives (`data-side-panel`), so the ¶ tool (`#tt-studio-btn`) switches the right
+side to it and another panel's tool switches it away. Whether it is shown and which tab is open
+are kept in this browser (localStorage `recto.textStudio.*`); the first time, a screen wider than
+900 px shows it unless another side panel already is. There is no formatting ribbon: the ribbon
+row (`#unified-options-bar-container`) holds other plugins' bars.
 
 `text-studio.js` is the panel. `toolbar.js` maps its character settings onto a box that is not
 a story (`window.utbPlainChar`), and keeps what every box shares: `getNaturalSpaceWidth` and

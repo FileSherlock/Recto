@@ -230,9 +230,8 @@
     if (e.target.closest('#unified-options-bar-container')) return;
     if (e.target.closest('#tool-column')) return;
     if (e.target.closest('.floating-panel')) return;
-    if (e.target.closest('#tools-sidebar')) return;
     if (e.target.closest('.utb-nudge-popover')) return;
-    if (e.target.closest('.tt-studio')) return;          // the Text panel acts on the selection
+    if (e.target.closest('[data-side-panel]')) return;   // a side panel (the Text panel, a plugin's) acts on the selection
     if (utbState.selectedId) {
       utbState.selectedId = null;
       deselectAllInSVG();

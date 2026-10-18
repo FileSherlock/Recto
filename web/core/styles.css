@@ -539,9 +539,9 @@ html {
   image-rendering: pixelated;
 }
 
-/* The right-panel "tools sidebar" (#tools-sidebar) and its inner primitives
-   (.tool-card, .tool-input, .tool-btn, …) are owned by the plugin that provides
-   that panel — its own stylesheet carries them; the core styles no right panel. */
+/* A right panel ([data-side-panel], a plugin's `sidebar` fragment) is styled by
+   the plugin that provides it — its own stylesheet; the core styles no right
+   panel. */
 
 /* ----------------- Sub-Toolbar (Ribbon) ----------------- */
 #unified-options-bar-container {
@@ -747,8 +747,8 @@ html {
     display: none; /* Zoom is secondary on mobile; pinch-zoom is preferred */
   }
 
-  /* Overlay Sidebars — the left thumbnails panel. The right-panel overlay
-     rules (#tools-sidebar) live with the plugin that owns that panel. */
+  /* Overlay Sidebars — the left thumbnails panel. A right panel's narrow-screen
+     rules (a sheet at the foot of the screen) live with the plugin that owns it. */
   #sidebar {
     position: fixed;
     top: 56px; /* Below toolbar */

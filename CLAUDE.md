@@ -114,7 +114,8 @@ boundary. Use the named constants; never re-derive `0.75`, `133`, `816`, etc.
 - Subtoolbar plugins register their toggle with `window.registerSubtoolbar(btn)` and open/close via
   `window.openSubtoolbar(bar, btn)` — one options bar visible at a time. Right-panel plugins are fully self-owned: the
   plugin's `sidebar` fragment supplies its own container element, the plugin ships its own CSS and toggle wiring, and
-  the core hosts no right panel — there is no core touchpoint.
+  the core hosts no right panel — there is no core touchpoint. Side panels share the right side one at a time by a bus
+  convention: a panel shown emits `sidepanel:shown` `{ id }` and every other `[data-side-panel]` hides itself.
 - Every MuPDF wrapper (`Page`, `Pixmap`, `Image`, `StructuredText`) is `destroy()`ed where it is made; left to the
   garbage collector they hold hundreds of MB of wasm heap.
 - `guide/ui-map.md` maps every visible control (label/tooltip → owning plugin → fragment → handler script). Update it

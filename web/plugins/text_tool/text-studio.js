@@ -51,23 +51,62 @@
     panel.querySelectorAll('.tt-pane').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== tab));
     store.set('tab', tab);
   }
+  // The right side is shared, one side panel at a time: a panel shown says so
+  // on the bus ('sidepanel:shown', { id }) and every other one hides — so the
+  // ¶ tool switches from another plugin's panel to this one, and that panel's
+  // tool back. Panels are marked data-side-panel.
   function open(tab) {
     panel.classList.remove('hidden');
     toolBtn?.classList.add('active');
     store.set('open', '1');
     if (tab) showTab(tab);
     sync();
+    PDFHooks.emit('sidepanel:shown', { id: panel.id });
   }
   function close() {
     panel.classList.add('hidden');
     toolBtn?.classList.remove('active');
     store.set('open', '0');
   }
+  PDFHooks.on('sidepanel:shown', e => { if (e?.id !== panel.id && isOpen()) close(); });
   toolBtn?.addEventListener('click', () => (isOpen() ? close() : open()));
   $('tt-studio-close')?.addEventListener('click', close);
   panel.querySelectorAll('.tt-tab-btn').forEach(b => b.addEventListener('click', () => { showTab(b.dataset.tab); sync(); }));
   showTab(store.get('tab') || 'character');
   window.openTextStudio = open;
+
+  // Drag the panel's edge to make it wider (docked at the foot of a narrow
+  // screen: taller); a double click goes back to the default size.
+  (function resizable() {
+    const grip = panel.querySelector('.tt-resize');
+    if (!grip) return;
+    grip.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const bottom = matchMedia('(max-width: 768px)').matches;
+      const start = bottom ? e.clientY : e.clientX, size0 = bottom ? panel.offsetHeight : panel.offsetWidth;
+      grip.setPointerCapture(e.pointerId);
+      panel.classList.add('is-resizing');
+      const move = ev => {
+        const size = size0 - ((bottom ? ev.clientY : ev.clientX) - start);
+        if (bottom) panel.style.setProperty('--tt-height', `${Math.round(Math.min(Math.max(size, 160), innerHeight * 0.9))}px`);
+        else panel.style.setProperty('--tt-width', `${Math.round(Math.min(Math.max(size, 280), Math.min(760, innerWidth * 0.7)))}px`);
+      };
+      const end = () => {
+        grip.removeEventListener('pointermove', move);
+        grip.removeEventListener('pointerup', end);
+        grip.removeEventListener('pointercancel', end);
+        panel.classList.remove('is-resizing');
+      };
+      grip.addEventListener('pointermove', move);
+      grip.addEventListener('pointerup', end);
+      grip.addEventListener('pointercancel', end);
+    });
+    grip.addEventListener('dblclick', () => {
+      panel.style.removeProperty('--tt-width');
+      panel.style.removeProperty('--tt-height');
+    });
+  })();
 
   // ── what the panel acts on ──────────────────────────────────────────────
 
@@ -703,10 +742,11 @@
 
   window.TextPanel = { open, close, sync: () => soon(), newText: () => ({ ...newText }), setNewText };
 
-  // Shown at first on a screen wide enough for a side panel (a phone gets the
-  // page first), then as the user left it.
+  // As the user left it; the first time, on a screen wide enough for a side
+  // panel (a phone gets the page first) where no other side panel is showing.
   const kept = store.get('open');
-  if (kept === '1' || (kept === null && innerWidth > 900)) open();
+  const otherShown = [...document.querySelectorAll('[data-side-panel]')].some(p => p !== panel && !p.classList.contains('hidden'));
+  if (kept === '1' || (kept === null && innerWidth > 900 && !otherShown)) open();
 
   // hyphenation needs the browser's dictionary: say so where it has none
   (function hyphenationNote() {

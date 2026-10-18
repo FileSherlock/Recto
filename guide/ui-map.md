@@ -74,8 +74,10 @@ Template: `web/plugins/webgl_mask/options_bar.html`
 
 Template: `web/plugins/text_tool/studio.html`; wired in `text_tool/text-studio.js` (a box that
 is not a story: `text_tool/toolbar.js` `utbPlainChar`). Every setting of text: a side panel
-docked at the right of the page, beside any other side panel (a sheet at the foot of the screen
-on a phone); shown / hidden with `tt-studio-btn`, closed with `tt-studio-close`. `tt-studio-scope`
+docked at the right of the page, sharing it with any other side panel one at a time (a sheet at
+the foot of the screen on a phone); shown / hidden with `tt-studio-btn` — which switches the right
+side to it from another side panel — closed with `tt-studio-close`, its edge `.tt-resize` dragged
+to make it wider (on a phone, taller; a double click: the default size). `tt-studio-scope`
 says what it acts on — the selected text, all of a box's text, a line read from the page, or new
 text; `utb-delete-box` beside it deletes the selected box (also Delete / Backspace outside a
 field). Controls are bound by their `data-k` (`char:` / `para:` / `frame:` + a StoryCore
@@ -100,4 +102,6 @@ the reason on hover); a tab locked as a whole says why at its top (`.tt-pane-loc
   by `toggle-sidebar` (`app.js`).
 - **Right panels** — the core hosts none. A plugin that wants one supplies its
   own container, CSS, and toggle wiring (see `tool-expansion-guide.md`); text_tool's
-  Text panel (above) is one.
+  Text panel (above) is one. They share the right side one at a time: a panel shown
+  emits `sidepanel:shown` and every other `[data-side-panel]` hides, so each panel's
+  tool switches to it.

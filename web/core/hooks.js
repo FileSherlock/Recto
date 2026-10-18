@@ -20,6 +20,9 @@
                       pdfFonts = declared BaseFont names, most used first; sizePt = sampled body size)
    'typography:detected' ({ fontFamily, sizePt, source }) — emitted by a plugin that MEASURED the page's face
                       (an OCR read); the text tool selects it as the default for new boxes
+   'sidepanel:shown' ({ id })                       — emitted by a plugin whose side panel (a [data-side-panel]
+                      element in #main-content) was just shown; every other side panel hides itself: the right
+                      side shows one at a time
    'zoom:changed'    ({ zoom })                       — the viewer zoom factor changed
 
    Handlers may be async; emit() awaits them in registration order and

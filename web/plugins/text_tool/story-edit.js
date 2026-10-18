@@ -413,12 +413,13 @@
   });
 
   // A press outside the edited box — on the page, on another box — ends the
-  // session; the ribbon, the tool column and the Text panel do not.
+  // session; the ribbon, the tool column and the side panels (the Text panel,
+  // a plugin's) do not.
   document.addEventListener('mousedown', e => {
     if (!session) return;
     const t = e.target;
     if (groupOf(session.box)?.contains(t)) return;
-    if (t.closest?.('#unified-options-bar-container, #tool-column, .tt-studio, .floating-panel, #ribbon-overflow, #tools-sidebar')) return;
+    if (t.closest?.('#unified-options-bar-container, #tool-column, [data-side-panel], .floating-panel, #ribbon-overflow')) return;
     commitStoryEdit();
   }, true);
 

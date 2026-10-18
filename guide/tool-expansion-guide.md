@@ -376,7 +376,7 @@ not the core's). Delete the folder and nothing about a right panel remains in th
 
 ```html
 <!-- panel.html -->
-<aside id="my-panel" class="hidden">
+<aside id="my-panel" class="hidden" data-side-panel>
   <div id="my-panel-header">
     <span>My Panel</span>
   </div>
@@ -384,24 +384,33 @@ not the core's). Delete the folder and nothing about a right panel remains in th
 </aside>
 ```
 
+`data-side-panel` marks it as one of the side panels that share the right side (Step 4).
+
 ### Step 4 — JavaScript Toggle
 
 Your panel owns its own open/close — the core wires nothing. Look up your own
-button and container and toggle them:
+button and container and toggle them. The right side is shared **one side panel at a
+time**, by a convention on the bus rather than by name: a panel that is shown emits
+`sidepanel:shown` with its element id, and every side panel hides itself when another
+one's id arrives — so each panel's tool switches the right side to it (text_tool's Text
+panel and any plugin's panel work this way):
 
 ```js
 // my-panel.js
-document.getElementById('toggle-my-panel')?.addEventListener('click', () => {
-  const panel = document.getElementById('my-panel');
-  const btn   = document.getElementById('toggle-my-panel');
-  const nowHidden = panel?.classList.toggle('hidden');
-  btn?.classList.toggle('active', !nowHidden);
-});
+const panel = document.getElementById('my-panel');
+const btn   = document.getElementById('toggle-my-panel');
+function show(on) {
+  panel?.classList.toggle('hidden', !on);
+  btn?.classList.toggle('active', on);
+  if (on) PDFHooks.emit('sidepanel:shown', { id: panel.id });
+}
+btn?.addEventListener('click', () => show(!!panel?.classList.contains('hidden')));
+PDFHooks.on('sidepanel:shown', ({ id } = {}) => { if (id !== panel?.id) show(false); });
 ```
 
-If two right panels can be open at once and you want them mutually exclusive,
-coordinate that **between the plugins** (e.g. each hides the other by id in its
-own open handler) — the core provides no shared right-panel coordinator.
+A panel that shows itself at load (a remembered state, a default) does so only when no
+other `[data-side-panel]` is showing — the user's last choice wins, not the load order.
+On a narrow screen (≤ 768 px) a side panel is a sheet docked at the foot of the screen.
 
 That's it. No changes to the template, the build, or `app.js`.
 
@@ -622,7 +631,7 @@ confirm the console is clean and the rest of the app works.
 - **Never use `display: block` directly.** Always toggle the `.hidden` class. Sidebars use CSS transitions keyed on `.hidden`; bypassing it breaks animations.
 - **Use optional chaining (`?.`) on all `getElementById` calls** in plugin JS. This ensures your script doesn't throw when a control it expects is absent.
 - **Guard `openSubtoolbar` calls** with `typeof openSubtoolbar === 'function'` when your script is in `scripts_before_viewer`. Scripts in `scripts_after_app` can reference it directly.
-- **Integrate through `PDFHooks`, not by name.** Subscribe to lifecycle events instead of having the core call your functions, and look up your own DOM with `document.getElementById`. A subtoolbar plugin's only core touchpoints are the generic `registerSubtoolbar` + `openSubtoolbar`; a right panel is fully plugin-owned (its own container, CSS, and toggle wiring) with no core touchpoint at all.
+- **Integrate through `PDFHooks`, not by name.** Subscribe to lifecycle events instead of having the core call your functions, and look up your own DOM with `document.getElementById`. A subtoolbar plugin's only core touchpoints are the generic `registerSubtoolbar` + `openSubtoolbar`; a right panel is fully plugin-owned (its own container, CSS, and toggle wiring) with no core touchpoint at all — it shares the right side with the others through the `sidepanel:shown` convention (one at a time).
 - **Keep plugin logic self-contained.** Fragments, scripts, styles, workers and data files all belong in the plugin folder; nothing of a plugin lives in `web/core/`.
 - **Guard calls into other plugins** (`typeof Shaping !== 'undefined'`, `typeof fn === 'function'`). Any folder can be dragged out at any time.
 - **Never store a page URL.** `Doc.pageImageURL(n)` answers from an LRU whose evicted URLs are revoked — ask again when you need the page again.

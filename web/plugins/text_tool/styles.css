@@ -299,8 +299,9 @@ body.hide-embedded-text .utb-group[data-type="embedded"] { display: none; }
    screen. Its head (tabs, what it acts on) and its foot (Display) stay put;
    the settings between them scroll. */
 .tt-studio {
-  flex: 0 0 320px;
-  width: 320px;
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--tt-width, 340px);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -310,6 +311,17 @@ body.hide-embedded-text .utb-group[data-type="embedded"] { display: none; }
   font-size: 12px;
   font-family: 'Inter', system-ui, sans-serif;
 }
+/* the edge you drag (text-studio.js): wider — on a phone, taller */
+.tt-resize {
+  position: absolute;
+  left: -3px; top: 0; bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 2;
+  touch-action: none;
+}
+.tt-resize:hover, .tt-studio.is-resizing .tt-resize { background: rgba(138, 180, 248, 0.5); }
+.tt-studio.is-resizing { user-select: none; }
 .tt-studio-head {
   display: flex;
   align-items: center;
@@ -501,21 +513,50 @@ body.hide-embedded-text .utb-group[data-type="embedded"] { display: none; }
 .tt-view .settings-check input { margin-top: 0; }
 .tt-view .tt-check { margin: 4px 0; }
 
-/* a phone: a sheet at the foot of the screen, over the page's lower part */
+/* a phone: a sheet at the foot of the screen, over the page's lower part, as
+   tall as dragged; hidden, it slides below the screen (as every side panel
+   there does) */
 @media (max-width: 768px) {
   .tt-studio {
     position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
+    top: auto;
     width: auto;
-    height: 46vh;
+    height: var(--tt-height, 50vh);
+    max-height: calc(100vh - 64px);
     border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 12px 12px 0 0;
-    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
     z-index: 1001;
+    transform: translateY(0);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
   }
+  .tt-studio.hidden {
+    display: flex !important;
+    transform: translateY(100%);
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s 0.25s;
+  }
+  .tt-resize {
+    left: 0; right: 0; top: 0; bottom: auto;
+    width: auto; height: 16px;
+    cursor: row-resize;
+    background: none !important;
+  }
+  .tt-resize::after {
+    content: '';
+    position: absolute;
+    top: 5px; left: 50%;
+    width: 36px; height: 4px;
+    margin-left: -18px;
+    border-radius: 2px;
+    background: #5f6368;
+  }
+  .tt-studio-head { padding-top: 12px; }
   .tt-tab-btn { padding: 9px 8px; }
 }
 
