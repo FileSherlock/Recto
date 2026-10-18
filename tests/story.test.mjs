@@ -119,13 +119,48 @@ test('list markers count on, restart and end like Affinity\'s', { skip }, () => 
   assert.deepEqual(SC.listMarkers(s), ['a)', 'b)']);
 });
 
-test('OpenType settings name only what differs from the font\'s defaults', { skip }, () => {
+test('OpenType settings name only what differs from the browser\'s defaults', { skip }, () => {
+  // Recto's own: no ligatures, no contextual alternates — as Word sets text
   const a = SC.charOf({});
-  assert.equal(SC.featureSettings(a), '');
-  assert.equal(SC.featureSettings({ ...a, ot_liga: false, ot_dlig: true, ot_numForm: 'onum', ot_ss: 0b101 }),
+  assert.equal(SC.featureSettings(a), '"liga" 0, "clig" 0, "calt" 0');
+  // with the browser's three on, nothing else is named
+  const on = { ...a, ot_liga: true, ot_clig: true, ot_calt: true };
+  assert.equal(SC.featureSettings(on), '');
+  assert.equal(SC.featureSettings({ ...on, ot_liga: false, ot_dlig: true, ot_numForm: 'onum', ot_ss: 0b101 }),
     '"liga" 0, "dlig" 1, "onum" 1, "ss01" 1, "ss03" 1');
-  assert.equal(SC.featureSettings({ ...a, ot_position: 'sups' }), '"sups" 1');
-  assert.equal(SC.featureSettings({ ...a, autoKern: false }), '"kern" 0');
+  assert.equal(SC.featureSettings({ ...on, ot_position: 'sups' }), '"sups" 1');
+  assert.equal(SC.featureSettings({ ...on, autoKern: false }), '"kern" 0');
+  assert.equal(SC.featureSettings({ ...on, autoKern: true }), '');
+});
+
+test('pair kerning: the run\'s choice, else the page\'s, else off — and a choice of On is kept', { skip }, () => {
+  assert.equal(SC.CHAR_DEFAULTS.autoKern, null);                      // as the page
+  const a = SC.charOf({});
+  assert.equal(SC.resolveKern(a, undefined).autoKern, false);         // nobody read the page: as Word sets text
+  assert.equal(SC.resolveKern(a, true).autoKern, true);               // the page's producer kerned this face
+  assert.equal(SC.resolveKern(a, false).autoKern, false);
+  assert.equal(SC.resolveKern({ ...a, autoKern: true }, false).autoKern, true);   // the user's choice wins
+  assert.equal(SC.resolveKern({ ...a, autoKern: false }, true).autoKern, false);
+  // On is not the default any more: choosing it is stored, so it overrides an unkerned page
+  const s = SC.applyChar(SC.fromText('Yo AV'), null, { autoKern: true });
+  assert.deepEqual(s.paragraphs[0].runs[0].attrs, { autoKern: true });
+  assert.deepEqual(SC.applyChar(s, null, { autoKern: null }).paragraphs[0].runs[0].attrs, {});   // back to the page
+  assert.equal(SC.runCSS(SC.charOf({ autoKern: true }), SC.paraOf({}), SC.scaledMetrics(null, 16), { pxPerPt: 1 })['font-kerning'], 'normal');
+  assert.equal(SC.runCSS(a, SC.paraOf({}), SC.scaledMetrics(null, 16), { pxPerPt: 1 })['font-kerning'], 'none');
+});
+
+test('what a pixel renderer can draw of a run: face, size, spacing, kerning, colour, single lines', { skip }, () => {
+  const a = SC.charOf({});
+  assert.ok(SC.pixelable(a));
+  assert.ok(SC.pixelable({ ...a, tracking: 40, manualKern: -20, autoKern: true, color: '#2e75b6', underline: 'single', caps: 'all' }));
+  for (const bad of [{ highlight: '#ffff00' }, { opacity: 50 }, { strokeColor: '#000000', strokeWidth: 1 }, { scaleX: 90 }, { scaleY: 110 },
+    { shear: 12 }, { position: 'super' }, { ot_position: 'sups' }, { caps: 'small' }, { underline: 'double' }, { strike: 'double' }])
+    assert.equal(SC.pixelable({ ...a, ...bad }), false, JSON.stringify(bad));
+  // an outline needs both a colour and a width
+  assert.ok(SC.pixelable({ ...a, strokeColor: '#000000', strokeWidth: 0 }));
+  // what it lays past is named, for the Text panel's locks
+  assert.ok(SC.PIXEL_IGNORES.keys.includes('ot_liga'));
+  assert.deepEqual(SC.PIXEL_LIMITS.find(l => l.key === 'caps').allow, ['none', 'all']);
 });
 
 test('capitals: the font\'s features where it has them, Affinity\'s synthesis where not', { skip }, () => {
@@ -136,7 +171,7 @@ test('capitals: the font\'s features where it has them, Affinity\'s synthesis wh
   assert.deepEqual(SC.capsPlan('allSmall', ['smcp']), { tags: ['smcp'], synth: [] });
   assert.deepEqual(SC.capsPlan('allSmall', []), { tags: [], synth: ['lower', 'upper'] });
   assert.deepEqual(SC.capsPlan('petite', []), { tags: ['pcap'], synth: [] });      // the font's only
-  assert.equal(SC.featureSettings({ ...SC.charOf({}), caps: 'allSmall' }, full), '"smcp" 1, "c2sc" 1');
+  assert.equal(SC.featureSettings({ ...SC.charOf({ ot_liga: true, ot_clig: true, ot_calt: true }), caps: 'allSmall' }, full), '"smcp" 1, "c2sc" 1');
   assert.equal(SC.runCSS(SC.charOf({ caps: 'all' }), SC.paraOf({}), SC.scaledMetrics(null, 16), { pxPerPt: 1 })['text-transform'], 'uppercase');
 });
 

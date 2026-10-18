@@ -26,9 +26,15 @@
   // ── the attributes ────────────────────────────────────────────────────────
 
   // Character attributes (Affinity: Character panel + Typography panel), with
-  // Affinity's defaults — but for the
-  // font, which follows the ribbon, and the fill, which is the colour of text
-  // the user added in Recto unless chosen.
+  // Affinity's defaults — but for the font, which follows the Text panel's
+  // font for new text; the fill, which is the colour of text the user added in
+  // Recto unless chosen; pair kerning, which follows the page; and the
+  // ligatures and contextual alternates, which are off: text typed over a page
+  // must be set as the page was, and Word applies neither unless asked — no
+  // page of the corpus Recto is measured on has a ligature (recto-eval,
+  // 2026-10: 0 of 30,836 read lines), and the browser's default ligatures
+  // put a Calibri line's glyphs off the page's (a line within ½ px of its
+  // pens: 22 of 51 with them, 37 of 51 without).
   const CHAR_DEFAULTS = {
     // Font
     fontFamily: 'Times New Roman',
@@ -40,7 +46,9 @@
     opacity: 100,             // %
     highlight: null,          // Background Colour (behind the glyphs); null = none
     // Position & Transform
-    autoKern: true,           // Kerning "Auto": the font's GPOS kern or its kern table
+    autoKern: null,           // Pair kerning (the font's GPOS kern or its kern table): true, false,
+                              // or null = as the page — what the page's producer did with this face
+                              // when a reader knows it (resolveKern), else off, as Word sets text
     manualKern: 0,            // Kerning "Manual": ‰ of an em after each character
     tracking: 0,              // ‰ of an em after every character
     baselineShift: 0,         // pt, up
@@ -59,9 +67,9 @@
     strokeWidth: 0,           // pt
     // Typography: capitals (CAPS) and the OpenType features
     caps: 'none',
-    ot_liga: true,            // standard ligatures
-    ot_clig: true,            // contextual ligatures
-    ot_calt: true,            // contextual alternates
+    ot_liga: false,           // standard ligatures (Word: off unless asked)
+    ot_clig: false,           // contextual ligatures
+    ot_calt: false,           // contextual alternates (Word: off unless asked)
     ot_dlig: false,           // discretionary ligatures
     ot_hlig: false,           // historical ligatures
     ot_salt: false,           // stylistic alternates
@@ -637,6 +645,8 @@
   function featureSettings(a, features = null) {
     const f = [];
     const flag = (tag, on, dflt) => { if (on !== dflt) f.push(`"${tag}" ${on ? 1 : 0}`); };
+    // (the browser's own defaults are what a flag differs from: it sets
+    // liga, clig and calt unless told not to)
     flag('liga', a.ot_liga, true); flag('clig', a.ot_clig, true); flag('calt', a.ot_calt, true);
     flag('dlig', a.ot_dlig, false); flag('hlig', a.ot_hlig, false); flag('salt', a.ot_salt, false);
     flag('swsh', a.ot_swsh, false); flag('cswh', a.ot_cswh, false); flag('titl', a.ot_titl, false);
@@ -648,9 +658,49 @@
     if (OT_POSITIONS.includes(a.ot_position) && a.ot_position !== 'normal') f.push(`"${a.ot_position}" 1`);
     for (let i = 0; i < 20; i++) if (a.ot_ss & (1 << i)) f.push(`"ss${String(i + 1).padStart(2, '0')}" 1`);
     for (const tag of capsPlan(a.caps, features).tags) if (!f.some(s => s.startsWith(`"${tag}"`))) f.push(`"${tag}" 1`);
-    if (!a.autoKern) f.push('"kern" 0');
+    if (a.autoKern === false) f.push('"kern" 0');
     return f.join(', ');
   }
+
+  // Pair kerning as it is drawn: the run's own choice, else the page's (a
+  // reader's answer for this face: true / false / undefined), else off — a
+  // page nobody has read is set as Word sets text, without pair kerning (Word
+  // kerns only when asked, "Kerning for fonts"; the documents Recto opens are
+  // mostly Word's). Returns the attributes with autoKern a boolean.
+  const KERN_UNKNOWN = false;
+  function resolveKern(a, page) {
+    if (typeof a.autoKern === 'boolean') return a;
+    return { ...a, autoKern: typeof page === 'boolean' ? page : KERN_UNKNOWN };
+  }
+
+  // What a pixel renderer — the utbPixelRender seam, which lays one-line
+  // pieces of one face, size, letter spacing, kerning, colour and single
+  // decorations — cannot draw, by character attribute: `cannot(value, attrs)`
+  // is true for a value it cannot draw (a run with one stays HTML), `why` the
+  // reason the Text panel shows on the lock, `allow` — where some values can
+  // be drawn — the ones that can. PIXEL_IGNORES lists what it lays past: one
+  // glyph per character, as the page's producer set it, so the OpenType
+  // features have no effect on its pixels.
+  const PIXEL_LIMITS = [
+    { key: 'opacity', cannot: v => v < 100, why: 'draws the ink as the page has it: no opacity' },
+    { key: 'highlight', cannot: v => v != null, why: 'draws the glyphs alone: no background colour' },
+    { key: 'strokeColor', cannot: (v, a) => !!v && a.strokeWidth > 0, why: 'draws the glyphs alone: no outline' },
+    { key: 'strokeWidth', cannot: (v, a) => v > 0 && !!a.strokeColor, why: 'draws the glyphs alone: no outline' },
+    { key: 'scaleX', cannot: v => v !== 100, why: 'draws the font\'s own glyphs: no scaling' },
+    { key: 'scaleY', cannot: v => v !== 100, why: 'draws the font\'s own glyphs: no scaling' },
+    { key: 'shear', cannot: v => !!v, why: 'draws the font\'s own glyphs: no shear' },
+    { key: 'position', cannot: v => v !== 'normal', why: 'has no synthesised super- or subscript' },
+    { key: 'ot_position', cannot: v => v !== 'normal', why: 'draws one glyph per character: no superior or inferior figures' },
+    { key: 'caps', cannot: v => v !== 'none' && v !== 'all', allow: ['none', 'all'], why: 'draws one glyph per character: All Caps only' },
+    { key: 'underline', cannot: v => v === 'double', allow: ['none', 'single'], why: 'draws single lines only' },
+    { key: 'strike', cannot: v => v === 'double', allow: ['none', 'single'], why: 'draws single lines only' },
+  ];
+  const PIXEL_IGNORES = {
+    keys: ['ot_liga', 'ot_clig', 'ot_calt', 'ot_dlig', 'ot_hlig', 'ot_salt', 'ot_swsh', 'ot_cswh', 'ot_titl', 'ot_case',
+      'ot_cpsp', 'ot_zero', 'ot_frac', 'ot_ordn', 'ot_hist', 'ot_ornm', 'ot_numForm', 'ot_numSpacing', 'ot_ss'],
+    why: 'draws one glyph per character, as the page\'s producer set them: OpenType features have no effect',
+  };
+  const pixelable = a => PIXEL_LIMITS.every(l => !l.cannot(a[l.key], a));
 
   // The CSS of a run: `a` its effective character attributes, `pa` its
   // paragraph's, `m` the face's scaled metrics (scaledMetrics), ctx
@@ -786,5 +836,6 @@
     runAttrsAt, charSummary, paraSummary, applyChar, mapChar, applyPara,
     deleteRange, insertText, replaceRange, slice, wordAt, listMarkers, changeCase, caseMapped,
     scaledMetrics, leadingPx, leadingPerRun, naturalLeading, firstBaselinePx, capsPlan, featureSettings, runCSS, strikeCSS, paraCSS, styleText,
+    resolveKern, PIXEL_LIMITS, PIXEL_IGNORES, pixelable,
   };
 })();

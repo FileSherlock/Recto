@@ -79,9 +79,26 @@
     box.color = a.color;
     box.opacity = a.opacity;
     box.letterSpacing = (a.tracking || 0) / 1000;
-    box.kerning = a.autoKern;
-    box.kerningAuto = false;
+    // kerning as the first character draws it; the box follows the page
+    // while some of its text has no choice of its own (it is drawn again when
+    // a reader learns the page's)
+    box.kerning = kernOf(a, box).autoKern;
+    box.kerningAuto = box.story.paragraphs.some(p => p.runs.some(r => r.attrs.autoKern == null));
   }
+
+  // Pair kerning as a run draws it (StoryCore.resolveKern): its own choice,
+  // else what the page's producer did with its face — the guarded seam an
+  // analysis plugin answers (window.utbAutoKerning: true, false, or nothing
+  // known) — else off.
+  function pageKern(box, a) {
+    if (typeof window.utbAutoKerning !== 'function') return undefined;
+    try {
+      const k = window.utbAutoKerning({ ...box, fontFamily: a.fontFamily, bold: !!a.bold, italic: !!a.italic, sizePt: a.sizePt, kerningAuto: true });
+      return typeof k === 'boolean' ? k : undefined;
+    } catch { return undefined; }    // the plugin's
+  }
+  const kernOf = (a, box) => SC.resolveKern(a, typeof a.autoKern === 'boolean' ? undefined : pageKern(box, a));
+  window.storyPageKern = (box, attrs) => pageKern(box, SC.charOf(attrs));
 
   // A plain box becomes an Artistic-text story: its text and typography as
   // the story's, its first baseline where it was (the y of the box moves so
@@ -93,7 +110,7 @@
     box.story = SC.fromText(box.text || '', {
       fontFamily: box.fontFamily, sizePt: box.sizePt, bold: !!box.bold, italic: !!box.italic,
       color: box.color || null, opacity: box.opacity ?? 100, underline: box.underline ? 'single' : 'none', strike: box.strikethrough ? 'single' : 'none',
-      tracking: Math.round((+box.letterSpacing || 0) * 1000), autoKern: !!box.kerning,
+      tracking: Math.round((+box.letterSpacing || 0) * 1000), autoKern: box.kerningAuto ? null : !!box.kerning,
     });
     box.frame = {};
     box._keepBaseline = baseline;           // renderStoryBox moves y so the first baseline stays here
@@ -238,15 +255,8 @@
       let o = 0;
       for (const run of para.runs) {
         if (!run.text) continue;
-        let a = SC.charOf(run.attrs);
-        // kerning nobody chose follows the page, as a typed box's does (the
-        // guarded seam an analysis plugin answers)
-        if (!('autoKern' in run.attrs) && typeof window.utbAutoKerning === 'function') {
-          try {
-            const k = window.utbAutoKerning({ ...box, fontFamily: a.fontFamily, bold: a.bold, italic: a.italic, sizePt: a.sizePt, kerningAuto: true });
-            if (typeof k === 'boolean') a = { ...a, autoKern: k };
-          } catch { /* the plugin's */ }
-        }
+        // kerning nobody chose follows the page, as a typed box's does
+        const a = kernOf(SC.charOf(run.attrs), box);
         const m = scaled(a, box, ctx.pxPerPt);
         const css = SC.runCSS(a, pa, m, ctx);
         // leading that follows the text: every run brings its line height, so
@@ -368,11 +378,10 @@
   // ── the pixel-renderer seam (window.utbPixelRender) ───────────────────────
 
   // What a pixel renderer can draw of a run: the face, size, tracking,
-  // kerning, colour and single decorations of a one-line box. A story using
-  // anything else stays HTML, all of it.
-  const pixelable = a => !a.highlight && !(a.strokeColor && a.strokeWidth > 0) && a.scaleX === 100 && a.scaleY === 100
-    && !a.shear && a.position === 'normal' && a.ot_position === 'normal' && (a.caps === 'none' || a.caps === 'all')
-    && !(a.opacity < 100) && a.underline !== 'double' && a.strike !== 'double';
+  // kerning, colour and single decorations of a one-line box
+  // (StoryCore.PIXEL_LIMITS — the Text panel locks the rest while one draws).
+  // A story using anything else stays HTML, all of it.
+  const pixelable = SC.pixelable;
   const SOFT_HYPHEN = String.fromCharCode(0xAD);
 
   // Ask the seam to forget pieces it drew before (an empty text is its "forget").
@@ -530,16 +539,12 @@
         id: `${box.id}~${n}`, type: box.type, page: box.page, text,
         fontFamily: p.a.fontFamily, bold: !!p.a.bold, italic: !!p.a.italic, sizePt: p.sizePt,
         letterSpacing: sp.letterPx / sizePx,
-        kerning: !!p.a.autoKern, kerningAuto: false,
+        kerning: kernOf(p.a, box).autoKern, kerningAuto: false,
         color: p.a.color || null, labelColor: null, labelAlign: null,
         underline: p.a.underline === 'single', strikethrough: p.a.strike === 'single',
         defaultSpaceWidth: sp.spacePx == null, spaceWidth: sp.spacePx, baseCharPositions: null, charAdvances: {},
         x, y: p.baseline - sizePx, w: 0, h: sizePx, lineId: null,
       };
-      // kerning nobody chose follows the page, as a typed box's does
-      if (!('autoKern' in p.stored) && typeof window.utbAutoKerning === 'function') {
-        try { const kk = window.utbAutoKerning(piece); if (typeof kk === 'boolean') piece.kerning = kk; } catch { /* the plugin's */ }
-      }
       let res = null;
       try { res = window.utbPixelRender(piece, [x], p.baseline); } catch (e) { console.warn('utbPixelRender failed for', piece.id, e); }
       if (!res) { forgetPieces(box, [...before, ...drawn.map(d => d.id)]); return; }
