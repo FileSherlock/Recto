@@ -403,12 +403,14 @@ then synced.
 
 ## MuPDF pixel view
 
-Two switches in the **MuPDF pixels** section of the Settings panel (`settings.html`, wired in `pixel-view.js`):
+Two switches (`settings.html`, wired in `pixel-view.js`). Their section is marked
+`data-text-panel`: text_tool's Text panel moves it into its **Display** section, beside Space
+widths — with no Text panel it stays in the Settings panel.
 
 | Switch | id | What it does |
 |---|---|---|
 | Draw text as MuPDF pixels | `ocr-pixel-view` | Every text box is drawn from the reader's own glyph bitmaps on mupdf's ¼-px pen lattice and whole-pixel baseline, instead of SVG text — the raster mupdf would have produced. Tinted like the SVG text (alpha = ink darkness); pixelated when zoomed. |
-| Diff: highlight the pixels that differ from the page | `ocr-pixel-diff` | Matching ink pixels go faint, pixels whose predicted byte differs from the page turn solid red, and page ink inside the line's band that no drawn glyph explains turns solid orange (the reader's residual — a quote mark it never transcribed). The status line reports `OCR lines n/m exact` (reader-certified lines, which must all be exact — within the reader's own ±tol when a line was read on a tolerant rung) and `other boxes n/m exact` (embedded / hand-added text, compared but not expected to match) for the page and, on selection, the box's ink-pixel and differing-pixel counts. |
+| Diff: pixels that differ from the page | `ocr-pixel-diff` | Matching ink pixels go faint, pixels whose predicted byte differs from the page turn solid red, and page ink inside the line's band that no drawn glyph explains turns solid orange (the reader's residual — a quote mark it never transcribed). The status line reports `OCR lines n/m exact` (reader-certified lines, which must all be exact — within the reader's own ±tol when a line was read on a tolerant rung) and `other boxes n/m exact` (embedded / hand-added text, compared but not expected to match) for the page and, on selection, the box's ink-pixel and differing-pixel counts. |
 
 - **Which glyph set draws a box.** OCR lines: the set the reader picked
   (`box.ocr.font`; a union name resolves per glyph through
@@ -539,17 +541,31 @@ Two switches in the **MuPDF pixels** section of the Settings panel (`settings.ht
   **Letter spacing** and a manual **space width** go through `layoutLine`.
   **Kerning**: `pixel-view.js` answers text_tool's `utbAutoKerning` seam with
   whether the page's producer kerned the box's family, so a new box follows
-  the page; the Kerning checkbox then wins in both directions (the status
+  the page (and where nothing is known text_tool sets it unkerned, as this
+  law assumes); the Pair kerning checkbox then wins in both directions (the status
   line says `your Kerning setting, not the page's`), with the face's kern
   pairs from `FontCatalog.metrics` quantized and scaled under the page's law. A set
   the page never certified (a bold italic nobody wrote) borrows the
   *structure* of its family's law on that page — quantization, scale,
   kerned-or-not — never its tables.
+- **The terms a typed box is judged by.** A read line is judged by its own
+  terms (`box.ocr`: y-phase, its rung's tolerance, its palette map); text typed
+  over the page — a typed box, a story's piece — by its page's (`pvTerms`: the
+  pass every line of the page was read with). Before 2026-10-18 typed text was
+  judged at tolerance 0 without the palette, so on a colour page read through
+  its palette the Diff showed red where the pens and glyphs were the page's
+  (Artistic text over the FBI summary's page 2: 532 and 555 px on two lines
+  whose typed boxes, judged by the line's terms, differ in none).
 - **Honest limits.** A character the face lacks, a style the family has no
   file for (nothing is synthesized), a set that is not loaded, or a
   page raster that is not 1:1 with the viewBox → SVG fallback, never an
   approximation. The seam is `window.utbPixelRender` in `svg-renderer.js`
-  (see [Unified Text Box](../../architecture/unified-text-box.md)).
+  (see [Unified Text Box](../../architecture/unified-text-box.md));
+  `window.utbPixelRenderOn()` (`'MuPDF pixels'` while on, else null) and the
+  `pixels:changed` hook tell text_tool's Text panel whether it draws, so the
+  panel locks what a piece cannot carry (opacity, background, outline, scale,
+  shear, synthetic super/subscript, small caps, double lines, OpenType
+  features) with the reason.
 - **Proofs.** tol0: `npm run certify:render` (render.js vs real mupdf at every
   1/64 pen phase, both TTF and CFF pipelines, forced overlaps — 0 diffs),
   `npm test` (synthetic round trip render → readPage → clean). Recto:

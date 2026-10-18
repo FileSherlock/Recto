@@ -8,10 +8,11 @@
 // This file only decides WHICH set draws a box, WHERE its pens are, and how
 // the raster is tinted and diffed.
 //
-// Two toggles in the Auto OCR bar:
-//   MuPDF pixels (#ocr-pixel-view, Settings)  raster instead of SVG text, tinted like
+// Two switches (settings.html — the Text panel's Display section, or the
+// Settings panel without one):
+//   MuPDF pixels (#ocr-pixel-view)  raster instead of SVG text, tinted like
 //                                   the SVG text would be, alpha = ink darkness
-//   Diff         (#ocr-pixel-diff, Settings)  matching ink pixels faint; pixels that
+//   Diff         (#ocr-pixel-diff)  matching ink pixels faint; pixels that
 //                                   DIFFER from the page solid red; page ink
 //                                   the OCR left UNEXPLAINED solid orange —
 //                                   zero red and zero orange means the line
@@ -32,6 +33,8 @@
 // Attaches to text_tool through ONE guarded seam: svg-renderer.js calls
 // window.utbPixelRender(box, xs, baseline) for every box it draws and shows
 // the returned raster instead of its <text>; null means "draw as always".
+// window.utbPixelRenderOn() and the 'pixels:changed' hook say whether it is
+// drawing (the Text panel locks what it cannot draw).
 // Nothing in text_tool or the core knows this file exists.
 
 const pixelView = {
@@ -389,6 +392,21 @@ const pvLawLabel = law => !law ? '' :
   (law.borrowed ? ` (the page's law for ${law.borrowed})` : '') +
   (law.assumed ? ' (assumed — nothing certified in this set on the page)' : law.words != null ? ` (${law.exact}/${law.words} words written back)` : '');
 
+// The terms a box's pixels are judged by in the Diff: a read line's own — the
+// y-phase records the reader pinned it to, the per-pixel tolerance of the
+// rung it was read on, its palette map — and for text typed over a page (a
+// typed box, a story's piece: no reading of its own) the page's, the pass
+// every line of the page was read with: a colour page read through its
+// palette compares typed text through that palette too (measured 2026-10-18:
+// Artistic text typed over the FBI summary's page-2 Calibri lines drew the
+// reader's pens exactly and still differed in 532 and 555 px on two lines at
+// tolerance 0 without the palette; at the page's terms, in none).
+function pvTerms(box) {
+  if (box.ocr) return { phy: box.ocr.phy || 0, tol: box.ocr.tol || 0, quant: !!box.ocr.quant };
+  const read = utbState.boxes.find(b => b.page === box.page && b.type === 'ocr' && b.ocr && !b.ocr.unread);
+  return { phy: 0, tol: read?.ocr.tol || 0, quant: !!read?.ocr.quant };
+}
+
 function pvTint(box) {
   const c = box.color || box.labelColor;
   if (typeof c === 'string') {
@@ -586,10 +604,11 @@ function utbPixelRender(box, xs, baseline) {
   const info = pvPageInfo(box.page);
   const tint = pvTint(box);
   // the reader's own terms for this line: which y-phase records it pinned
-  // the line to, and the per-pixel tolerance of the rung it was read on
-  const phy = box.ocr?.phy || 0, tol = box.ocr?.tol || 0;
+  // the line to, the per-pixel tolerance of the rung it was read on, its
+  // palette map — typed text takes its page's (pvTerms)
+  const { phy, tol, quant } = pvTerms(box);
   const key = [setInfo.label, box.text, glyphs.map(g => Math.round(g.pen * 4)).join(','), yb, phy, tol,
-    pixelView.diff ? 'd' : 'p', info ? 'pg' : 'nopg', tint.join('.'), box.ocr?.quant ? 'q' : '',
+    pixelView.diff ? 'd' : 'p', info ? 'pg' : 'nopg', tint.join('.'), quant ? 'q' : '',
     rects.map(q => `${q.x0},${q.y0},${q.w},${q.h},${q.cov[0]},${q.cov[q.cov.length - 1]}`).join(';')].join('|');
   let out = pixelView.cache.get(key);
   if (!out) {
@@ -599,7 +618,7 @@ function utbPixelRender(box, xs, baseline) {
       pvNote(box, `no glyph for "${r.missing.join('')}" in ${setInfo.label}${phy ? ` at y-phase ${phy}` : ''}`);
       return null;
     }
-    const d = info ? OCRRender.diffLine(r, info.page, box.ocr?.quant ? pvQuant(info) : null, info.mask, tol) : null;
+    const d = info ? OCRRender.diffLine(r, info.page, quant ? pvQuant(info) : null, info.mask, tol) : null;
     out = { r, d, tint, ...pvPaint(r, d, tint, pixelView.diff, null), advanceW,
       ink: d?.ink ?? null, count: d?.count ?? null, within: d?.within ?? 0, masked: d?.masked ?? 0,
       outside: d?.outside ?? 0, glyphs: r.glyphs };
@@ -617,6 +636,10 @@ function utbPixelRender(box, xs, baseline) {
   return { href: out.href, x: out.x, y: out.y, w: out.w, h: out.h, advanceW };
 }
 window.utbPixelRender = utbPixelRender;
+// text_tool's question: is a pixel renderer drawing the text now? Its name
+// while it does (the Text panel's locks say what it cannot draw), else null.
+const PV_NAME = 'MuPDF pixels';
+window.utbPixelRenderOn = () => (pixelView.on ? PV_NAME : null);
 
 function pvForget(id) {
   pixelView.results.delete(id);
@@ -721,6 +744,7 @@ function pvInvalidate() {
 }
 
 function pvSetOn(on) {
+  const was = pixelView.on;
   pixelView.on = !!on;
   if (!pixelView.on) pixelView.diff = false;
   pvInvalidate();
@@ -732,6 +756,8 @@ function pvSetOn(on) {
   window.renderAllTextLayers?.();
   if (pixelView.on && ocrToolState.sets) pvSettle();
   else if (!pixelView.on) setOcrStatus('MuPDF pixels off');
+  // text_tool's panel locks what the pixels cannot draw while they draw
+  if (was !== pixelView.on) PDFHooks.emit('pixels:changed', { on: pixelView.on, name: PV_NAME });
 }
 
 function pvSetDiff(diff) {
@@ -845,8 +871,9 @@ window.PixelView = {
     let count = null, ink = null;
     const info = pvPageInfo(box.page);
     if (info && !lay.missing.length && typeof window.computeBaseline === 'function') {
-      const r = OCRRender.renderLine(primary, lay.glyphs, OCRRender.snapY(window.computeBaseline(box)), { phy: box.ocr?.phy || 0 });
-      const d = OCRRender.diffLine(r, info.page, box.ocr?.quant ? pvQuant(info) : null, info.mask, box.ocr?.tol || 0);
+      const t = pvTerms(box);
+      const r = OCRRender.renderLine(primary, lay.glyphs, OCRRender.snapY(window.computeBaseline(box)), { phy: t.phy });
+      const d = OCRRender.diffLine(r, info.page, t.quant ? pvQuant(info) : null, info.mask, t.tol);
       count = d.count; ink = d.ink;
     }
     return { id, page: box.page, text: box.text, set: primary.name, clean: box.ocr?.clean ?? null,
