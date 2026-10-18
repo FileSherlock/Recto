@@ -390,6 +390,82 @@ the colour law leaves uncertified; the shipped Times New Roman, Courier New and
 Segoe UI files are another build than the bundle's sets in a few characters
 each (the report lists them).
 
+### Typed text over the page: how close it comes (2026-10-18)
+
+The question this answers: typed with text_tool's Artistic text over a line the page already
+has — the line's face, style, size, its first pen and baseline, the text the reader read — how
+close do the typed glyphs come to the page's? Two measurements, both with scratch scripts over
+this repository and recto-eval (kept in the session, not committed):
+
+- **MuPDF pixels, the whole corpus** — recto-eval's typed write-back (`wb.typed`, every
+  certified segment of the full tier: 43 documents, 30,836 segments) laid three ways: kerning
+  **as the page** (what text_tool does), **always on** (Affinity's default, and text_tool's
+  before 2026-10-18 for a page nobody had read), **always off** (Word's default).
+- **The browser's own text** — the app in headless Chrome: Artistic text made over every
+  trusted OCR segment of 13 documents (up to their first three pages), every glyph's x as the browser
+  laid it against the reader's pen, with text_tool's new defaults (kerning as the page, no
+  ligatures) and the old ones (kerning and ligatures on); the same stories through the pixel
+  view, started where the page's lattice lets the line start.
+
+**Who kerns.** Every page Word made — the affidavit and the warrant (Times New Roman), the FBI
+summary in both releases (Calibri), the eDiscovery memo, the palette pages — and every
+synthetic page (set like Word) is set **without** pair kerning; the Times 16 px e-mail
+printouts (the startup document's header, v3, email, big, the e-mails of 2010 and 2019) are
+kerned. Courier and Nimbus Mono bodies have no kern pairs. 47 % of the segments hold a pair of
+their face's kern table, so the choice decides them. **No producer used a ligature**: 0 of
+30,836 read lines has an fi / fl ligature glyph.
+
+| typed in MuPDF pixels (`wb.typed`) | as the page | always on | always off |
+|---|---:|---:|---:|
+| all 30,836 segments | **77.1 %** | 76.9 % | 46.4 % |
+| FBI summary p2 (Calibri, Word) | **62.7 %** | 15.7 % | 62.7 % |
+| FBI summary p2, second release | **15.2 %** | 4.3 % | 15.2 % |
+| synthetic: 21 faces | **90.5 %** | 33.3 % | 90.5 % |
+| synthetic: Calibri report / Verdana spacing | **50.0 / 75.0 %** | 12.5 / 25.0 % | 50.0 / 75.0 % |
+| big (340 pages of kerned Times e-mail) | **84.1 %** | 84.1 % | 33.1 % |
+| the 2019 e-mail (kerned) | **63.3 %** | 63.3 % | 43.3 % |
+
+In the browser (HTML text, no pixel view), per document — lines whose every glyph lies within
+½ px of the page's pen; lines whose glyphs inside each word do (the word gaps left out); lines
+the pixel view then draws exactly; the median glyph error — new defaults / old:
+
+| document | lines | ≤ ½ px | in-word ≤ ¼ px | pixels exact | median error, px |
+|---|---:|---:|---:|---:|---:|
+| startup p1–3 (kerned Times header, Courier body) | 191 | 191 / 191 | 190 / 190 | 190 / 190 | 0.06 / 0.06 |
+| synthetic: 21 faces | 21 | 20 / 8 | 20 / 7 | 19 / 7 | 0.06 / 0.23 |
+| synthetic: Verdana spacing | 8 | 8 / 2 | 8 / 2 | 6 / 2 | 0.09 / 0.58 |
+| synthetic: Arial memo | 20 | 14 / 13 | 20 / 15 | 11 / 8 | 0.13 / 0.16 |
+| synthetic: Times letter | 22 | 12 / 7 | 22 / 14 | 12 / 7 | 1.31 / 1.67 |
+| synthetic: Calibri report | 8 | 4 / 1 | 8 / 1 | 4 / 1 | 3.52 / 3.78 |
+| synthetic: justified Times | 18 | 5 / 5 | 18 / 17 | 4 / 4 | 1.91 / 1.91 |
+| affidavit (Word, Times, justified) | 35 | 13 / 9 | 27 / 18 | 3 / 2 | 5.30 / 5.88 |
+| FBI summary p2 (Calibri) | 51 | 37 / 15 | 48 / 11 | 32 / 8 | 0.13 / 1.20 |
+| FBI summary p2, second release | 46 | 32 / 8 | 43 / 7 | 6 / 2 | 0.09 / 1.30 |
+| the 2019 e-mail (kerned Times) | 30 | 30 / 30 | 28 / 28 | 19 / 19 | 0.06 / 0.06 |
+| the 2010 e-mails p1–2 (kerned Times, palette pages) | 77 | 77 / 77 | 76 / 76 | 64 / 64 | 0.08 / 0.08 |
+
+What it says:
+
+- **Inside a word the typed text is the page's** once kerning is the page's and ligatures are
+  off: the glyphs land within ¼ px of the reader's pens on 93–100 % of the lines of every
+  document but the Word affidavit (27 of 35: Word lays the same word differently by where it
+  starts, the lab's open case) — the browser lays a face's own advances, the producer its
+  1/1000-em widths, and the difference stays under the lattice step. Kerning the wrong way is
+  the largest error — the Calibri page kerned drops from 48 to 11 lines of 51, the kerned 2010
+  e-mails unkerned from 76 to 62 of 77 — and the browser's default ligatures the next (48 → 26
+  on the Calibri page: Calibri ligates fi, fl, ff).
+- **Between words** the page decides: Word **justifies** its lines by widening each line's
+  spaces, and puts its rounding into some gaps; text typed with the face's own space misses those
+  by up to several px by the line's end (the affidavit's, the Times letter's and the Calibri
+  report's medians above are their justified lines). **Space width** (the Text panel's Spacing)
+  sets one line's space; Frame text with Justified alignment justifies with the browser's spaces,
+  not Word's.
+- **Pixel-exact lines** follow the in-word result where the line's gaps are the face's own (the
+  e-mails, the synthetic faces page: 19 of 21); on Word's justified pages few lines are
+  (affidavit 3 of 35): the producer's own word gaps, which no per-word law reproduces.
+- Typed over a read line, a story's pieces are the typed box's (same glyph set, law and pens),
+  and with the page's read terms (`pvTerms`) the same verdict, line for line.
+
 ## Limits
 
 Byte-exact reading requires the document family's renderer to be modelled —

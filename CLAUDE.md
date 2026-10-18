@@ -40,7 +40,8 @@ feature. Full docs live in `guide/` (start with `guide/architecture/architecture
   at its `@plugins:*` markers and emits the script tags in the fixed order. **Never edit `web/index.html`, the template
   or the build to add a plugin** — add a folder. The core arranges what it finds and names no plugin: the tool column
   is reordered and trimmed by the user (Customise tools, localStorage), ribbon groups that do not fit move under
-  "More", the Settings button appears only when some plugin contributed a section.
+  "More", the Settings button shows only while some plugin's section is in it (a section marked `data-text-panel`
+  moves into text_tool's Text panel instead).
 - **`PDFHooks` — the event bus** (`web/core/hooks.js`, loaded before everything else): the core emits lifecycle events
   (`ui:ready`, `document:opening`, `viewer:clear`, `page:rendered`, `pages:refresh`, `document:loaded`,
   `zoom:changed`); plugins subscribe with `PDFHooks.on(...)`. The core never calls a plugin function by name. Handlers
@@ -65,7 +66,7 @@ overlays. Prefer per-page work over whole-document passes so huge documents stay
 
 | Plugin | Role |
 |---|---|
-| `text_tool` | Edit/add text; `shaping.js` measures with HarfBuzz (`Shaping.widths`, `Shaping.fontMetrics`, `Shaping.faceMetrics`), `fonts.js` is the font catalogue (`FontCatalog`, from `generated/fonts.json`). Affinity's Artistic and Frame text: `story-core.js` (`StoryCore`, the rich-text model, no DOM), `story-render.js`, `story-edit.js`, the tools `frame-tool.js` / `artistic-tool.js` and the Text panel `text-studio.js` — see `guide/frontend/artistic-and-frame-text.md` |
+| `text_tool` | Edit/add text; `shaping.js` measures with HarfBuzz (`Shaping.widths`, `Shaping.fontMetrics`, `Shaping.faceMetrics`), `fonts.js` is the font catalogue (`FontCatalog`, from `generated/fonts.json`). Affinity's Artistic and Frame text: `story-core.js` (`StoryCore`, the rich-text model, no DOM), `story-render.js`, `story-edit.js`, the tools `frame-tool.js` / `artistic-tool.js`. Every text setting is in the Text panel (`studio.html`, `text-studio.js`), a side panel docked beside the page; a box that is not a story is formatted through `toolbar.js` (`utbPlainChar`) — see `guide/frontend/text-tool.md` and `guide/frontend/artistic-and-frame-text.md` |
 | `embedded_text_viewer` | Inline overlay of the PDF's embedded text; `extract.js` turns `Doc.structuredText` into spans |
 | `webgl_mask` | Black-region detection (`mask-core.js`, in the plugin's own worker) + GPU mask tinting |
 
