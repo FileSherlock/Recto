@@ -7,9 +7,9 @@
 //   - a click puts a new Artistic text's baseline at the point, in the font
 //     and size new text takes (the Text panel's) — beside or on a line of the
 //     page, in that line's face and size, on its baseline, with its space
-//     (the paragraph's word spacing: Word widens a justified line's spaces),
-//     and from its first glyph when the click is within half an em of where
-//     it starts;
+//     (the paragraph's word spacing: Word widens a justified line's spaces)
+//     and a tab stop where it goes on after a tab (a list label's), and from
+//     its first glyph when the click is within half an em of where it starts;
 //   - a drag sets the size: the font's typographic ascent is the drag's
 //     height, the baseline its lower edge (Affinity's rule);
 //   - a press on Artistic or Frame text puts the caret there (drag-resize.js).
@@ -98,7 +98,7 @@
   // A new Artistic text with its first baseline at (x, baseline). `ascentPx`
   // (a drag's height) sets the size so that the typographic ascent fills it.
   // `snap` (a click): beside a line of the page's text, the new text takes
-  // that line's face, style, size, baseline and space
+  // that line's face, style, size, baseline, space and tab stops
   async function create(pageNum, x, baseline, ascentPx, dragW = 0, snap = false) {
     const fresh = window.newTextFont?.() || { fontFamily: 'Times New Roman', sizePt: 12 };
     let family = fresh.fontFamily;
@@ -125,6 +125,11 @@
         const ws = await window.utbLineWordSpacing?.(near, { fontFamily: family, bold, italic, sizePt, kerning, ligatures: a.ot_liga });
         if (ws > 0 && ws !== 100) para.wordSpacing = ws;
       }
+      // where the line goes on after a tab (a list label's: "2.", then
+      // "Evidence" at the list's stop), a tab stop: a tab typed after the
+      // label puts the text where the page's starts
+      const tabs = window.utbLineTabStops?.(near, x);
+      if (tabs?.length) para.tabs = tabs;
     }
     if (ascentPx) {
       let m = null;

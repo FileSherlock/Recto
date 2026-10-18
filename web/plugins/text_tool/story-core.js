@@ -641,6 +641,43 @@
     return words;
   }
 
+  // How much wider than the line's spaces one space must be to be a tab's
+  // gap, px. Word sets a justified line's spaces alike — the page's read
+  // back within a few tenths of a pixel of each other — and a list label's
+  // tab to a stop just beyond it a pixel or more wider (the affidavit's
+  // "w." 8.5 px, its spaces 6.75).
+  const TAB_GAP = 1;
+
+  // Which gaps of a line's words (lineWords) are a tab's: a Set of the
+  // indices of the words that come after one. A tab ends at its stop,
+  // whatever the line's space, and a reader writes its gap as the spaces
+  // that fill it at that space: a run of spaces (two after a full stop are
+  // typed as spaces, and a stop there does them no harm), or — a stop just
+  // beyond a label — one space wider than the line's own by TAB_GAP: than
+  // the lower middle of its single spaces (of one, nothing can be told).
+  function lineTabGaps(words) {
+    const tabs = new Set(), singles = [];
+    for (let k = 0; k + 1 < words.length; k++) {
+      if (words[k].gap > 1) tabs.add(k + 1);
+      else singles.push({ k: k + 1, g: words[k + 1].x - words[k].end });
+    }
+    if (singles.length > 1) {
+      const sorted = singles.map(s => s.g).sort((a, b) => a - b);
+      const usual = sorted[Math.floor((sorted.length - 1) / 2)];
+      for (const s of singles) if (s.g > usual + TAB_GAP) tabs.add(s.k);
+    }
+    return tabs;
+  }
+
+  // Where a line of the page goes on after a tab: [{ x, i }] — x where the
+  // word after each tab's gap starts (in the frame of the measured
+  // characters), i the index of its first character. A tab stop there puts
+  // a typed tab's text on the page's.
+  function lineTabs(chars) {
+    const words = lineWords(chars);
+    return [...lineTabGaps(words)].sort((a, b) => a - b).map(k => ({ x: words[k].x, i: words[k].i }));
+  }
+
   // How far a word as a face sets it may be from the room the page's glyphs
   // take and still be the page's face, px. Inside a word typed text comes
   // within a quarter pixel of the page's pens; a word further off is not set
@@ -653,9 +690,9 @@
   // widening its spaces, each line by its own amount, and puts its rounding
   // into some of them: their mean lands the line's last word where the page
   // has it. `pieces`: the measured characters of the line's pieces (a row
-  // cut by redaction bars), counted together — never across a cut. Runs of
-  // spaces (a tab's gap, two after a full stop) say nothing about it. null:
-  // no single space between two words.
+  // cut by redaction bars), counted together — never across a cut. A tab's
+  // gap (lineTabGaps: a run of spaces, one much wider than the others) says
+  // nothing about it. null: no single space between two words.
   // A space is what is left between two words: from where the word before it
   // ends — the room the page's own glyphs take — to where the next starts.
   // `laid(chars)`, when it knows, says how the face the space is for sets the
@@ -671,11 +708,11 @@
   function lineSpace(pieces, laid = null) {
     let sum = 0, n = 0;
     for (const chars of pieces || []) {
-      const words = lineWords(chars);
+      const words = lineWords(chars), tabs = lineTabGaps(words);
       const set = laid?.(chars);
       for (let k = 0; k + 1 < words.length; k++) {
         const a = words[k], b = words[k + 1];
-        if (a.gap !== 1) continue;
+        if (a.gap !== 1 || tabs.has(k + 1)) continue;
         const fits = set && Math.abs(set.x[a.j + 1] - set.x[a.i] - (a.end - a.x)) <= WORD_FIT;
         const g = fits ? b.x - a.x - (set.x[b.i] - set.x[a.i]) + set.own : b.x - a.end;
         if (!(g > 0)) continue;
@@ -919,7 +956,8 @@
     cmp, ordered, collapsed, startPos, endPos, whole, clampPos, isWhole,
     runAttrsAt, charSummary, paraSummary, applyChar, mapChar, applyPara,
     deleteRange, insertText, replaceRange, slice, wordAt, listMarkers, changeCase, caseMapped,
-    scaledMetrics, leadingPx, leadingPerRun, naturalLeading, firstBaselinePx, lineWords, WORD_FIT, lineSpace, PEN_STEP, wordSpacingFor,
+    scaledMetrics, leadingPx, leadingPerRun, naturalLeading, firstBaselinePx,
+    lineWords, TAB_GAP, lineTabGaps, lineTabs, WORD_FIT, lineSpace, PEN_STEP, wordSpacingFor,
     capsPlan, featureSettings, runCSS, strikeCSS, paraCSS, styleText,
     resolveKern, PIXEL_LIMITS, PIXEL_IGNORES, pixelable,
   };

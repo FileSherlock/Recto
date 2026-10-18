@@ -519,7 +519,7 @@ legacy-`kern`-table kern, as above):
   and within ¼ px plus that unit the affidavit counts 27 → 28.
 - **What is left**: tab gaps — a list label's or a bullet's ("w. A Lenovo…", "2.    Evidence…",
   "•    Requests…": 11 of the 13 lines given a space and still off, 0.5–3.8 px), which a run of
-  typed spaces takes at the line's space; the FBI letterhead in both releases (the other 2), its
+  typed spaces takes at the line's space (now a tab stop: below); the FBI letterhead in both releases (the other 2), its
   letter-spaced capitals read as "FE DERAL BUREAUOF" (20 px either way); and on a monospace
   base64 page (EFTA00751637 p2, 79 lines, no spaces) the browser's own advances, 0.8 px off by
   a line's end in HTML either way, while the pixel view draws it exact either way.
@@ -527,6 +527,64 @@ legacy-`kern`-table kern, as above):
   0 better, 0 worse — its typed write-back types a one-line box, not a story. Its `whatIf.pageSpace` (one width per line from
   the reader's solved gaps, under the pixel view's law) is the same idea for that box: the group
   "word gaps — one width per line" holds 1409 segments, 4.6 % of `wb.typed`.
+
+### A list label's tab becomes a tab stop (2026-10-18)
+
+Word sets a list item as its label, a tab, and its text from the list's stop: on the affidavit
+the lettered labels at x 144 with their text at 168, the numbered ones at 144 with theirs at 192.
+The reader writes the tab's gap as the spaces that fill it **at the line's space** — a 36 px gap is
+four spaces on a line of 8–9 px spaces and eight on one of 4.5 px — or, where the stop is just
+past the label, as **one wider space** ("w." 8.5 px on a line of 6.75 px spaces, "z." 13 against
+10.5, "aa." 5.75 against 4.45). Typed spaces take it at the line's space and miss the text by up to
+half a space or more. text_tool now reads such a gap as a tab (`StoryCore.lineTabGaps`: a run of
+spaces, or one space more than `TAB_GAP` = 1 px wider than the lower middle of the line's single
+spaces), leaves it out of the line's space, and gives Artistic text clicked on the line a left tab
+stop at the page's x of the word after it (`utbLineTabStops`; the Text panel's **Space as this
+line** sets the stops again) — from its own data again, the line box's `baseCharPositions`. Over
+877 read lines of the 22 documents below, every single space but those three labels' lies within
+0.52 px of its line's lower middle; theirs are 1.35–2.5 px wider. The runs are bullets and numbers
+(the memo, the FBI summary), the affidavit's labels, and two spaces after a full stop (the FBI
+summary, the e-mails, the seams page) — a stop there leaves typed spaces as they were.
+
+The same study (the tool's own click; 22 documents now, the tab pages and four more synthetic
+pages added), each line typed as a person retypes it: **a tab after a list label** (the line's first
+word: a number, one or two letters or a roman numeral with "." or ")", a bracketed one, a
+bullet) or for a run of three spaces or more, the reader's spaces elsewhere; before = the code
+before this change, the reader's text typed:
+
+| document | lines | typed with a tab | ≤ ½ px | in-word ≤ ¼ px | MuPDF pixels exact |
+|---|---:|---:|---:|---:|---:|
+| affidavit (Word, Times, justified) | 35 | 12 | 23 → **35** | 25 → 25 | 3 → 3 |
+| synthetic: Arial memo | 20 | 6 | 14 → **20** | 20 → 20 | 11 → **14** |
+| FBI summary p2 (Calibri) | 51 | 12 | 37 → **48** | 48 → 48 | 32 → 32 |
+| FBI summary p2, second release | 46 | 12 | 32 → **43** | 43 → 43 | 6 → 6 |
+| 18 other documents (no list line) | 725 | 0 | 518 → 518 | 510 → 510 | 598 → 598 |
+| **all** | 877 | 42 | 624 → **664** | 646 → 646 (≤ ¼ px + 1/64: 653 → 653) | 650 → **653** |
+
+- **List lines land**: every glyph of the 42 within ⅓ px of the reader's pen — the affidavit's 12
+  from 0.53–3.83 px off to 0.17–0.33 px, the memo's 6 from 0.72–1.89 to 0.13–0.16, the FBI
+  summary's 12 from 0.19–2.31 to 0.13–0.23 (second release 0.22–2.19 to 0.13–0.16). In-word, one
+  affidavit line moves from 0.250 to 0.266 px and another back — Chrome's 1/64-px layout unit at
+  the threshold.
+- **Nothing else moves**: only the three one-space labels change their line's space (the tab's gap
+  no longer counted); no line of any document is further off, in a word or in pixels.
+- **Pixels**: the memo's three bullet lines become exact; the other list lines come much closer
+  but not exact — mismatched pixels 1300–2927 → 204–1408 on the affidavit, 527–3279 → 23–261 on the
+  FBI summary (529–3228 → 59–521 on its second release). Their text after the tab starts on the
+  reader's pen; laying it from the start the page's lattice lets it instead (`OCRRender.lineStart`
+  over the words after the tab, as the study does for every line's start) makes no line exact —
+  that start is the pen itself on all but five affidavit lines (−0.125 to +0.04 px). On the FBI
+  pages most of what is left on some lines is the bullet: the reader reads it from a glyph set of
+  its own (`bullet16`, `bulleto16`), and the story's Calibri bullet misses 20–30 of its 32 ink px
+  (the sub-bullet *o* 48 of 49); the text after the tab is exact on 2 of the 12.
+- **Typed with spaces instead**, 39 of the 42 lines given a stop land as before (the stop is not
+  used); the affidavit's three one-space labels 0.25–0.42 px further off (1.30–2.20 → 1.66–2.63
+  px). Typing a tab where the page has two spaces after a full stop lands the next word within
+  ½ px but not on the producer's pixels (the pixel view lays the text after a tab from the browser's
+  stop, not from the float pen two spaces carry): six FBI lines exact with spaces are not with a
+  tab.
+- **recto-eval**, full tier against `full-2026-10-18-12-07-37` (run `full-2026-10-18-12-50-50`):
+  0 better, 0 worse — its typed write-back types a one-line box, not a story.
 
 ## Limits
 

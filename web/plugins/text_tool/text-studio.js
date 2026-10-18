@@ -505,8 +505,11 @@
   // all) whose first line sits on a line of the page (utbLineAt) takes the
   // space that line was set with as its desired word spacing, measured in the
   // paragraph's own face as it draws (utbLineWordSpacing): the space a
-  // justified Word line was widened to — or the face's own.
-  // → { lines: [{ p, line, face }], why } — why: the lock's reason, or null
+  // justified Word line was widened to — or the face's own. Where the line
+  // goes on after a tab (a list label's), its tab stops become the
+  // paragraph's (utbLineTabStops, from the paragraph's left edge: its first
+  // character less its first-line indent), so that a typed tab lands there.
+  // → { lines: [{ p, line, face, tabs }], why } — why: the lock's reason, or null
   function spaceLine(t) {
     if (!t?.story) return { lines: [], why: null };
     const box = t.box;
@@ -519,13 +522,19 @@
       const line = window.utbLineAt?.(box.page, s);
       if (!line) continue;
       onLine = true;
-      if (line.space > 0) lines.push({ p: s.p, line, face: faceOf(box, s.p) });
+      const indent = SC.paraOf(box.story?.paragraphs[s.p]?.attrs).firstIndent * GEO.docPxPerPt();
+      const tabs = window.utbLineTabStops?.(line, s.x - indent) || [];
+      if (line.space > 0 || tabs.length) lines.push({ p: s.p, line, face: faceOf(box, s.p), tabs });
     }
     const why = lines.length ? null
-      : onLine ? 'The page\'s line under this text has no space between two words to measure.'
+      : onLine ? 'The page\'s line under this text has no space between two words to measure, and no tab.'
       : `No line of the page under ${r && box.textMode ? 'the selected paragraphs' : 'this text'} — put its first line on a line read from the page (the Artistic Text Tool, clicked on a line, starts there).`;
     return { lines, why };
   }
+  // the paragraph has the line's tab stops (a line without a tab leaves the
+  // paragraph's own alone)
+  const hasTabs = (pa, tabs) => !tabs.length || (pa.tabs?.length === tabs.length &&
+    tabs.every((s, i) => Math.abs(pa.tabs[i].pos - s.pos) < 1e-6 && pa.tabs[i].align === s.align));
   // a paragraph's face as it draws: its first character's, kerning as
   // story-render.js resolves it, tracking and the paragraph's letter spacing
   // after every glyph
@@ -549,26 +558,39 @@
     }
     return byFace.get(k);
   }
-  // beside the button: the space of the line under the text; the button is
-  // lit while every paragraph it would set has it
+  // beside the button: the space of the line under the text, and its tab
+  // stops; the button is lit while every paragraph it would set has them
   function syncSpaceLine(t) {
     const b = $('tt-space-line'), src = $('tt-space-line-src');
     if (!b || !src) return;
     const { lines } = spaceLine(t);
-    const ws = lines.map(measuredWS), known = lines.length > 0 && ws.every(v => v != null);
-    b.classList.toggle('active', known && lines.every((l, i) => Math.abs(SC.paraOf(t.box.story?.paragraphs[l.p]?.attrs).wordSpacing - ws[i]) < 1e-6));
-    const own = known ? window.storySpacePx?.(lines[0].face) : 0, px = own * (ws[0] || 100) / 100;
-    src.textContent = !lines.length ? '' : !known ? 'line: …' : ws[0] === 100 ? 'line: the font\'s' : `line: ${px.toFixed(2)} px`;
-    src.title = !known ? '' : `The page's line under ${lines.length > 1 ? 'the first paragraph' : 'the text'} was set with ${ws[0] === 100
+    const ws = lines.map(l => (l.line.space > 0 ? measuredWS(l) : 100)), known = lines.length > 0 && ws.every(v => v != null);
+    b.classList.toggle('active', known && lines.every((l, i) => {
+      const pa = SC.paraOf(t.box.story?.paragraphs[l.p]?.attrs);
+      return (!(l.line.space > 0) || Math.abs(pa.wordSpacing - ws[i]) < 1e-6) && hasTabs(pa, l.tabs);
+    }));
+    const first = lines[0], spaced = first?.line.space > 0;
+    const own = known ? window.storySpacePx?.(first.face) : 0, px = own * (ws[0] || 100) / 100;
+    const stops = first?.tabs.length ? `tab${first.tabs.length > 1 ? 's' : ''} at ${first.tabs.map(s => +s.pos.toFixed(2)).join(', ')} pt` : '';
+    src.textContent = !lines.length ? '' : !known ? 'line: …'
+      : `line: ${[spaced ? (ws[0] === 100 ? 'the font\'s' : `${px.toFixed(2)} px`) : '', stops].filter(Boolean).join(' · ')}`;
+    src.title = !known ? '' : [spaced ? `The page's line under ${lines.length > 1 ? 'the first paragraph' : 'the text'} was set with ${ws[0] === 100
       ? `the face's own space (${own.toFixed(3)} px): its words land on the page's within a quarter pixel`
-      : `${px.toFixed(3)} px spaces — the face's own is ${own.toFixed(3)} px`} (its spaces between words, measured in this face)`;
+      : `${px.toFixed(3)} px spaces — the face's own is ${own.toFixed(3)} px`} (its spaces between words, measured in this face).` : '',
+    stops ? `The line goes on after a tab (a list label's): a tab stop ${first.tabs.map(s => `${+s.pos.toFixed(3)} pt`).join(', ')} from the paragraph's left edge puts what is typed after a tab where the page's text starts.` : '']
+      .filter(Boolean).join(' ');
   }
   $('tt-space-line')?.addEventListener('click', async () => {
     const t = target();
     const { lines } = spaceLine(t);
     if (!lines.length) return;
     const patches = new Map();
-    for (const l of lines) patches.set(l.p, { wordSpacing: (await window.utbLineWordSpacing?.(l.line, l.face)) ?? 100 });
+    for (const l of lines) {
+      const patch = {};
+      if (l.line.space > 0) patch.wordSpacing = (await window.utbLineWordSpacing?.(l.line, l.face)) ?? 100;
+      if (l.tabs.length) patch.tabs = l.tabs;
+      patches.set(l.p, patch);
+    }
     window.storyApplyParaEach?.(t.box, patches, 'space as the line');
     sync();
   });

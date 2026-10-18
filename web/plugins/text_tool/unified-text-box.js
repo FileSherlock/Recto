@@ -325,15 +325,31 @@ const utbLineSpace = box => globalThis.StoryCore?.lineSpace?.(utbLinePieces(box)
 // What a box beside or over a line of the page takes from it: its face, style
 // and size, its baseline (y / h, as computeBaseline reads them), where it
 // starts (x: its first glyph's pen), the space it was set with (px, as the
-// page's glyphs take their room) and the measured characters that say so.
+// page's glyphs take their room) and the measured characters that say so,
+// and where it goes on after a tab (tabs: the page x of each word after a
+// tab's gap — a list label's, StoryCore.lineTabs).
 const utbLineInfo = b => {
   const pieces = utbLinePieces(b);
+  const SC = globalThis.StoryCore;
   return {
     x: b.x, y: b.y, h: b.h, w: b.w, lineId: b.lineId,
     font: b.fontFamily, bold: !!b.bold, italic: !!b.italic, sizePt: b.sizePt,
-    pieces, space: globalThis.StoryCore?.lineSpace?.(pieces)?.space ?? null,
+    pieces, space: SC?.lineSpace?.(pieces)?.space ?? null,
+    tabs: b.baseCharPositions?.length && SC?.lineTabs ? SC.lineTabs(b.baseCharPositions).map(t => b.x + t.x) : [],
   };
 };
+
+/**
+ * The tab stops that put text starting at x0 (a paragraph's left edge, page
+ * px) on the words of `line` (a utbFindNearestLine / utbLineAt result) that
+ * come after a tab: a left stop at each such word's x beyond x0, in pt from
+ * x0 (a story paragraph's `tabs`) — the list label "2." typed, then a tab, and
+ * "Evidence" starts where the page's does. [] when the line has no tab.
+ */
+function utbLineTabStops(line, x0) {
+  return (line?.tabs || []).filter(t => t - x0 >= 1)
+    .map(t => ({ pos: Math.round((t - x0) / GEO.docPxPerPt() * 1000) / 1000, align: 'left', leader: '' }));
+}
 
 /**
  * The desired word spacing (% of the face's space: a story paragraph's
@@ -371,8 +387,8 @@ async function utbLineWordSpacing(line, face) {
 /**
  * Find the nearest text line (embedded span or OCR-read line) to a point on a
  * page — `at` is { x, y }, or a y alone — what a new box beside it takes.
- * Returns { x, y, h, w, lineId, font, bold, italic, sizePt, space, pieces }
- * (utbLineInfo) or null.
+ * Returns { x, y, h, w, lineId, font, bold, italic, sizePt, space, pieces,
+ * tabs } (utbLineInfo) or null.
  */
 function utbFindNearestLine(pageNum, at, threshold = 2.0) {
   const y = typeof at === 'object' ? at.y : at, x = typeof at === 'object' ? at.x : null;
@@ -432,4 +448,5 @@ window.utbFindNearestLine = utbFindNearestLine;
 window.utbLineAt = utbLineAt;
 window.utbLineSpace = utbLineSpace;
 window.utbLineWordSpacing = utbLineWordSpacing;
+window.utbLineTabStops = utbLineTabStops;
 window.utbGetSpansCompat = utbGetSpansCompat;

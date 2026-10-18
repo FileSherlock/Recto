@@ -264,6 +264,33 @@ test('a page line\'s space: the mean of its single spaces between words, the pie
   assert.equal(SC.runCSS(SC.charOf({ sizePt: 12 }), SC.paraOf({ wordSpacing: SC.wordSpacingFor(5.375, m.space, 2) }), m, { pxPerPt: 4 / 3 })['word-spacing'], '1.375px');
 });
 
+test('a page line\'s tabs: a run of spaces, or one space wider than the line\'s by TAB_GAP — and where the line goes on', { skip }, () => {
+  const line = spec => { let x = 0; return spec.map(([c, w]) => { const cp = { c, x, w }; x += w; return cp; }); };
+  assert.equal(SC.TAB_GAP, 1);
+  // "2." and a tab the reader wrote as four spaces, then "Ev of" at 8 px spaces:
+  // the text goes on at x 45; the run says nothing about the line's space
+  const listed = line([['2', 6], ['.', 3], [' ', 9], [' ', 9], [' ', 9], [' ', 9], ['E', 7], ['v', 6], [' ', 8], ['o', 6], ['f', 4]]);
+  assert.deepEqual([...SC.lineTabGaps(SC.lineWords(listed))], [1]);
+  assert.deepEqual(SC.lineTabs(listed), [{ x: 45, i: 6 }]);
+  assert.deepEqual(SC.lineSpace([listed]), { space: 8, n: 1 });
+  // "w." and a tab to a stop just beyond it, written as one space 8.5 px wide
+  // on a line of 6.5–7 px spaces (the lower middle 6.75): a tab, which the
+  // line's space leaves out
+  const wide = line([['w', 9], ['.', 3], [' ', 8.5], ['A', 9], [' ', 6.75], ['L', 7], [' ', 6.5], ['t', 4], [' ', 7], ['m', 9]]);
+  assert.deepEqual(SC.lineTabs(wide), [{ x: 20.5, i: 3 }]);
+  assert.deepEqual(SC.lineSpace([wide]), { space: 6.75, n: 3 });
+  // within TAB_GAP of the line's spaces it is one of them
+  const near = line([['w', 9], ['.', 3], [' ', 7.5], ['A', 9], [' ', 6.75], ['L', 7], [' ', 6.5], ['t', 4], [' ', 7], ['m', 9]]);
+  assert.deepEqual(SC.lineTabs(near), []);
+  assert.deepEqual(SC.lineSpace([near]), { space: 6.9375, n: 4 });
+  // of two spaces the wider is the tab; of one, nothing can be told
+  const two = line([['z', 6], ['.', 3], [' ', 13], ['A', 9], [' ', 10.5], ['U', 9]]);
+  assert.deepEqual(SC.lineTabs(two), [{ x: 22, i: 3 }]);
+  assert.deepEqual(SC.lineSpace([two]), { space: 10.5, n: 1 });
+  assert.deepEqual(SC.lineTabs(line([['a', 7], [' ', 20], ['b', 7]])), []);
+  assert.deepEqual(SC.lineTabs([]), []);
+});
+
 test('a run\'s CSS: tracking in ‰ of an em, baseline shift up, decorations from the face', { skip }, () => {
   const m = SC.scaledMetrics({ upem: 1000, hheaAscender: 900, hheaDescender: -200, postUnderlinePosition: -100, postUnderlineThickness: 50 }, 16);
   const css = SC.runCSS(SC.charOf({ sizePt: 12, tracking: 50, baselineShift: 3, underline: 'double' }), SC.paraOf({}), m, { pxPerPt: 4 / 3 });

@@ -20,7 +20,7 @@ own paragraph attributes.
 | Affinity | Recto (tool column) | What it does |
 |---|---|---|
 | Frame Text Tool | **Frame Text Tool** `#tt-frame-text-btn` | A **drag** draws a frame and puts the caret in it (a drag that starts on a line of the page takes that line's face, bold / italic and size — over the page's own lines it draws, it never moves them). **Shift** keeps it square, **Ctrl** draws it from the centre. While dragging, the **arrow keys** make a grid of frames (Left/Right: one column fewer/more, Down/Up: one row more/fewer), **Ctrl+arrows** widen or narrow the gap between them. A **press without a drag** creates nothing — on a redaction box it selects it, on the page it deselects. A press on Artistic or Frame text puts the caret there. |
-| Artistic Text Tool | **Artistic Text Tool** `#tt-art-text-btn` | A **click** starts Artistic text with its baseline at the point, in the font and size new text takes (the Text panel's, with nothing selected) — or, on or beside a line of the page's text, in **that line's face, bold / italic and size on its baseline, with the space it was set with** (Word widens a justified line's spaces: the paragraph's desired Word Spacing, below) — of a row cut by redaction bars, the piece the click is in; a click within half an em of where that line starts **starts at its first glyph**, so the new text lines up with the page's, word for word. An empty one is half an em wide (a drag's: the drag's width), so it can be seen and pressed. A **drag** sets the size: the font's typographic ascent is the drag's height, the baseline its lower edge. Artistic text breaks only at its returns; its box is its text's extent. Its **corner handles scale** it — every size in the story by the same factor, the opposite corner fixed. |
+| Artistic Text Tool | **Artistic Text Tool** `#tt-art-text-btn` | A **click** starts Artistic text with its baseline at the point, in the font and size new text takes (the Text panel's, with nothing selected) — or, on or beside a line of the page's text, in **that line's face, bold / italic and size on its baseline, with the space it was set with** (Word widens a justified line's spaces: the paragraph's desired Word Spacing, below) — of a row cut by redaction bars, the piece the click is in; a click within half an em of where that line starts **starts at its first glyph**, so the new text lines up with the page's, word for word. Where the line goes on after a tab — a list label's or a bullet's ("2.", then "Evidence…" at the list's stop) — the paragraph gets **a left tab stop at the page's x of the text after it**: type the label, a **Tab**, and the rest starts where the page's does. An empty one is half an em wide (a drag's: the drag's width), so it can be seen and pressed. A **drag** sets the size: the font's typographic ascent is the drag's height, the baseline its lower edge. Artistic text breaks only at its returns; its box is its text's extent. Its **corner handles scale** it — every size in the story by the same factor, the opposite corner fixed. |
 
 Both Affinity tools stay armed, as Affinity's do, until clicked again or another placing tool
 is chosen. **Escape** leaves the text being edited (the box stays selected), then deselects,
@@ -50,11 +50,14 @@ text through attributes Affinity already has:
   of the page — the selection's paragraphs while the text is edited, else all of them — the
   space that line was set with, as its desired Word Spacing: Word justifies a line by widening
   its spaces, each line by its own amount, and text typed over it with the face's own space
-  drifts off the page's words by several px by the line's end. Beside the button the line's
-  space (`tt-space-line-src`: `line: 7.90 px`, or `line: the font's` for a line set with the
-  face's own); the button is lit while the text has it. A new Artistic text clicked on a line takes
-  it already. Locked, with the reason, on text no line of the page is under and on a line with
-  no single space between two words. How the space is measured, and what it gains:
+  drifts off the page's words by several px by the line's end. Where the line goes on after a
+  tab (a list label's), its tab stops become the paragraph's (`tabs`, in place of the
+  paragraph's own; a line without a tab leaves them alone). Beside the button the line's
+  space and stops (`tt-space-line-src`: `line: 7.90 px`, `line: the font's` for a line set with
+  the face's own, `line: 8.09 px · tab at 36 pt`); the button is lit while the text has them. A
+  new Artistic text clicked on a line takes them already. Locked, with the reason, on text no
+  line of the page is under and on a line with neither a single space between two words nor a
+  tab. How the space and the tabs are measured, and what they gain:
   [The Text panel](text-tool.md#space-width-nudge).
 - **Space widths** (`toggle-space-labels`, in the panel's Display section) badges every run of
   spaces inside a line with its width.
@@ -209,8 +212,8 @@ alternates, ordinals, fractions, superior and inferior figures, all caps, small 
   (`insertText`, `deleteRange`, `replaceRange`, `applyChar`, `mapChar`, `applyPara`,
   `changeCase`), list markers, and the mapping of attributes to CSS (`runCSS`, `paraCSS`), of
   face metrics to Affinity's numbers (`scaledMetrics`, `leadingPx`, `firstBaselinePx`,
-  `capsPlan`) and of a page line's measured characters to the space it was set with
-  (`lineWords`, `lineSpace`, `wordSpacingFor`).
+  `capsPlan`) and of a page line's measured characters to the space it was set with and where
+  it goes on after a tab (`lineWords`, `lineTabGaps`, `lineTabs`, `lineSpace`, `wordSpacingFor`).
 - **The face metrics** — `Shaping.faceMetrics` reads the tables Affinity sets text with
   (`hhea`, `post`, `OS/2`), the outlines of H, x, l and q, and the font's OpenType feature
   list, through the same HarfBuzz build that measures widths.
@@ -237,8 +240,9 @@ alternates, ordinals, fractions, superior and inferior figures, all caps, small 
   known) and the ligatures and contextual alternates are off — Affinity kerns and ligates by
   default; the documents Recto opens were mostly made in Word, which does neither unless asked.
 - **Text over the page takes the page's spacing**: Artistic text clicked on a line of the page
-  takes that line's space as its paragraph's Word Spacing, and **Space as this line** sets it
-  again — Affinity has no page to read it from.
+  takes that line's space as its paragraph's Word Spacing and a tab stop where the line goes on
+  after a tab, and **Space as this line** sets them again — Affinity has no page to read them
+  from.
 
 - **Text flow between frames** (linking, autoflow), **text wrap** around other objects, the
   **baseline grid**, **optical alignment**, **initial words**, **character and paragraph

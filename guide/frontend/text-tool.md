@@ -49,7 +49,7 @@ renderer** draws the text (below), what it cannot draw.
 | **Pair kerning** `#kerning` (+ `#tt-kern-source`, ↺ `#tt-kern-page`) | `autoKern`: `true`, `false`, `null` = as the page | `box.kerning` + `box.kerningAuto` |
 | Manual kerning `#tt-ch-kern`, Tracking `#tt-ch-tracking` (‰ of an em) | `manualKern`, `tracking` | Tracking: `box.letterSpacing` (em) = ‰ ÷ 1000 |
 | **Space width** `#fabric-space-width` (px) + **Font's** `#fabric-default-sw` | the paragraphs' desired Word Spacing (% of the face's space) | `box.spaceWidth` / `box.defaultSpaceWidth` |
-| **Space as this line** `#tt-space-line` (+ `#tt-space-line-src`) | each paragraph's desired Word Spacing: the space of the page's line under its first line | locked |
+| **Space as this line** `#tt-space-line` (+ `#tt-space-line-src`) | each paragraph's desired Word Spacing: the space of the page's line under its first line; and its `tabs` where that line goes on after a tab | locked |
 | **Nudge characters** `#fabric-nudge-mode` | the pair's manual kerning (`micro-typo.js`) | `box.charAdvances` (while `utbCharsValid(box)`) |
 | Background, Position & Transform, Decorations, Typography, Language | see [Artistic and Frame Text](artistic-and-frame-text.md) | locked |
 | **Redaction match** `#tt-settings`: `#tolerance` (px), `#tt-name-case` (`#tt-match-scope` says whose) | — | a redaction box's `box.tolerance`, `box.uppercase` (`utbApplyCase`); shown for a redaction box and with nothing selected. The ids are read by whichever matching plugin is installed |
@@ -95,12 +95,13 @@ while the text is edited, else all — whose first line sits on a line read from
 space that line was set with, as its desired word spacing (`storyApplyParaEach`, one undo
 step). Word justifies a line by widening its spaces, each line by its own amount; text retyped
 over it with the face's own space misses the page's words by several px by the line's end (on
-a justified Word affidavit, up to 74 px). Beside the button, the space of the line under the
-text (`#tt-space-line-src`: `line: 7.90 px`, or `line: the font's`); the button is lit while
-every paragraph it would set has it. A new Artistic text clicked on a line takes that line's
-space already (`artistic-tool.js create()`). The button is locked, with the reason, on a box
-with one face, on text no line of the page is under, and over a line with no single space
-between two words.
+a justified Word affidavit, up to 74 px). Where the line goes on after a tab, the paragraph
+also takes the line's tab stops (below). Beside the button, the space of the line under the
+text and its stops (`#tt-space-line-src`: `line: 7.90 px`, `line: the font's`, `line: 8.09 px ·
+tab at 36 pt`); the button is lit while every paragraph it would set has them. A new Artistic
+text clicked on a line takes that line's space and stops already (`artistic-tool.js
+create()`). The button is locked, with the reason, on a box with one face, on text no line of
+the page is under, and over a line with neither a single space between two words nor a tab.
 
 Which line: `utbLineAt(page, { x, y, h })` (`unified-text-box.js`) — the shown OCR or embedded
 line whose band overlaps the band of the paragraph's first line by half the smaller height at
@@ -116,10 +117,10 @@ face)` —
 - each single space between two words is then the page's distance between their starts less
   the face's, plus the face's own space — what a typed space must be for the next word to land
   where the page's does — and the line's space is their mean (`StoryCore.lineSpace`), which
-  lands its last word where the page has it. Runs of spaces (a tab's gap) are left out. The
-  page's own glyph room is not used: a reader's advances are off the face's by a few
-  hundredths of a px a word, which a line of twelve spaces adds up, and a kerned page kerns the
-  space before an *A*, which the face kerns again. Where the face sets the word before a space
+  lands its last word where the page has it. A tab's gap is left out (below). The page's own
+  glyph room is not used: a reader's advances are off the face's by a few hundredths of a px a
+  word, which a line of twelve spaces adds up, and a kerned page kerns the space before an *A*,
+  which the face kerns again. Where the face sets the word before a space
   more than half a pixel off the room the page's glyphs take (`StoryCore.WORD_FIT`), the word is
   not in that face — an OCR layer's invisible text, stretched to the scan's words under a size
   of its own — and that space is what the page leaves between the two words;
@@ -133,8 +134,36 @@ start of every line read from 16 documents' first pages (731 lines), the line's 
 every glyph's x against the page's — lines whose every glyph lies within ½ px: 495 with the
 face's own space, **557** with the line's. The 77 lines given a space of their own (Word's
 justified lines) go from 2 to 64, and from 1 to 10 drawn pixel for pixel by a pixel renderer;
-every other line is drawn as before. What is left is mostly tab gaps after list labels and
-bullets, which typed spaces take at the line's space.
+every other line is drawn as before. What was left was mostly tab gaps after list labels and
+bullets, which typed spaces take at the line's space — now a tab stop:
+
+**A label's tab.** Word sets a list item as its label ("2.", "w.", "•"), a tab, and its text
+from the list's tab stop. A reader writes the tab's gap as the spaces that fill it at the
+line's space — "2.    Evidence" with four, "x.   A Lenovo" with three, "w. A Lenovo" with one —
+and spaces typed for it miss the page's text by up to half a space or more, the rest of the
+line with it (on the affidavit 0.5–3.8 px). Which gaps are a tab's, `StoryCore.lineTabGaps`: a
+run of spaces, or one space wider than the line's own by `TAB_GAP` — 1 px over the lower middle
+of its single spaces (Word sets a justified line's spaces alike: on 877 read lines of 22
+documents every other single space is within 0.52 px of its line's, and the affidavit's three
+labels written with one space are 1.35–2.5 px wider). Such a gap says nothing about the line's
+space (`lineSpace` leaves it out), and where it ends the line goes on (`StoryCore.lineTabs`;
+`utbLineInfo`'s `tabs`: the page x of each word after one). `utbLineTabStops(line, x0)` makes
+them left tab stops, in pt from a paragraph's left edge `x0` (none at or before it): the click's
+new paragraph's, from its first pen, and Space as this line's, from the paragraph's first
+character less its first-line indent. A tab typed after the label grows to its stop
+(`story-render.js` `passTabs`) and the text after it starts on the page's, to Chrome's 1/64-px
+layout unit. Two spaces after a full stop are a run too: a stop there leaves typed spaces as
+they were.
+
+Measured the same way (2026-10-18, 22 documents, 877 lines, each line typed as a person retypes
+it — a tab after a list label, the reader's spaces elsewhere): lines within ½ px **624 → 664**.
+The affidavit's 12 list lines go from 0.53–3.83 px to 0.17–0.33 px (all 35 of its lines within
+½ px); with their bullets and numbers, 20 of the Arial memo's 20 lines are within ½ px (14
+before), 48 of the FBI summary's 51 (37; its second release 43 of 46, 32); no line is further
+off, in a word or in pixels (pixel-exact 650 → 653). Typed with spaces instead of a tab, 39 of
+the 42 lines given a stop land as before; the affidavit's three labels written as one space
+land 0.25–0.42 px further off (1.30–2.20 → 1.66–2.63 px), the line's space no longer counting
+the tab's gap.
 
 **Nudge characters** enters micro-typography mode (`enterMicroTypo`): every character gets a
 hit area, and a character's x nudge is the manual kerning of the pair it closes (a story) or
@@ -243,7 +272,7 @@ changes (`char:sizePt:<id>`, …) — and with nothing selected the font and siz
 | `click` | `#tt-kern-page` | `apply('char', { autoKern: null })` — as the page again |
 | `change` | `#fabric-default-sw` | the face's space (`wordSpacing: 100` / `spaceWidth = null`), or the measured natural width to start from |
 | `input` / `change` | `#fabric-space-width` | a story's word spacing (% of its face's space), a plain box's `spaceWidth` |
-| `click` | `#tt-space-line` | each target paragraph's `wordSpacing` from the page's line under it (`utbLineAt`, `utbLineWordSpacing`, `storyApplyParaEach`) |
+| `click` | `#tt-space-line` | each target paragraph's `wordSpacing` from the page's line under it (`utbLineAt`, `utbLineWordSpacing`, `storyApplyParaEach`), and its `tabs` where that line goes on after a tab (`utbLineTabStops`) |
 | `click` | `#fabric-nudge-mode` | `enterMicroTypo` / `exitMicroTypo` on the selected box |
 | `click` | `#tt-size-up` / `#tt-size-down` | every run's size ± 1 pt (`storyMapChar`), a plain box's `sizePt` ± 1, new text's size |
 | `change` | `#tt-change-case` | `storyChangeCase` |
