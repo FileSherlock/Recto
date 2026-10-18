@@ -29,7 +29,7 @@ All five modules live in `web/plugins/text_tool/` and are loaded, in this order,
 
 | Module | Responsibility | Key exports |
 |---|---|---|
-| `unified-text-box.js` | `UnifiedTextBox` class and `utbState` global | `utbState.addBox()`, `getBox()`, `removeBox()`, `updateBox()`, `getPageBoxes()`, `reset()`; `spanToUnified(span)`, `utbCharsValid(box)`, `utbFindNearestLine(pageNum, {x, y})` (the nearest shown line; of a row cut by redaction bars, the one at the point) |
+| `unified-text-box.js` | `UnifiedTextBox` class and `utbState` global | `utbState.addBox()`, `getBox()`, `removeBox()`, `updateBox()`, `getPageBoxes()`, `reset()`; `spanToUnified(span)`, `utbCharsValid(box)`, `utbFindNearestLine(pageNum, {x, y})` (the nearest shown line; of a row cut by redaction bars, the one at the point), `utbLineAt(pageNum, {x, y, h})` (the shown line a line of text sits on) — both with the line's measured characters and space (`utbLineSpace`); `utbLineWordSpacing(line, face)` (the Word Spacing that lands text set in a face on the line's words) |
 | `svg-renderer.js` | Renders boxes as SVG `<text>` elements in a per-page layer | `renderBox(box)`, `renderTextLayer(pageContainer, pageNum)`, `renderAllTextLayers()`, `computeXPositions(box)`, `computeBaseline(box)` |
 | `toolbar.js` | Unified formatting toolbar — one code path for all box types | `syncToolbarToBox(box)`, `syncToolbarToSelection()` |
 | `micro-typo.js` | Per-character nudge mode via hit-rects and a popover slider | `enterMicroTypo(box)`, `exitMicroTypo()` |

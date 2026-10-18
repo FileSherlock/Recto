@@ -196,7 +196,7 @@
   // the fitting tools that are not attributes.
   const ACTIONS = {
     'tt-size-up': 'char:sizePt', 'tt-size-down': 'char:sizePt', 'tt-change-case': 'char:case',
-    'fabric-space-width': 'char:space', 'fabric-default-sw': 'char:space', 'fabric-nudge-mode': 'char:nudge',
+    'fabric-space-width': 'char:space', 'fabric-default-sw': 'char:space', 'fabric-nudge-mode': 'char:nudge', 'tt-space-line': 'char:spaceLine',
     'tt-kern-page': 'char:autoKern', 'tt-show-typography': null,
     'tt-pa-tab-pos': 'para:tabs', 'tt-pa-tab-align': 'para:tabs', 'tt-pa-tab-leader': 'para:tabs', 'tt-pa-tab-add': 'para:tabs',
   };
@@ -210,6 +210,7 @@
     const [scope, key] = parseKey(k);
     if (key === 'case') return t && !t.story ? `${kindWhy(t.box)} — Change Case rewrites Artistic and Frame text.` : null;
     if (key === 'space' || key === 'nudge') return null;   // every box has them (nudge: see syncFitting)
+    if (key === 'spaceLine') return t ? lockOf(t, scope, key) || spaceLine(t).why : null;
     const why = lockOf(t, scope, key);
     if (why) return why;
     // a toggle whose value the pixel renderer cannot draw (Small caps)
@@ -458,6 +459,7 @@
         }
       }
     }
+    syncSpaceLine(t);
     if (nudge) {
       const on = !!t && utbState.microTypoId === t.box.id;
       nudge.classList.toggle('active', on);
@@ -498,6 +500,78 @@
   }
   $('fabric-space-width')?.addEventListener('input', e => applySpaceWidth(e.target.value, true));
   $('fabric-space-width')?.addEventListener('change', e => { applySpaceWidth(e.target.value, true); sync(); });
+
+  // Space as this line: each paragraph of the target (the selection's, else
+  // all) whose first line sits on a line of the page (utbLineAt) takes the
+  // space that line was set with as its desired word spacing, measured in the
+  // paragraph's own face as it draws (utbLineWordSpacing): the space a
+  // justified Word line was widened to — or the face's own.
+  // → { lines: [{ p, line, face }], why } — why: the lock's reason, or null
+  function spaceLine(t) {
+    if (!t?.story) return { lines: [], why: null };
+    const box = t.box;
+    const starts = box.textMode ? window.storyParaStarts?.(box) || [] : [{ p: 0, x: box.x, y: box.y, h: box.h }];
+    const r = t.range ? SC.ordered(t.range) : null;
+    const lines = [];
+    let onLine = false;
+    for (const s of starts) {
+      if (r && (s.p < r.start.p || s.p > r.end.p)) continue;
+      const line = window.utbLineAt?.(box.page, s);
+      if (!line) continue;
+      onLine = true;
+      if (line.space > 0) lines.push({ p: s.p, line, face: faceOf(box, s.p) });
+    }
+    const why = lines.length ? null
+      : onLine ? 'The page\'s line under this text has no space between two words to measure.'
+      : `No line of the page under ${r && box.textMode ? 'the selected paragraphs' : 'this text'} — put its first line on a line read from the page (the Artistic Text Tool, clicked on a line, starts there).`;
+    return { lines, why };
+  }
+  // a paragraph's face as it draws: its first character's, kerning as
+  // story-render.js resolves it, tracking and the paragraph's letter spacing
+  // after every glyph
+  function faceOf(box, p) {
+    const para = box.story?.paragraphs[p];
+    const a = SC.charOf(para?.runs[0].attrs || window.utbPlainChar?.attrs(box) || {});
+    const kerning = SC.resolveKern(a, window.storyPageKern?.(box, a)).autoKern;
+    const letterPx = (a.tracking || 0) / 1000 * a.sizePt * GEO.docPxPerPt() + (SC.paraOf(para?.attrs).letterSpacing || 0) / 100 * (window.storySpacePx?.(a) || 0);
+    return { fontFamily: a.fontFamily, bold: !!a.bold, italic: !!a.italic, sizePt: a.sizePt, kerning, ligatures: !!a.ot_liga, letterPx };
+  }
+  // what a line asks for, measured once per line and face (a line's
+  // measured characters → face → word spacing; null while it is measured)
+  const lineWS = new WeakMap();
+  function measuredWS(l) {
+    const id = l.line.pieces[0];
+    if (!lineWS.has(id)) lineWS.set(id, new Map());
+    const byFace = lineWS.get(id), k = `${l.line.pieces.length}|${JSON.stringify(l.face)}`;
+    if (!byFace.has(k)) {
+      byFace.set(k, null);
+      Promise.resolve(window.utbLineWordSpacing?.(l.line, l.face)).catch(() => 100).then(ws => { byFace.set(k, ws ?? 100); soon(); });
+    }
+    return byFace.get(k);
+  }
+  // beside the button: the space of the line under the text; the button is
+  // lit while every paragraph it would set has it
+  function syncSpaceLine(t) {
+    const b = $('tt-space-line'), src = $('tt-space-line-src');
+    if (!b || !src) return;
+    const { lines } = spaceLine(t);
+    const ws = lines.map(measuredWS), known = lines.length > 0 && ws.every(v => v != null);
+    b.classList.toggle('active', known && lines.every((l, i) => Math.abs(SC.paraOf(t.box.story?.paragraphs[l.p]?.attrs).wordSpacing - ws[i]) < 1e-6));
+    const own = known ? window.storySpacePx?.(lines[0].face) : 0, px = own * (ws[0] || 100) / 100;
+    src.textContent = !lines.length ? '' : !known ? 'line: …' : ws[0] === 100 ? 'line: the font\'s' : `line: ${px.toFixed(2)} px`;
+    src.title = !known ? '' : `The page's line under ${lines.length > 1 ? 'the first paragraph' : 'the text'} was set with ${ws[0] === 100
+      ? `the face's own space (${own.toFixed(3)} px): its words land on the page's within a quarter pixel`
+      : `${px.toFixed(3)} px spaces — the face's own is ${own.toFixed(3)} px`} (its spaces between words, measured in this face)`;
+  }
+  $('tt-space-line')?.addEventListener('click', async () => {
+    const t = target();
+    const { lines } = spaceLine(t);
+    if (!lines.length) return;
+    const patches = new Map();
+    for (const l of lines) patches.set(l.p, { wordSpacing: (await window.utbLineWordSpacing?.(l.line, l.face)) ?? 100 });
+    window.storyApplyParaEach?.(t.box, patches, 'space as the line');
+    sync();
+  });
   $('fabric-nudge-mode')?.addEventListener('click', () => {
     const t = target();
     if (!t) return;

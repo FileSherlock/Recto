@@ -218,6 +218,52 @@ test('Initial advance: max(metric, Minimum)', { skip }, () => {
   near(SC.firstBaselinePx(fr({ baseline: 'x', baselineMin: 8 }), a, m, 12, 1), 8);
 });
 
+test('a page line\'s space: the mean of its single spaces between words, the pieces of a row together', { skip }, () => {
+  // a line's measured characters, [{ c, x, w }]: a space's w is the room it takes
+  const line = spec => { let x = 0; return spec.map(([c, w]) => { const cp = { c, x, w }; x += w; return cp; }); };
+  const toBeOr = line([['T', 6], ['o', 8], [' ', 5.5], ['b', 8], ['e', 7], [' ', 5.25], ['o', 8], ['r', 5]]);
+  assert.deepEqual(SC.lineWords(toBeOr), [{ text: 'To', i: 0, j: 1, x: 0, end: 14, gap: 1 }, { text: 'be', i: 3, j: 4, x: 19.5, end: 34.5, gap: 1 },
+    { text: 'or', i: 6, j: 7, x: 39.75, end: 52.75, gap: 0 }]);
+  assert.deepEqual(SC.lineSpace([toBeOr]), { space: 5.375, n: 2 });
+  // spaces at either end and runs of spaces say nothing about the line's space
+  assert.deepEqual(SC.lineSpace([line([[' ', 9], ['a', 7], [' ', 4.5], ['b', 7], [' ', 9]])]), { space: 4.5, n: 1 });
+  assert.deepEqual(SC.lineSpace([line([['a', 7], [' ', 4], [' ', 4], ['b', 7], [' ', 5], ['c', 7]])]), { space: 5, n: 1 });
+  assert.equal(SC.lineSpace([line([['a', 7], [' ', 0], ['b', 7]])]), null);
+  assert.equal(SC.lineSpace([line([['W', 12], ['o', 8], ['r', 5], ['d', 8]])]), null);
+  assert.equal(SC.lineSpace([[]]), null);
+  assert.equal(SC.lineSpace(null), null);
+  // the pieces of a row cut by a redaction bar count together, never across the cut
+  assert.deepEqual(SC.lineSpace([line([['a', 7], [' ', 5], ['b', 7], [' ', 9]]), line([['c', 7], [' ', 7], ['d', 7]])]), { space: 6, n: 2 });
+  // as the face sets the line: the page's distance between two word starts
+  // less the face's, plus the face's own space — here the face sets "To" a
+  // quarter px wider than the page's glyphs take (14.25) and kerns its space
+  // before "be" by −0.5: the typed spaces must be 19.5 − 14.25 + 0.5 = 5.75
+  // and 39.75 − 34.5 = 5.25
+  const laid = { x: [0, 6, 14.25, 17.75, 25.75, 32.75, 36.75, 44.75], own: 4 };
+  assert.deepEqual(SC.lineSpace([toBeOr], chars => (chars === toBeOr ? laid : null)), { space: 5.5, n: 2 });
+  // a piece the face does not say how it sets keeps the page's own room
+  assert.deepEqual(SC.lineSpace([toBeOr], () => null), { space: 5.375, n: 2 });
+  // …and so does a word the face sets more than WORD_FIT off the page's (an
+  // OCR layer's invisible text, stretched to the scan's words): "To" laid
+  // 1.25 px narrower is not this face — its space is the page's 5.5
+  assert.equal(SC.WORD_FIT, 0.5);
+  const narrow = { x: [0, 5, 12.75, 16.25, 24.25, 31.25, 35.25, 43.25], own: 4 };
+  assert.deepEqual(SC.lineSpace([toBeOr], () => narrow), { space: (5.5 + (39.75 - 19.5 - (35.25 - 16.25) + 4)) / 2, n: 2 });
+  // …as the desired word spacing, in % of the face's space — the face's own
+  // when it lands the line's spaces within a pen step (¼ px) of the page's
+  assert.equal(SC.PEN_STEP, 0.25);
+  assert.equal(SC.wordSpacingFor(5.5, 4, 8), 137.5);
+  assert.equal(SC.wordSpacingFor(5, 3, 1), 166.666667);
+  assert.equal(SC.wordSpacingFor(4.02, 4, 12), 100);               // 12 × 0.02 = 0.24 px: the face's own
+  assert.equal(SC.wordSpacingFor(4.03, 4, 12), 100.75);            // 0.36 px: the line's
+  assert.equal(SC.wordSpacingFor(3.9, 4, 4), 97.5);                // a tight line too
+  assert.equal(SC.wordSpacingFor(null, 4, 3), 100);
+  assert.equal(SC.wordSpacingFor(5, 0, 3), 100);
+  // which the run's CSS lays: the face's space + the difference
+  const m = SC.scaledMetrics({ upem: 1000, space: 250 }, 16);
+  assert.equal(SC.runCSS(SC.charOf({ sizePt: 12 }), SC.paraOf({ wordSpacing: SC.wordSpacingFor(5.375, m.space, 2) }), m, { pxPerPt: 4 / 3 })['word-spacing'], '1.375px');
+});
+
 test('a run\'s CSS: tracking in ‰ of an em, baseline shift up, decorations from the face', { skip }, () => {
   const m = SC.scaledMetrics({ upem: 1000, hheaAscender: 900, hheaDescender: -200, postUnderlinePosition: -100, postUnderlineThickness: 50 }, 16);
   const css = SC.runCSS(SC.charOf({ sizePt: 12, tracking: 50, baselineShift: 3, underline: 'double' }), SC.paraOf({}), m, { pxPerPt: 4 / 3 });

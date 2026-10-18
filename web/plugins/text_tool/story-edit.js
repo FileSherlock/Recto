@@ -519,6 +519,24 @@
     window.utbUndo?.commit(step, 'paragraph', key);
     notify();
   }
+  // Paragraph attributes, each paragraph its own: `patches` maps a paragraph
+  // index to its patch (the Text panel's Space as this line: every paragraph
+  // the space of the page's line under it). One undo step.
+  function storyApplyParaEach(box, patches, label = 'paragraph') {
+    if (!box || !patches?.size) return;
+    const op = story => {
+      for (const [p, patch] of patches) if (story.paragraphs[p]) story = SC.applyPara(story, { start: { p, o: 0 }, end: { p, o: 0 } }, patch);
+      return story;
+    };
+    if (session?.box === box) { change(op(box.story), session.sel, null); return; }
+    const step = window.utbUndo?.capture([box]);
+    window.ensureStory?.(box);
+    box.story = op(box.story);
+    window.storySync?.(box);
+    window.renderBox?.(box);
+    window.utbUndo?.commit(step, label);
+    notify();
+  }
   function storyApplyFrame(box, patch, key = null) {
     if (!box?.textMode) return;
     const step = session?.box === box ? null : window.utbUndo?.capture([box]);
@@ -537,6 +555,7 @@
   window.storyParaState = storyParaState;
   window.storyApplyChar = storyApplyChar;
   window.storyApplyPara = storyApplyPara;
+  window.storyApplyParaEach = storyApplyParaEach;
   window.storyApplyFrame = storyApplyFrame;
   window.storyMapChar = storyMapChar;
   window.storyChangeCase = storyChangeCase;

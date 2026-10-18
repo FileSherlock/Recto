@@ -457,14 +457,76 @@ What it says:
 - **Between words** the page decides: Word **justifies** its lines by widening each line's
   spaces, and puts its rounding into some gaps; text typed with the face's own space misses those
   by up to several px by the line's end (the affidavit's, the Times letter's and the Calibri
-  report's medians above are their justified lines). **Space width** (the Text panel's Spacing)
-  sets one line's space; Frame text with Justified alignment justifies with the browser's spaces,
-  not Word's.
+  report's medians above are their justified lines). Artistic text now takes the line's space
+  (below); Frame text with Justified alignment justifies with the browser's spaces, not Word's.
 - **Pixel-exact lines** follow the in-word result where the line's gaps are the face's own (the
   e-mails, the synthetic faces page: 19 of 21); on Word's justified pages few lines are
   (affidavit 3 of 35): the producer's own word gaps, which no per-word law reproduces.
 - Typed over a read line, a story's pieces are the typed box's (same glyph set, law and pens),
   and with the page's read terms (`pvTerms`) the same verdict, line for line.
+
+### Typed text takes the line's space (2026-10-18)
+
+Artistic text clicked on a read line now takes that line's space as its paragraph's Word Spacing,
+and the Text panel's **Space as this line** sets it again, paragraph by paragraph
+([The Text panel](../../frontend/text-tool.md#space-width-nudge)). text_tool measures it from
+its own data — the line box's `baseCharPositions`, here the reader's pens: the line's text laid
+in the face by HarfBuzz as the story draws it, its word starts against the reader's, one width
+per line; the face's own space where that lands the line within a quarter pixel. It does not read
+`box.ocr` (the reader's `spaceAdv` is its set's calibration, not the line's).
+
+The same browser study as above, now through the tool's own click (`create()`: the line's face,
+size, baseline, first pen — and its space), the reader's text typed in; before = the same story
+with the face's own space. Every glyph's x against the reader's pen (the caret rect, plus half a
+legacy-`kern`-table kern, as above):
+
+| document | lines | given a space of their own | ≤ ½ px | in-word ≤ ¼ px | MuPDF pixels exact | median glyph error, px |
+|---|---:|---:|---:|---:|---:|---:|
+| startup p1–3 (kerned Times header, Courier body) | 191 | 0 | 191 → 191 | 190 → 190 | 190 → 190 | 0.06 → 0.06 |
+| synthetic: Times letter | 22 | 10 | 12 → **22** | 22 → 22 | 12 → 12 | 1.31 → 0.06 |
+| synthetic: Arial memo | 20 | 0 | 14 → 14 | 20 → 20 | 11 → 11 | 0.13 → 0.13 |
+| synthetic: Calibri report | 8 | 4 | 4 → **8** | 8 → 8 | 4 → 4 | 3.52 → 0.06 |
+| synthetic: 21 faces | 21 | 0 | 20 → 20 | 20 → 20 | 19 → 19 | 0.06 → 0.06 |
+| synthetic: Verdana spacing | 8 | 0 | 8 → 8 | 8 → 8 | 6 → 6 | 0.09 → 0.09 |
+| synthetic: justified Times | 18 | 14 | 5 → **18** | 18 → 18 | 4 → **6** | 1.91 → 0.06 |
+| synthetic: justified Calibri | 18 | 14 | 5 → **18** | 18 → 18 | 5 → **8** | 2.73 → 0.06 |
+| synthetic: justified Courier | 21 | 12 | 9 → **21** | 21 → 21 | 9 → **13** | 0.14 → 0.06 |
+| synthetic: underline mixed | 9 | 0 | 9 → 9 | 9 → 9 | 5 → 5 | 0.06 → 0.06 |
+| affidavit (Word, Times, justified) | 35 | 21 | 13 → **23** | 27 → 25 (≤ ¼ px + 1/64: 27 → 28) | 3 → 3 | 5.30 → 0.13 |
+| FBI summary p2 (Calibri) | 51 | 1 | 37 → 37 | 48 → 48 | 32 → 32 | 0.13 → 0.13 |
+| FBI summary p2, second release | 46 | 1 | 32 → 32 | 43 → 43 | 6 → 6 | 0.09 → 0.09 |
+| the 2019 e-mail (kerned Times) | 30 | 0 | 30 → 30 | 28 → 28 | 19 → 19 | 0.06 → 0.06 |
+| the 2010 e-mails p1–2 (kerned Times, palette pages) | 77 | 0 | 77 → 77 | 76 → 76 | 64 → 64 | 0.08 → 0.08 |
+| e-mail printout p1 + base64 p2 (EFTA00751637) | 156 | 0 | 29 → 29 | 25 → 25 | 121 → 121 | 0.33 → 0.33 |
+| **all** | 731 | 77 | 495 → **557** | 581 → 579 (585 → 586) | 510 → **519** | |
+
+- **Justified lines land.** The lines given a space of their own are Word's justified lines (and
+  one misread letterhead, below); with it every glyph of 64 of the 77 lies within ½ px of the
+  reader's pen, against 2 before — the median glyph error on the affidavit falls from 5.30 to
+  0.13 px, on the Calibri report from 3.52 to 0.06.
+- **Every other line is drawn as before.** A line set with the face's space measures as the
+  face's own (100 %, `wordSpacingFor`: within a quarter pixel over the line), so the startup
+  document, the e-mails, the faces and Verdana pages are line for line what they were — also in
+  pixels. Measured from the page's own glyph room instead of the face's layout, those lines read
+  3.95–3.99 px for a 4.000 px space (the reader's advances are a few hundredths of a px a word
+  off the face's) and lost exact lines; and a kerned page's "Tue, 19 Apr 2011" header lost ½ px
+  (the page kerns the space before the *A*, and so does the face).
+- **Pixel-exact lines** rise on the justified pages (Times 4 → 6, Calibri 5 → 8, Courier 9 → 13;
+  of the 77 lines, 1 → 10): one width per line lands the line's ends and most of its words, not
+  Word's own rounding, gap by gap.
+- **In-word** is unchanged: the two affidavit lines below ¼ px that are not any more moved from
+  0.250 to 0.266 px — one 1/64-px layout unit of Chrome's character rects, at the threshold —
+  and within ¼ px plus that unit the affidavit counts 27 → 28.
+- **What is left**: tab gaps — a list label's or a bullet's ("w. A Lenovo…", "2.    Evidence…",
+  "•    Requests…": 11 of the 13 lines given a space and still off, 0.5–3.8 px), which a run of
+  typed spaces takes at the line's space; the FBI letterhead in both releases (the other 2), its
+  letter-spaced capitals read as "FE DERAL BUREAUOF" (20 px either way); and on a monospace
+  base64 page (EFTA00751637 p2, 79 lines, no spaces) the browser's own advances, 0.8 px off by
+  a line's end in HTML either way, while the pixel view draws it exact either way.
+- **recto-eval**, full tier against `full-2026-10-18-11-09-59` (run `full-2026-10-18-12-07-37`):
+  0 better, 0 worse — its typed write-back types a one-line box, not a story. Its `whatIf.pageSpace` (one width per line from
+  the reader's solved gaps, under the pixel view's law) is the same idea for that box: the group
+  "word gaps — one width per line" holds 1409 segments, 4.6 % of `wb.typed`.
 
 ## Limits
 

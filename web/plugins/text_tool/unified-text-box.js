@@ -279,23 +279,104 @@ window.normUtbFont = normUtbFont;
 
 // ── Adapter functions for legacy consumers ────────────────────
 
-/**
- * Find the nearest text line (embedded span or OCR-read line) to a point on a
- * page — `at` is { x, y }, or a y alone — what a new box beside it takes: its
- * face, style and size, its baseline (y / h, as computeBaseline reads them),
- * where it starts (x: its first glyph's pen).
- * Returns { x, y, h, w, lineId, font, bold, italic, sizePt } or null.
- */
-function utbFindNearestLine(pageNum, at, threshold = 2.0) {
-  const y = typeof at === 'object' ? at.y : at, x = typeof at === 'object' ? at.x : null;
-  // a line on a hidden layer is not what the user clicked beside: when the
-  // OCR layer is shown and the embedded one hidden, the embedded line's face
-  // (the text layer's declared substitute) must not become the new box's
+// The page's own lines on a page — embedded spans and OCR-read lines — on a
+// layer that is shown: a line on a hidden layer is not what the user clicked
+// beside (when the OCR layer is shown and the embedded one hidden, the
+// embedded line's face — the text layer's declared substitute — must not
+// become a new box's).
+function utbShownLines(pageNum) {
   const cl = document.body.classList;
   const shown = b => !(b.type === 'embedded' && cl.contains('hide-embedded-text')) &&
                      !(b.type === 'ocr' && cl.contains('hide-ocr-text'));
-  const pageBoxes = utbState.boxes.filter(b => b.page === pageNum &&
-    (b.type === 'embedded' || b.type === 'ocr') && shown(b));
+  return utbState.boxes.filter(b => b.page === pageNum && (b.type === 'embedded' || b.type === 'ocr') && shown(b));
+}
+// A row cut by redaction bars is several lines (a bold "To: " label, then a
+// regular address): of `line`'s row, the one x is in, else the one nearest
+// beside it.
+function utbPieceAt(lines, line, x) {
+  if (x == null) return line;
+  const cy = line.y + line.h / 2;
+  const off = b => Math.max(0, b.x - x, x - (b.x + b.w));
+  for (const b of lines) if (Math.abs(b.y + b.h / 2 - cy) < 1 && off(b) < off(line)) line = b;
+  return line;
+}
+
+/**
+ * The measured characters that say what space a line of the page was set
+ * with: the line's own (box.baseCharPositions), or — a piece of a row cut by
+ * redaction bars with no single space between two words of its own — every
+ * piece of its row (its lineId) set in its face, each on its own
+ * (StoryCore.lineSpace never counts across a cut; a bold "To:" label says
+ * nothing of the regular address beside it). [] when no position says.
+ */
+function utbLinePieces(box) {
+  const SC = globalThis.StoryCore;
+  if (!box?.baseCharPositions?.length || !SC?.lineSpace) return [];
+  const own = [box.baseCharPositions];
+  if (SC.lineSpace(own) || !box.lineId) return own;
+  const face = utbFaceOf(box), same = b => { const f = utbFaceOf(b); return f.fontFamily === face.fontFamily && f.bold === face.bold && f.italic === face.italic && Math.abs(f.sizePt - face.sizePt) < 0.005; };
+  return utbState.boxes.filter(b => b.page === box.page && b.type === box.type && b.lineId === box.lineId && b.baseCharPositions?.length && same(b))
+    .map(b => b.baseCharPositions);
+}
+// The space a line of the page was set with, in px, as the page's own
+// glyphs take their room (StoryCore.lineSpace); null when no position says.
+const utbLineSpace = box => globalThis.StoryCore?.lineSpace?.(utbLinePieces(box))?.space ?? null;
+
+// What a box beside or over a line of the page takes from it: its face, style
+// and size, its baseline (y / h, as computeBaseline reads them), where it
+// starts (x: its first glyph's pen), the space it was set with (px, as the
+// page's glyphs take their room) and the measured characters that say so.
+const utbLineInfo = b => {
+  const pieces = utbLinePieces(b);
+  return {
+    x: b.x, y: b.y, h: b.h, w: b.w, lineId: b.lineId,
+    font: b.fontFamily, bold: !!b.bold, italic: !!b.italic, sizePt: b.sizePt,
+    pieces, space: globalThis.StoryCore?.lineSpace?.(pieces)?.space ?? null,
+  };
+};
+
+/**
+ * The desired word spacing (% of the face's space: a story paragraph's
+ * wordSpacing) that lands text set in `face` on the words of `line` (a
+ * utbFindNearestLine / utbLineAt result): the line's text laid in the face
+ * by HarfBuzz — with the kerning, ligatures and letter spacing the text is
+ * drawn with — against the page's word starts (StoryCore.lineSpace), so the
+ * space is the one the line was set with in the face's own terms. 100 when
+ * that is the face's own (StoryCore.wordSpacingFor) or nothing says.
+ * face: { fontFamily, bold, italic, sizePt, kerning, ligatures, letterPx }
+ */
+async function utbLineWordSpacing(line, face) {
+  const SC = globalThis.StoryCore;
+  if (!line?.pieces?.length || !SC || typeof Shaping === 'undefined') return 100;
+  const f = { family: face.fontFamily, bold: !!face.bold, italic: !!face.italic };
+  let res = null, m = null;
+  try {
+    [res, m] = await Promise.all([
+      Shaping.widths({ ...f, strings: line.pieces.map(chars => chars.map(ch => ch.c).join('')), size: face.sizePt, scale: GEO.docScale(),
+        kerning: !!face.kerning, ligatures: !!face.ligatures }),
+      Shaping.faceMetrics(f),
+    ]);
+  } catch { return 100; }
+  if (!m) return 100;
+  const own = SC.scaledMetrics(m, GEO.docPtToPx(face.sizePt)).space, letter = face.letterPx || 0;
+  // each piece as the face sets it — one pen per character, or it says nothing
+  const laid = new Map(line.pieces.map((chars, k) => {
+    const set = res?.results?.[k]?.chars;
+    return [chars, set?.length === chars.length ? { x: set.map((g, i) => g.x + letter * i), own } : null];
+  }));
+  const s = SC.lineSpace(line.pieces, chars => laid.get(chars));
+  return s ? SC.wordSpacingFor(s.space, own, s.n) : 100;
+}
+
+/**
+ * Find the nearest text line (embedded span or OCR-read line) to a point on a
+ * page — `at` is { x, y }, or a y alone — what a new box beside it takes.
+ * Returns { x, y, h, w, lineId, font, bold, italic, sizePt, space, pieces }
+ * (utbLineInfo) or null.
+ */
+function utbFindNearestLine(pageNum, at, threshold = 2.0) {
+  const y = typeof at === 'object' ? at.y : at, x = typeof at === 'object' ? at.x : null;
+  const pageBoxes = utbShownLines(pageNum);
   if (!pageBoxes.length) return null;
 
   let nearest = null;
@@ -306,25 +387,24 @@ function utbFindNearestLine(pageNum, at, threshold = 2.0) {
     if (d < minDist) { minDist = d; nearest = b; }
   }
   if (!nearest || minDist > nearest.h * threshold) return null;
-  // a row cut by redaction bars is several lines (a bold "To: " label, then a
-  // regular address): the one the point is in, else the one nearest beside it
-  if (x != null) {
-    const cy = nearest.y + nearest.h / 2;
-    const off = b => Math.max(0, b.x - x, x - (b.x + b.w));
-    for (const b of pageBoxes) if (Math.abs(b.y + b.h / 2 - cy) < 1 && off(b) < off(nearest)) nearest = b;
-  }
+  return utbLineInfo(utbPieceAt(pageBoxes, nearest, x));
+}
 
-  return {
-    x: nearest.x,
-    y: nearest.y,
-    h: nearest.h,
-    w: nearest.w,
-    lineId: nearest.lineId,
-    font: nearest.fontFamily,
-    bold: !!nearest.bold,
-    italic: !!nearest.italic,
-    sizePt: nearest.sizePt,
-  };
+/**
+ * The line of the page a line of text sits on — `at` is { x, y, h }, the
+ * text line's band and where it starts: the shown page line whose band
+ * overlaps it the most, by half the smaller height at least (of a row cut by
+ * redaction bars, the piece x is in, else the one nearest beside it). Same
+ * shape as utbFindNearestLine; null when the text is on no line of the page.
+ */
+function utbLineAt(pageNum, at) {
+  const lines = utbShownLines(pageNum);
+  let best = null, most = 0;
+  for (const b of lines) {
+    const o = Math.min(at.y + at.h, b.y + b.h) - Math.max(at.y, b.y);
+    if (o >= Math.min(at.h, b.h) * 0.5 && o > most) { most = o; best = b; }
+  }
+  return best ? utbLineInfo(utbPieceAt(lines, best, at.x)) : null;
 }
 
 /**
@@ -349,4 +429,7 @@ function utbGetSpansCompat() {
 }
 
 window.utbFindNearestLine = utbFindNearestLine;
+window.utbLineAt = utbLineAt;
+window.utbLineSpace = utbLineSpace;
+window.utbLineWordSpacing = utbLineWordSpacing;
 window.utbGetSpansCompat = utbGetSpansCompat;

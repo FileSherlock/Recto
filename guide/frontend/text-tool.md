@@ -49,6 +49,7 @@ renderer** draws the text (below), what it cannot draw.
 | **Pair kerning** `#kerning` (+ `#tt-kern-source`, ↺ `#tt-kern-page`) | `autoKern`: `true`, `false`, `null` = as the page | `box.kerning` + `box.kerningAuto` |
 | Manual kerning `#tt-ch-kern`, Tracking `#tt-ch-tracking` (‰ of an em) | `manualKern`, `tracking` | Tracking: `box.letterSpacing` (em) = ‰ ÷ 1000 |
 | **Space width** `#fabric-space-width` (px) + **Font's** `#fabric-default-sw` | the paragraphs' desired Word Spacing (% of the face's space) | `box.spaceWidth` / `box.defaultSpaceWidth` |
+| **Space as this line** `#tt-space-line` (+ `#tt-space-line-src`) | each paragraph's desired Word Spacing: the space of the page's line under its first line | locked |
 | **Nudge characters** `#fabric-nudge-mode` | the pair's manual kerning (`micro-typo.js`) | `box.charAdvances` (while `utbCharsValid(box)`) |
 | Background, Position & Transform, Decorations, Typography, Language | see [Artistic and Frame Text](artistic-and-frame-text.md) | locked |
 | **Redaction match** `#tt-settings`: `#tolerance` (px), `#tt-name-case` (`#tt-match-scope` says whose) | — | a redaction box's `box.tolerance`, `box.uppercase` (`utbApplyCase`); shown for a redaction box and with nothing selected. The ids are read by whichever matching plugin is installed |
@@ -88,6 +89,52 @@ shown in px of the face's space of the selection's first character, or a plain b
 space width (its measured positions are moved by the difference). **Font's** is the face's own
 space (100 %; a plain box: `box.spaceWidth = null`); unticking it starts from the face's space
 measured by HarfBuzz (`getNaturalSpaceWidth`).
+
+**Space as this line** (`#tt-space-line`) gives each paragraph of a story — the selection's
+while the text is edited, else all — whose first line sits on a line read from the page the
+space that line was set with, as its desired word spacing (`storyApplyParaEach`, one undo
+step). Word justifies a line by widening its spaces, each line by its own amount; text retyped
+over it with the face's own space misses the page's words by several px by the line's end (on
+a justified Word affidavit, up to 74 px). Beside the button, the space of the line under the
+text (`#tt-space-line-src`: `line: 7.90 px`, or `line: the font's`); the button is lit while
+every paragraph it would set has it. A new Artistic text clicked on a line takes that line's
+space already (`artistic-tool.js create()`). The button is locked, with the reason, on a box
+with one face, on text no line of the page is under, and over a line with no single space
+between two words.
+
+Which line: `utbLineAt(page, { x, y, h })` (`unified-text-box.js`) — the shown OCR or embedded
+line whose band overlaps the band of the paragraph's first line by half the smaller height at
+least (`storyParaStarts`: its first character's box, an empty paragraph's caret line); of a row
+cut by redaction bars, the piece the text starts in. How much: `utbLineWordSpacing(line,
+face)` —
+
+- the line's measured characters (`baseCharPositions`: a reader's pens, a PDF's positions) say
+  where each of its words starts (`StoryCore.lineWords`); a piece of a cut row with no space of
+  its own takes every piece of its row (`utbLinePieces`), each on its own;
+- HarfBuzz lays the line's text in the paragraph's face as it is drawn — its kerning (as the
+  page), ligatures, tracking — at the face's own space (`Shaping.widths`);
+- each single space between two words is then the page's distance between their starts less
+  the face's, plus the face's own space — what a typed space must be for the next word to land
+  where the page's does — and the line's space is their mean (`StoryCore.lineSpace`), which
+  lands its last word where the page has it. Runs of spaces (a tab's gap) are left out. The
+  page's own glyph room is not used: a reader's advances are off the face's by a few
+  hundredths of a px a word, which a line of twelve spaces adds up, and a kerned page kerns the
+  space before an *A*, which the face kerns again. Where the face sets the word before a space
+  more than half a pixel off the room the page's glyphs take (`StoryCore.WORD_FIT`), the word is
+  not in that face — an OCR layer's invisible text, stretched to the scan's words under a size
+  of its own — and that space is what the page leaves between the two words;
+- when the face's own space lands the line's spaces within a quarter pixel of the page's — the
+  pen lattice MuPDF draws on (`StoryCore.wordSpacingFor`, `PEN_STEP`) — the face's own is kept
+  (100 %): a line set with it reads back a hair off it, and the face's own draws it pixel for
+  pixel.
+
+Measured in the app (2026-10-18, headless Chrome): Artistic text made by the tool's click at the
+start of every line read from 16 documents' first pages (731 lines), the line's text typed in,
+every glyph's x against the page's — lines whose every glyph lies within ½ px: 495 with the
+face's own space, **557** with the line's. The 77 lines given a space of their own (Word's
+justified lines) go from 2 to 64, and from 1 to 10 drawn pixel for pixel by a pixel renderer;
+every other line is drawn as before. What is left is mostly tab gaps after list labels and
+bullets, which typed spaces take at the line's space.
 
 **Nudge characters** enters micro-typography mode (`enterMicroTypo`): every character gets a
 hit area, and a character's x nudge is the manual kerning of the pair it closes (a story) or
@@ -196,6 +243,7 @@ changes (`char:sizePt:<id>`, …) — and with nothing selected the font and siz
 | `click` | `#tt-kern-page` | `apply('char', { autoKern: null })` — as the page again |
 | `change` | `#fabric-default-sw` | the face's space (`wordSpacing: 100` / `spaceWidth = null`), or the measured natural width to start from |
 | `input` / `change` | `#fabric-space-width` | a story's word spacing (% of its face's space), a plain box's `spaceWidth` |
+| `click` | `#tt-space-line` | each target paragraph's `wordSpacing` from the page's line under it (`utbLineAt`, `utbLineWordSpacing`, `storyApplyParaEach`) |
 | `click` | `#fabric-nudge-mode` | `enterMicroTypo` / `exitMicroTypo` on the selected box |
 | `click` | `#tt-size-up` / `#tt-size-down` | every run's size ± 1 pt (`storyMapChar`), a plain box's `sizePt` ± 1, new text's size |
 | `change` | `#tt-change-case` | `storyChangeCase` |

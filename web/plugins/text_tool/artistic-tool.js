@@ -6,8 +6,10 @@
 //
 //   - a click puts a new Artistic text's baseline at the point, in the font
 //     and size new text takes (the Text panel's) — beside or on a line of the
-//     page, in that line's face and size, on its baseline, and from its first
-//     glyph when the click is within half an em of where it starts;
+//     page, in that line's face and size, on its baseline, with its space
+//     (the paragraph's word spacing: Word widens a justified line's spaces),
+//     and from its first glyph when the click is within half an em of where
+//     it starts;
 //   - a drag sets the size: the font's typographic ascent is the drag's
 //     height, the baseline its lower edge (Affinity's rule);
 //   - a press on Artistic or Frame text puts the caret there (drag-resize.js).
@@ -96,12 +98,13 @@
   // A new Artistic text with its first baseline at (x, baseline). `ascentPx`
   // (a drag's height) sets the size so that the typographic ascent fills it.
   // `snap` (a click): beside a line of the page's text, the new text takes
-  // that line's face, style, size and baseline
+  // that line's face, style, size, baseline and space
   async function create(pageNum, x, baseline, ascentPx, dragW = 0, snap = false) {
     const fresh = window.newTextFont?.() || { fontFamily: 'Times New Roman', sizePt: 12 };
     let family = fresh.fontFamily;
     let sizePt = fresh.sizePt;
     let bold = false, italic = false;
+    const para = {};
     const near = snap ? window.utbFindNearestLine?.(pageNum, { x, y: baseline }) : null;
     if (near) {
       family = near.font || family;
@@ -112,6 +115,16 @@
       // a click within half an em of where the line starts starts there: the
       // text lines up with the page's (its first pen, not where the mouse was)
       if (near.x != null && Math.abs(x - near.x) <= GEO.docPtToPx(sizePt) / 2) x = near.x;
+      // the space the line was set with (Word widens a justified line's), as
+      // the paragraph's desired word spacing: typed words land on the page's.
+      // Measured in the face as the text will draw it — kerning as the page
+      // (story-render.js), no ligatures (a new story's)
+      if (near.pieces?.length) {
+        const a = SC.charOf({ fontFamily: family, bold, italic, sizePt });
+        const kerning = SC.resolveKern(a, window.storyPageKern?.({ type: 'harfbuzz', page: pageNum }, a)).autoKern;
+        const ws = await window.utbLineWordSpacing?.(near, { fontFamily: family, bold, italic, sizePt, kerning, ligatures: a.ot_liga });
+        if (ws > 0 && ws !== 100) para.wordSpacing = ws;
+      }
     }
     if (ascentPx) {
       let m = null;
@@ -124,7 +137,7 @@
       type: 'harfbuzz', page: pageNum, text: '', x, y: baseline - GEO.docPtToPx(sizePt), w: 8, h: GEO.docPtToPx(sizePt),
       fontFamily: family, bold, italic, sizePt, kerning: true,
       // Affinity's default fill is black
-      textMode: 'artistic', story: SC.fromText('', { fontFamily: family, bold, italic, sizePt, color: '#000000' }), frame: {},
+      textMode: 'artistic', story: SC.fromText('', { fontFamily: family, bold, italic, sizePt, color: '#000000' }, para), frame: {},
     }));
     box._keepBaseline = baseline;
     box._minW = dragW;

@@ -538,6 +538,7 @@ installed for the family.
 | `charSummary(story, range)`, `paraSummary(story, range)` | `{ attrs, mixed: [keys] }` |
 | `changeCase(story, range, mode)` (`'upper'`, `'lower'`, `'sentence'`, `'title'`), `slice(story, range)`, `listMarkers(story)` | a new story; its text; the paragraphs' markers |
 | `scaledMetrics(faceMetrics, sizePx)`, `leadingPx(pa, a, m, pxPerPt)`, `firstBaselinePx(frame, a, m, leading, pxPerPt)`, `capsPlan(caps, features)` | Affinity's numbers for a face at a size |
+| `lineWords(chars)`, `lineSpace(pieces, laid)`, `wordSpacingFor(space, own, n)` | a page line's words (`[{ text, i, j, x, end, gap }]`) from its measured characters (`[{ c, x, w }]`); the space it was set with, `{ space, n }` (px; `laid(chars)` → `{ x, own }`: how a face sets the text — see [The Text panel](../frontend/text-tool.md#space-width-nudge)); the desired Word Spacing (%) for it, 100 within `PEN_STEP` of the face's own |
 | `runCSS(a, pa, m, ctx)`, `paraCSS(pa, lead, prev, ctx, opts)`, `featureSettings(a, features)` | the CSS the renderer sets |
 
 The attributes, their Affinity names and how each is computed: [Artistic and Frame Text](../frontend/artistic-and-frame-text.md).

@@ -34,13 +34,13 @@ the order of their manifest's `order` (`embedded_text_viewer` 10, `webgl_mask` 2
 | 11 | `text_tool/shaping.js` | `Shaping` (`widths`, `fontMetrics`, `faceMetrics`), `ShapingCore` | — | `assetURL` |
 | 12 | `text_tool/fonts.js` | `FontCatalog` | **on:** `document:loaded`, `typography:detected` | `Shaping` (run time) |
 | 13 | `text_tool/story-core.js` | `StoryCore` — the rich-text model of Artistic / Frame text (no DOM) | — | — |
-| 14 | `text_tool/unified-text-box.js` | `UnifiedTextBox`, `utbState`, `spanToUnified`, `normUtbFont`, `utbCharsValid`, `utbFindNearestLine` | — | `FontCatalog` (run time) |
+| 14 | `text_tool/unified-text-box.js` | `UnifiedTextBox`, `utbState`, `spanToUnified`, `normUtbFont`, `utbCharsValid`, `utbFindNearestLine`, `utbLineAt`, `utbLineSpace`, `utbLineWordSpacing` | — | `FontCatalog`, `StoryCore`, `Shaping` (run time) |
 | 15 | `text_tool/undo.js` | `utbUndo` | **on:** `document:opening` | `utbState`, `renderBox` (run time) |
 | 16 | `text_tool/svg-renderer.js` | `renderBox`, `renderTextLayer`, `renderAllTextLayers`, `selectBoxInSVG`, `computeXPositions`, `clearAllSVGLayers` | **on:** `page:rendered` | `utbState`, `GEO`; `renderStoryBox` (run time) |
 | 17 | `text_tool/story-render.js` | `renderStoryBox`, `storySync`, `ensureStory`, `renderAllStories`, `storyFaceMetrics` | **on:** `zoom:changed` | `StoryCore`, `Shaping`, `GEO` |
 | 18 | `text_tool/drag-resize.js` | IIFE — SVG-native drag/resize event delegation, frame handles | — | `utbState`, `renderBox` |
 | 19 | `text_tool/ruler.js` | `refreshRuler` | **on:** `page:rendered` | `utbState`, `GEO` |
-| 20 | `text_tool/story-edit.js` | `enterStoryEdit`, `commitStoryEdit`, `storyTarget`, `storyCharState`, `storyParaState`, `storyApplyChar`, `storyApplyPara`, `storyApplyFrame`, `storyMapChar`, `storyChangeCase`, `onStoryChange` | **on:** `document:opening` | `StoryCore`, `renderBox`, `utbUndo` |
+| 20 | `text_tool/story-edit.js` | `enterStoryEdit`, `commitStoryEdit`, `storyTarget`, `storyCharState`, `storyParaState`, `storyApplyChar`, `storyApplyPara`, `storyApplyParaEach`, `storyApplyFrame`, `storyMapChar`, `storyChangeCase`, `onStoryChange` | **on:** `document:opening` | `StoryCore`, `renderBox`, `utbUndo` |
 | 21 | `text_tool/toolbar.js` | `syncToolbarToBox`, `syncToolbarToSelection`, `syncStoryControls`, `getNaturalSpaceWidth` | — | `utbState`, `renderBox`, `Shaping`, `story-edit.js` |
 | 22 | `text_tool/micro-typo.js` | `enterMicroTypo`, `exitMicroTypo` | — | `utbState`, `computeXPositions`, `renderBox` |
 | 23 | `text_tool/inline-edit.js` | `enterInlineEdit`, `commitInlineEdit`, `cancelInlineEdit` | — | `utbState`, `renderBox`, `exitMicroTypo`, `enterStoryEdit` |

@@ -614,6 +614,90 @@
     return Math.max(metric, (frame.baselineMin || 0) * pxPerPt);
   }
 
+  // ── a page line's spaces ──────────────────────────────────────────────────
+
+  // The words of a line of the page, from its measured characters ([{ c, x,
+  // w }] — a reader's pens or a PDF's positions, w the room a character
+  // takes): [{ text, i, j, x, end, gap }] — i and j the indices of its first
+  // and last characters, x where the first starts, end where the last one's
+  // room ends, gap the spaces after it (0 after the last word: spaces at
+  // either end are not between words).
+  function lineWords(chars) {
+    const words = [];
+    let cur = null, gap = 0;
+    (chars || []).forEach((ch, i) => {
+      if (!ch?.c) return;
+      if (ch.c === ' ') { if (cur) gap++; return; }
+      if (!cur || gap) {
+        if (cur) cur.gap = gap;
+        cur = { text: '', i, j: i, x: ch.x, end: ch.x, gap: 0 };
+        words.push(cur);
+        gap = 0;
+      }
+      cur.text += ch.c;
+      cur.j = i;
+      cur.end = ch.x + (ch.w || 0);
+    });
+    return words;
+  }
+
+  // How far a word as a face sets it may be from the room the page's glyphs
+  // take and still be the page's face, px. Inside a word typed text comes
+  // within a quarter pixel of the page's pens; a word further off is not set
+  // in that face — an OCR layer's invisible text, stretched to the scan's
+  // words under a size of its own.
+  const WORD_FIT = 0.5;
+
+  // The space a line of the page was set with: { space (px), n } — the mean
+  // of its n single spaces between two words. Word justifies a line by
+  // widening its spaces, each line by its own amount, and puts its rounding
+  // into some of them: their mean lands the line's last word where the page
+  // has it. `pieces`: the measured characters of the line's pieces (a row
+  // cut by redaction bars), counted together — never across a cut. Runs of
+  // spaces (a tab's gap, two after a full stop) say nothing about it. null:
+  // no single space between two words.
+  // A space is what is left between two words: from where the word before it
+  // ends — the room the page's own glyphs take — to where the next starts.
+  // `laid(chars)`, when it knows, says how the face the space is for sets the
+  // piece's text: { x: the x of every character (HarfBuzz's pens — its
+  // advances, its kerning, across a space too, the letter spacing after each
+  // glyph), own: the face's space it was set with }. Where the face sets the
+  // word before a space as the page has it (within WORD_FIT), the space is
+  // the page's distance between the two words' starts less the face's, plus
+  // its own: what a typed space must be for the next word to land where the
+  // page's does. (The room the page's glyphs take is a reader's advance, off
+  // the face's by a few hundredths of a px a word, which a line of twelve
+  // spaces adds up; and a kerned page kerns the space before an A.)
+  function lineSpace(pieces, laid = null) {
+    let sum = 0, n = 0;
+    for (const chars of pieces || []) {
+      const words = lineWords(chars);
+      const set = laid?.(chars);
+      for (let k = 0; k + 1 < words.length; k++) {
+        const a = words[k], b = words[k + 1];
+        if (a.gap !== 1) continue;
+        const fits = set && Math.abs(set.x[a.j + 1] - set.x[a.i] - (a.end - a.x)) <= WORD_FIT;
+        const g = fits ? b.x - a.x - (set.x[b.i] - set.x[a.i]) + set.own : b.x - a.end;
+        if (!(g > 0)) continue;
+        sum += g;
+        n++;
+      }
+    }
+    return n ? { space: sum / n, n } : null;
+  }
+
+  // What the page's pens tell apart, px: MuPDF draws a glyph at a quarter of
+  // a pixel (its pen lattice).
+  const PEN_STEP = 0.25;
+  // The desired Word Spacing (% of the face's space, Paragraph ▸
+  // Justification) that sets spaces `space` px wide in a face whose own space
+  // is `own` px. 100 — the face's own — when either is not known, or when the
+  // face's own puts the line's `n` spaces within a pen step of the page's: a
+  // line set with the face's space reads back a hair off it, off the pen
+  // lattice, and the face's own is what lays it pixel for pixel.
+  const wordSpacingFor = (space, own, n = 0) =>
+    (!(space > 0 && own > 0) || n * Math.abs(space - own) <= PEN_STEP ? 100 : Math.round(space / own * 1e8) / 1e6);
+
   // ── capitals ──────────────────────────────────────────────────────────────
 
   // What the caps mode of a run needs: the OpenType features the font will
@@ -835,7 +919,8 @@
     cmp, ordered, collapsed, startPos, endPos, whole, clampPos, isWhole,
     runAttrsAt, charSummary, paraSummary, applyChar, mapChar, applyPara,
     deleteRange, insertText, replaceRange, slice, wordAt, listMarkers, changeCase, caseMapped,
-    scaledMetrics, leadingPx, leadingPerRun, naturalLeading, firstBaselinePx, capsPlan, featureSettings, runCSS, strikeCSS, paraCSS, styleText,
+    scaledMetrics, leadingPx, leadingPerRun, naturalLeading, firstBaselinePx, lineWords, WORD_FIT, lineSpace, PEN_STEP, wordSpacingFor,
+    capsPlan, featureSettings, runCSS, strikeCSS, paraCSS, styleText,
     resolveKern, PIXEL_LIMITS, PIXEL_IGNORES, pixelable,
   };
 })();

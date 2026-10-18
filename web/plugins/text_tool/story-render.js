@@ -641,9 +641,32 @@
     probe.remove();
     return { x: map.docX(q.left), baseline: map.docY(q.top) };
   }
+  // Where each paragraph's first line is on the page: [{ p, x, y, h }] — the
+  // box of its first character, or of an empty paragraph's placeholder (the
+  // line the caret is on). Read from the layout alone, so it may be asked
+  // while the text is edited.
+  function paraStarts(g, box) {
+    const map = flowMap(g, box);
+    if (!map) return null;
+    const out = [];
+    for (const pe of map.flow.querySelectorAll('.tt-para')) {
+      let q = null;
+      for (const lf of pe.querySelectorAll('.tt-leaf')) {
+        const node = lf.firstChild;
+        if (!node || node.nodeType !== 3 || !node.length) continue;
+        const r = document.createRange();
+        r.setStart(node, 0); r.setEnd(node, 1);
+        if ((q = r.getClientRects()[0])) break;
+      }
+      q ??= pe.querySelector(':scope > br.tt-ph')?.getBoundingClientRect();
+      if (q) out.push({ p: +pe.dataset.p, x: map.docX(q.left), y: map.docY(q.top), h: q.height / map.k });
+    }
+    return out;
+  }
   const groupOf = box => document.querySelector(`.utb-group[data-id="${box.id}"]`);
   window.storyCharBoxes = box => (box?.textMode ? charBoxes(groupOf(box), box) : null);
   window.storyFirstLine = box => (box?.textMode ? firstLine(groupOf(box), box) : null);
+  window.storyParaStarts = box => (box?.textMode ? paraStarts(groupOf(box), box) : null);
   // the face's own space of a run's attributes, in px (0.25 em while its
   // metrics load — what the renderer uses meanwhile)
   window.storySpacePx = attrs => { const a = SC.charOf(attrs); return SC.scaledMetrics(metricsOf(a, null), a.sizePt * GEO.docPxPerPt()).space; };
