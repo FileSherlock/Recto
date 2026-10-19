@@ -1,12 +1,187 @@
-/* Base64 decoder — subtoolbar controls */
-#b64-blocks {
-  min-width: 180px;
-  max-width: 280px;
+/* ── the tool's badge: how many attachments the open document holds ── */
+#toggle-b64-tool { position: relative; }
+.b64-badge {
+  position: absolute;
+  top: 2px;
+  right: 1px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: #8ab4f8;
+  color: #202124;
+  font: 600 10px/15px 'Inter', system-ui, sans-serif;
+  text-align: center;
+  pointer-events: none;
 }
 
-#b64-status {
-  max-width: 340px;
+/* ── the Attachments panel (panel.html, base64-tool.js) ──────────────
+   A side panel docked at the right of the page, as wide as the other side
+   panels by default so the page does not move when they switch; it never
+   covers the page. On a phone it is a sheet at the foot of the screen. */
+.b64-panel {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--b64-width, 340px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #292a2d;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e8eaed;
+  font-size: 12px;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+.b64-resize {
+  position: absolute;
+  left: -3px; top: 0; bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 2;
+  touch-action: none;
+}
+.b64-resize:hover, .b64-panel.is-resizing .b64-resize { background: rgba(138, 180, 248, 0.5); }
+.b64-panel.is-resizing { user-select: none; }
+
+.b64-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px 6px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  user-select: none;
+}
+.b64-title {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.b64-title .material-symbols-outlined { font-size: 18px; color: #9aa0a6; }
+.b64-mini { padding: 4px; }
+.b64-mini .material-symbols-outlined { font-size: 18px; }
+
+.b64-status {
+  padding: 8px 12px;
+  color: #9aa0a6;
+  font-size: 11px;
+  line-height: 1.4;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+.b64-cards {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.b64-card {
+  background: #202124;
+  border: 1px solid #3c4043;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.b64-card-top { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.b64-icon { font-size: 26px; color: #8ab4f8; flex-shrink: 0; }
+.b64-card-text { min-width: 0; flex: 1; }
+.b64-name {
+  font-size: 13px;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.b64-meta { margin-top: 2px; color: #9aa0a6; font-size: 11px; }
+.b64-page {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #8ab4f8;
+  font: inherit;
+  cursor: pointer;
+}
+.b64-page:hover { text-decoration: underline; }
+.b64-warn { color: #fdd663; font-size: 11px; line-height: 1.4; }
+.b64-thumb {
+  display: block;
+  max-width: 100%;
+  max-height: 180px;
+  margin: 0 auto;
+  border-radius: 4px;
+  background: #fff;
+  object-fit: contain;
+}
+
+.b64-actions { display: flex; gap: 6px; }
+.b64-btn {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #5f6368;
+  border-radius: 4px;
+  background: transparent;
+  color: #e8eaed;
+  font: 500 12px 'Inter', system-ui, sans-serif;
+  cursor: pointer;
+}
+.b64-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); }
+.b64-btn.primary { background: #8ab4f8; border-color: #8ab4f8; color: #202124; }
+.b64-btn.primary:hover:not(:disabled) { background: #aecbfa; }
+.b64-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* a phone: a sheet at the foot of the screen, as tall as dragged; hidden, it
+   slides below the screen (as every side panel there does) */
+@media (max-width: 768px) {
+  .b64-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: auto;
+    height: var(--b64-height, 50vh);
+    max-height: calc(100vh - 64px);
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
+    z-index: 1001;
+    transform: translateY(0);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
+  }
+  .b64-panel.hidden {
+    display: flex !important;
+    transform: translateY(100%);
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s 0.25s;
+  }
+  .b64-resize {
+    left: 0; right: 0; top: 0; bottom: auto;
+    width: auto; height: 16px;
+    cursor: row-resize;
+    background: none !important;
+  }
+  .b64-resize::after {
+    content: '';
+    position: absolute;
+    top: 5px; left: 50%;
+    width: 36px; height: 4px;
+    margin-left: -18px;
+    border-radius: 2px;
+    background: #5f6368;
+  }
+  .b64-head { padding-top: 14px; }
 }

@@ -1,8 +1,11 @@
-// base64-tool.js — Base64 attachment decoder.
+// base64-tool.js — the Attachments panel.
 //
 // Scans the document's text layer for base64 blocks (the wrapped-line body of
-// an email attachment), decodes them in the browser, sniffs the file type from
-// the magic bytes, and offers each block as a download or an in-browser view.
+// an email attachment), decodes them in the browser and shows each as a card
+// in a docked side panel: its type, the name its MIME headers declare, size,
+// pages, a preview for an image, View (a new tab, as the type allows) and
+// Download. Finding, decoding, typing and naming are b64-core.js (B64Core, no
+// DOM); this file gathers the text and draws the panel.
 //
 // Text source: the unified text box system (utbState, owned by text_tool).
 // OCR and embedded layers hold the same lines at the same coordinates, so
@@ -18,15 +21,16 @@
 // document, not just the pages on screen.
 
 const b64State = {
-  blocks: [],     // { data: Uint8Array, mime, ext, pages: [first, last], chars }
+  blocks: [],     // { data: Uint8Array, kind (B64Core.sniff), name, pages: [first, last], chars, thumb }
   urls: [],       // object URLs to revoke on rescan / new document
   scanned: false, // a scan ran for the current document
+  waiting: false, // the auto-scan is waiting for the text layer to settle
   autoSeq: 0,     // auto-scan generation — a new document supersedes the old watcher
 };
 
 function b64Status(msg) {
   const el = document.getElementById('b64-status');
-  if (el) { el.textContent = msg; el.title = msg; }
+  if (el) el.textContent = msg;
 }
 
 // ── Text gathering ────────────────────────────────────────────
@@ -79,120 +83,21 @@ function b64GatherLines(layerType) {
   return lines.map(l => ({ page: l.page, text: l.text }));
 }
 
-// ── Block detection ───────────────────────────────────────────
-
-// A line "looks like base64" when, ignoring whitespace (OCR may insert
-// spaces) and any leading '>' quoted-reply markers (a forwarded email quotes
-// the whole attachment body, line by line), it is pure base64 alphabet with
-// at most trailing padding. Prose almost always carries punctuation outside
-// the alphabet, and the strong-line gate below additionally demands the
-// length and character mix of a wrapped attachment body, so headers and
-// ordinary sentences don't qualify.
-const B64_CONTENT = /^[A-Za-z0-9+/]+={0,2}$/;
-
-function b64Stripped(text) {
-  return (text || '').replace(/^\s*(?:>\s*)+/, '').replace(/\s+/g, '');
-}
-
-function b64IsCandidate(text) {
-  const s = b64Stripped(text);
-  return s.length >= 4 && B64_CONTENT.test(s);
-}
-
-// Strong enough to *start* a block: wrapped-body length + mixed charset.
-function b64IsStrong(text) {
-  const s = b64Stripped(text);
-  return s.length >= 40 && B64_CONTENT.test(s) &&
-    /[a-z]/.test(s) && /[A-Z]/.test(s) && /[0-9+/]/.test(s);
-}
-
-const B64_MIN_BLOCK = 80;   // total chars — anything shorter is a false positive
-
-// Reading-order lines -> raw blocks [{ chars, pages }]. A block is a run of
-// consecutive base64-looking lines containing at least one strong line; runs
-// continue across page boundaries (attachments span pages).
-function b64FindBlocks(lines) {
-  const blocks = [];
-  let run = null;
-  const flush = () => {
-    if (run && run.strong && run.chars.length >= B64_MIN_BLOCK)
-      blocks.push({ chars: run.chars, pages: [run.firstPage, run.lastPage] });
-    run = null;
-  };
-  for (const line of lines) {
-    // blank / quote-marks-only lines are neutral: they neither extend nor
-    // break a run (an OCR hiccup inside the body must not split the block)
-    if (run && !b64Stripped(line.text)) continue;
-    if (b64IsCandidate(line.text)) {
-      const s = b64Stripped(line.text);
-      if (!run) run = { chars: '', strong: false, firstPage: line.page, lastPage: line.page };
-      run.chars += s;
-      run.strong = run.strong || b64IsStrong(line.text);
-      run.lastPage = line.page;
-      if (s.endsWith('=')) flush();   // padding closes the attachment body
-    } else {
-      flush();
-    }
-  }
-  flush();
-  return blocks;
-}
-
-// ── Decoding + type sniffing ──────────────────────────────────
-
-function b64DecodeChars(chars) {
-  let s = chars.replace(/=+/g, '');
-  if (s.length % 4 === 1) s = s.slice(0, -1);          // stray char (OCR slip)
-  s += '='.repeat((4 - s.length % 4) % 4);
-  const bin = atob(s);                                  // throws on bad input
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
-
-function b64Sniff(bytes) {
-  const at = (i, ...vals) => vals.every((v, k) => bytes[i + k] === v);
-  if (at(0, 0x25, 0x50, 0x44, 0x46)) return { mime: 'application/pdf', ext: 'pdf', label: 'PDF' };
-  if (at(0, 0x89, 0x50, 0x4E, 0x47)) return { mime: 'image/png', ext: 'png', label: 'PNG' };
-  if (at(0, 0xFF, 0xD8, 0xFF)) return { mime: 'image/jpeg', ext: 'jpg', label: 'JPEG' };
-  if (at(0, 0x47, 0x49, 0x46, 0x38)) return { mime: 'image/gif', ext: 'gif', label: 'GIF' };
-  if (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50))
-    return { mime: 'image/webp', ext: 'webp', label: 'WebP' };
-  if (at(0, 0x50, 0x4B)) return { mime: 'application/zip', ext: 'zip', label: 'ZIP' };
-  // mostly printable ASCII -> text
-  const n = Math.min(bytes.length, 256);
-  let printable = 0;
-  for (let i = 0; i < n; i++) {
-    const c = bytes[i];
-    if (c === 9 || c === 10 || c === 13 || (c >= 32 && c < 127)) printable++;
-  }
-  if (n && printable / n > 0.9) return { mime: 'text/plain', ext: 'txt', label: 'text' };
-  return { mime: 'application/octet-stream', ext: 'bin', label: 'unknown type' };
-}
-
-function b64FormatSize(n) {
-  if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
-  if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
-  return n + ' B';
-}
-
-// ── Scan + UI ─────────────────────────────────────────────────
+// ── Scan ──────────────────────────────────────────────────────
 
 function b64Reset() {
   for (const u of b64State.urls) URL.revokeObjectURL(u);
   b64State.urls = [];
   b64State.blocks = [];
   b64State.scanned = false;
-  const sel = document.getElementById('b64-blocks');
-  if (sel) sel.innerHTML = '';
-  b64SetActionButtons();
-  b64Status('idle');
+  b64Render();
+  b64Status(state.numPages > 0 ? 'Waiting for the text layer…' : 'Open a document to look for attachments.');
 }
 
-function b64SetActionButtons() {
-  const none = !b64State.blocks.length;
-  document.getElementById('b64-view')?.toggleAttribute('disabled', none);
-  document.getElementById('b64-download')?.toggleAttribute('disabled', none);
+function b64Url(data, type) {
+  const url = URL.createObjectURL(new Blob([data], { type }));
+  b64State.urls.push(url);
+  return url;
 }
 
 function b64Scan() {
@@ -201,74 +106,161 @@ function b64Scan() {
   const layer = b64ActiveLayer();
   if (!layer) {
     b64Status(typeof utbState === 'undefined'
-      ? 'text_tool is required'
-      : 'no text — run OCR or load a document with embedded text');
+      ? 'Needs the text tool to read the document\'s text.'
+      : 'No text to read — run OCR, or open a document with embedded text.');
     return;
   }
-  const rawBlocks = b64FindBlocks(b64GatherLines(layer));
-  const sel = document.getElementById('b64-blocks');
-  for (const raw of rawBlocks) {
+  for (const raw of B64Core.findBlocks(b64GatherLines(layer))) {
     let data;
-    try { data = b64DecodeChars(raw.chars); } catch { continue; }
+    try { data = B64Core.decode(raw.chars); } catch { continue; }
     if (!data.length) continue;
-    const kind = b64Sniff(data);
-    const block = { data, mime: kind.mime, ext: kind.ext, pages: raw.pages, chars: raw.chars.length };
-    b64State.blocks.push(block);
-    if (sel) {
-      const opt = document.createElement('option');
-      const where = raw.pages[0] === raw.pages[1] ? `p. ${raw.pages[0]}` : `p. ${raw.pages[0]}–${raw.pages[1]}`;
-      opt.value = String(b64State.blocks.length - 1);
-      opt.textContent = `${b64State.blocks.length}: ${kind.label} · ${b64FormatSize(data.length)} · ${where}`;
-      sel.appendChild(opt);
-    }
+    const kind = B64Core.sniff(data);
+    const thumb = kind.view === 'inline' && kind.mime.startsWith('image/') ? b64Url(data, kind.mime) : null;
+    b64State.blocks.push({ data, kind, name: raw.name, pages: raw.pages, chars: raw.chars.length, thumb });
   }
-  b64SetActionButtons();
-  b64Status(b64State.blocks.length
-    ? `${b64State.blocks.length} attachment${b64State.blocks.length > 1 ? 's' : ''} found (${layer} text)`
-    : `no base64 blocks in the ${layer} text`);
+  b64Render();
+  const n = b64State.blocks.length;
+  const src = layer === 'ocr' ? 'OCR' : 'embedded';
+  b64Status(n ? `${n} attachment${n > 1 ? 's' : ''} in the ${src} text.` : `No base64 attachments in the ${src} text.`);
 }
 
-function b64Selected() {
-  const sel = document.getElementById('b64-blocks');
-  return b64State.blocks[Number(sel?.value ?? 0)] || null;
-}
-
-function b64BlockUrl(block) {
-  const url = URL.createObjectURL(new Blob([block.data], { type: block.mime }));
-  b64State.urls.push(url);
-  return url;
-}
+// ── Cards ─────────────────────────────────────────────────────
 
 function b64FileName(block) {
+  if (block.name) return block.name;
   const doc = (state.currentFile?.name || 'document').replace(/\.[^.]+$/, '');
-  const idx = b64State.blocks.indexOf(block) + 1;
-  return `${doc}-attachment-${idx}.${block.ext}`;
+  return `${doc}-attachment-${b64State.blocks.indexOf(block) + 1}.${block.kind.ext}`;
 }
 
-function b64View() {
-  const block = b64Selected();
-  if (!block) return;
-  window.open(b64BlockUrl(block), '_blank');
+function b64View(block) {
+  const type = B64Core.viewMime(block.kind);
+  if (type) window.open(b64Url(block.data, type), '_blank');
 }
 
-function b64Download() {
-  const block = b64Selected();
-  if (!block) return;
+function b64Download(block) {
   const a = document.createElement('a');
-  a.href = b64BlockUrl(block);
+  a.href = b64Url(block.data, block.kind.mime);
   a.download = b64FileName(block);
   document.body.appendChild(a);
   a.click();
   a.remove();
 }
 
+// Every text from the document (a declared name) goes in as textContent.
+function b64El(tag, cls, text) {
+  const el = document.createElement(tag);
+  if (cls) el.className = cls;
+  if (text != null) el.textContent = text;
+  return el;
+}
+
+function b64Card(block) {
+  const { kind } = block;
+  const card = b64El('div', 'b64-card');
+  const top = card.appendChild(b64El('div', 'b64-card-top'));
+  top.appendChild(b64El('span', 'material-symbols-outlined b64-icon', kind.icon)).setAttribute('aria-hidden', 'true');
+  const text = top.appendChild(b64El('div', 'b64-card-text'));
+  const title = text.appendChild(b64El('div', 'b64-name', block.name || kind.label));
+  title.title = b64FileName(block);
+  const meta = text.appendChild(b64El('div', 'b64-meta'));
+  meta.append(`${block.name ? kind.label + ' · ' : ''}${B64Core.formatSize(block.data.length)} · `);
+  const [p0, p1] = block.pages;
+  const where = meta.appendChild(b64El('button', 'b64-page', p0 === p1 ? `p. ${p0}` : `p. ${p0}–${p1}`));
+  where.title = `Go to page ${p0}`;
+  where.addEventListener('click', () => { if (typeof goToPage === 'function') goToPage(p0); });
+  // the name says one type, the bytes read as none: the text likely holds misreads
+  const declared = block.name?.match(/\.(\w{1,8})$/)?.[1];
+  if (declared && kind.ext === 'bin')
+    card.appendChild(b64El('div', 'b64-warn', `Doesn't decode as .${declared.toLowerCase()} — the text may hold misreads.`));
+  if (block.thumb) {
+    const img = card.appendChild(b64El('img', 'b64-thumb'));
+    img.alt = '';
+    img.src = block.thumb;
+    img.addEventListener('error', () => img.remove());
+  }
+  const actions = card.appendChild(b64El('div', 'b64-actions'));
+  const view = actions.appendChild(b64El('button', 'b64-btn primary', 'View'));
+  if (kind.view === 'none') { view.disabled = true; view.title = 'No browser preview for this type — use Download'; }
+  else view.title = kind.view === 'text' ? 'Open as plain text in a new tab' : 'Open in a new tab';
+  view.addEventListener('click', () => b64View(block));
+  const dl = actions.appendChild(b64El('button', 'b64-btn', 'Download'));
+  dl.title = `Save as ${b64FileName(block)}`;
+  dl.addEventListener('click', () => b64Download(block));
+  return card;
+}
+
+function b64Render() {
+  const cards = document.getElementById('b64-cards');
+  if (cards) cards.replaceChildren(...b64State.blocks.map(b64Card));
+  const n = b64State.blocks.length;
+  const badge = document.getElementById('b64-badge');
+  if (badge) { badge.textContent = n > 99 ? '99+' : String(n); badge.classList.toggle('hidden', !n); }
+}
+
+// ── The panel ─────────────────────────────────────────────────
+// The right side is shared with the other side panels, one at a time: a panel
+// shown says so on the bus ('sidepanel:shown', { id }) and every other one
+// hides — so this panel's tool switches to it from whichever panel was
+// showing, and that panel's tool back. Whether it is shown is kept in this
+// browser; the first time, it is hidden.
+
+const B64_PANEL_KEY = 'recto.attachments.open';
+
+function b64PanelShown() {
+  return !document.getElementById('b64-panel')?.classList.contains('hidden');
+}
+
+function b64SetPanel(open, { announce = true } = {}) {
+  const panel = document.getElementById('b64-panel');
+  if (!panel) return;
+  panel.classList.toggle('hidden', !open);
+  document.getElementById('toggle-b64-tool')?.classList.toggle('active', open);
+  try { localStorage.setItem(B64_PANEL_KEY, open ? '1' : '0'); } catch { /* this session only */ }
+  if (open && announce) PDFHooks.emit('sidepanel:shown', { id: panel.id });
+  // first show scans — unless the auto-scan is still waiting for the text
+  if (open && !b64State.scanned && !b64State.waiting && state.numPages > 0) b64Scan();
+}
+
+// Drag the panel's edge to make it wider (docked at the foot of a narrow
+// screen: taller); a double click goes back to the default size.
+function b64Resizable(panel) {
+  const grip = panel.querySelector('.b64-resize');
+  if (!grip) return;
+  grip.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const bottom = matchMedia('(max-width: 768px)').matches;
+    const start = bottom ? e.clientY : e.clientX, size0 = bottom ? panel.offsetHeight : panel.offsetWidth;
+    grip.setPointerCapture(e.pointerId);
+    panel.classList.add('is-resizing');
+    const move = ev => {
+      const size = size0 - ((bottom ? ev.clientY : ev.clientX) - start);
+      if (bottom) panel.style.setProperty('--b64-height', `${Math.round(Math.min(Math.max(size, 160), innerHeight * 0.9))}px`);
+      else panel.style.setProperty('--b64-width', `${Math.round(Math.min(Math.max(size, 260), Math.min(760, innerWidth * 0.7)))}px`);
+    };
+    const end = () => {
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', end);
+      grip.removeEventListener('pointercancel', end);
+      panel.classList.remove('is-resizing');
+    };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', end);
+    grip.addEventListener('pointercancel', end);
+  });
+  grip.addEventListener('dblclick', () => {
+    panel.style.removeProperty('--b64-width');
+    panel.style.removeProperty('--b64-height');
+  });
+}
+
 // ── Auto-scan on load ─────────────────────────────────────────
 // After a document loads, wait for its text layer to settle (the OCR
 // auto-read finishes long after document:loaded), then scan. When attachments
-// are found and the user hasn't opened any subtoolbar yet, the base64 bar
-// opens by itself so download/view are one click away. The OCR plugin's state
-// is read through a guarded global (it's optional and may be absent); without
-// it, "settled" means two polls seeing the same amount of text.
+// are found the tool's badge counts them, and the panel shows itself if no
+// other side panel is showing. The OCR plugin's state is read through a
+// guarded global (it's optional and may be absent); without it, "settled"
+// means two polls seeing the same amount of text.
 
 const B64_POLL_MS = 600;
 const B64_POLL_MAX_MS = 180000;   // give a slow whole-document OCR time
@@ -287,10 +279,11 @@ async function b64AutoScan() {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const deadline = Date.now() + B64_POLL_MAX_MS;
   let prev = -1;
+  b64State.waiting = true;
   while (Date.now() < deadline) {
     await sleep(B64_POLL_MS);
     if (!live()) return;
-    if (typeof utbState === 'undefined') return;   // no text_tool, nothing to scan
+    if (typeof utbState === 'undefined') { b64State.waiting = false; b64Scan(); return; }   // says what is missing
     const amount = b64TextAmount();
     const ocr = window.OCRTool?.state;
     const ocrSettled = ocr ? (ocr.autoDone && !ocr.running) : (amount > 0 && amount === prev);
@@ -300,37 +293,37 @@ async function b64AutoScan() {
     if (ocrSettled && embSettled) break;
     prev = amount;
   }
-  if (!live() || b64State.scanned) return;   // user beat us to it — leave their result
-  b64Scan();
-  if (!live() || !b64State.blocks.length) return;
-  // don't steal the ribbon if the user already opened some bar
-  if (document.querySelector('#unified-options-bar-container .options-bar:not(.hidden)')) return;
-  const btn = document.getElementById('toggle-b64-tool');
-  const bar = document.getElementById('b64-tool-bar');
-  if (btn && bar) window.openSubtoolbar?.(bar, btn);
+  if (!live()) return;
+  b64State.waiting = false;
+  b64Scan();                      // also over a scan the user ran on half-read text
+  if (!live() || !b64State.blocks.length || b64PanelShown()) return;
+  // never take the right side from another panel: the badge says it instead
+  const otherShown = [...document.querySelectorAll('[data-side-panel]')]
+    .some(p => p.id !== 'b64-panel' && !p.classList.contains('hidden'));
+  if (!otherShown) b64SetPanel(true);
 }
 
 // ── Wiring ────────────────────────────────────────────────────
 // Module scope, NOT 'ui:ready' — this is a scripts_after_app entry, so the
-// DOM and registerSubtoolbar/openSubtoolbar already exist (same pattern as
-// text_tool's toolbar.js; ui:ready fired before this script parsed).
+// DOM already exists (ui:ready fired before this script parsed).
 
 (function wireB64Tool() {
   const btn = document.getElementById('toggle-b64-tool');
-  const bar = document.getElementById('b64-tool-bar');
-  if (!btn || !bar) return;
-  window.registerSubtoolbar?.(btn);
-  btn.addEventListener('click', () => {
-    if (bar.classList.contains('hidden')) {
-      window.openSubtoolbar?.(bar, btn);
-      if (!b64State.scanned) b64Scan();   // first open scans automatically
-    } else {
-      window.openSubtoolbar?.(null, null);
-    }
-  });
-  document.getElementById('b64-scan')?.addEventListener('click', b64Scan);
-  document.getElementById('b64-view')?.addEventListener('click', b64View);
-  document.getElementById('b64-download')?.addEventListener('click', b64Download);
+  const panel = document.getElementById('b64-panel');
+  if (!btn || !panel) return;
+  btn.addEventListener('click', () => b64SetPanel(!b64PanelShown()));
+  document.getElementById('b64-close')?.addEventListener('click', () => b64SetPanel(false));
+  document.getElementById('b64-scan')?.addEventListener('click', () => { if (state.numPages > 0) b64Scan(); });
+  b64Resizable(panel);
+  // as the user left it
+  let kept = null;
+  try { kept = localStorage.getItem(B64_PANEL_KEY); } catch { /* the default: hidden */ }
+  if (kept === '1') b64SetPanel(true);
 })();
 
+PDFHooks.on('sidepanel:shown', ({ id } = {}) => {
+  if (id !== 'b64-panel' && b64PanelShown()) b64SetPanel(false, { announce: false });
+});
+
+PDFHooks.on('document:opening', () => { b64State.autoSeq++; b64State.waiting = false; b64Reset(); });
 PDFHooks.on('document:loaded', () => { b64Reset(); b64AutoScan(); });

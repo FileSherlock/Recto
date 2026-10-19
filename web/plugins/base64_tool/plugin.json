@@ -5,11 +5,12 @@
     "styles.css"
   ],
   "toolbar_button": "toolbar_button.html",
-  "options_bar": "options_bar.html",
+  "options_bar": null,
   "ribbon_bar": null,
-  "sidebar": null,
+  "sidebar": "panel.html",
   "scripts_before_viewer": [],
   "scripts_after_app": [
+    "b64-core.js",
     "base64-tool.js"
   ]
 }
