@@ -23,7 +23,8 @@ own paragraph attributes.
 | Artistic Text Tool | **Artistic Text Tool** `#tt-art-text-btn` | A **click** starts Artistic text with its baseline at the point, in the font and size new text takes (the Text panel's, with nothing selected) — or, on or beside a line of the page's text, in **that line's face, bold / italic and size on its baseline, with the space it was set with** (Word widens a justified line's spaces: the paragraph's desired Word Spacing, below) — of a row cut by redaction bars, the piece the click is in; a click within half an em of where that line starts **starts at its first glyph**, so the new text lines up with the page's, word for word. Where the line goes on after a tab — a list label's or a bullet's ("2.", then "Evidence…" at the list's stop) — the paragraph gets **a left tab stop at the page's x of the text after it**: type the label, a **Tab**, and the rest starts where the page's does. An empty one is half an em wide (a drag's: the drag's width), so it can be seen and pressed. A **drag** sets the size: the font's typographic ascent is the drag's height, the baseline its lower edge. Artistic text breaks only at its returns; its box is its text's extent. Its **corner handles scale** it — every size in the story by the same factor, the opposite corner fixed. |
 
 Both Affinity tools stay armed, as Affinity's do, until clicked again or another placing tool
-is chosen. **Escape** leaves the text being edited (the box stays selected), then deselects,
+is chosen. Armed, they take only presses on the page: what sits over it — the ruler's marker, a
+nudge's slider, a control a plugin puts there — is used as it is without a tool. **Escape** leaves the text being edited (the box stays selected), then deselects,
 and with nothing selected puts the tool down.
 
 A frame **reflows** when its eight handles resize it. Text that does not fit shows Affinity's
