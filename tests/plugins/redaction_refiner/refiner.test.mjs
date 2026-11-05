@@ -146,8 +146,30 @@ test('classifyToken: words, proper nouns, names, fragments', () => {
   state.namesData = [{ first: ['Sarah'], last: ['Kellen', 'Ford'] }];
   state.customCandidates = [];
   assert.equal(R.classifyToken('KELLEN', 'right').reason, 'name');
-  assert.equal(R.classifyToken('ORD', 'right').kind, 'fragment');     // "…ord" → word, record …
+  assert.equal(R.classifyToken('ORD', 'right').reason, 'acronym');                    // capitals on a mixed row: a word
+  assert.equal(R.classifyToken('ORD', 'right', { caps: true }).kind, 'fragment');    // on a row in capitals: "…ord" → word, record …
   state.namesData = [];
+});
+
+test('an abbreviation, an acronym or a name particle beside a bar is a word, not a cut word', async () => {
+  for (const t of ['Dr', 'Ms', 'Ph', 'El', 'Da']) assert.equal(R.classifyToken(t, 'left').kind, 'word', t);
+  for (const t of ['NY', 'IRS', 'CIA', 'MS', 'IV']) assert.equal(R.classifyToken(t, 'right').kind, 'word', t);
+  assert.equal(R.classifyToken('IRS', 'right').reason, 'acronym');
+  for (const t of ['der', 'da', 'van']) assert.equal(R.classifyToken(t, 'left').kind, 'word', t);
+  assert.equal(R.classifyToken('nd', 'right').kind, 'fragment');                     // lower case: still the tail of "and"
+  assert.equal(R.classifyToken('ND', 'right', { caps: true }).kind, 'fragment');     // on a row in capitals, so is ND
+
+  // "Dr ███ said", the bar 1 px past "Dr": the edge is a space past "Dr" (read
+  // as "drive" it was 20 px further in, and the name it hides no longer fit)
+  reset();
+  const left = span({ text: 'Dr', x: 100, w: widthPx('Dr', 12), baseCharPositions: charsFor('Dr'), lineId: 'L' });
+  const x0 = 100 + widthPx('Dr', 12) + 1;
+  const right = span({ text: 'said', x: x0 + 80 + SPACE, w: widthPx('said', 12), baseCharPositions: charsFor('said'), lineId: 'L' });
+  const box = redaction(x0, x0 + 80); box.lineId = 'L';
+  utbState.boxes.push(left, right, box);
+  await R.refineRedaction(box);
+  assert.equal(box.refineInfo.left.kind, 'word');
+  near(box.x, inkEnd(left) + SPACE, 0.05, 'left edge = Dr + space');
 });
 
 test('a list changed to one of the same size is read anew (namesVersion)', () => {
@@ -257,6 +279,31 @@ test('OCR layer wins once present and converges on the same edge', async () => {
   assert.equal(box.refineInfo.x, box.x);
   assert.equal(box.refineInfo.w, box.w);
   near(Math.abs(box.w - NAME_W), 0, 0.3, 'the pen equation holds to the lattice');
+});
+
+test('an edge set by a fragment is never exact, even from OCR pens', async () => {
+  reset();
+  const bar = fixture.bars[1];
+  const emb = fixture.spans.filter((s) => s.y === fixture.spans[2].y).map((s) => fromFixture(s, 'L'));
+  const embLeft = emb.find((s) => s.text.includes('including'));
+  const embRight = emb.find((s) => s.text.startsWith('nd '));
+  const box = redaction(bar.x, bar.x1, embLeft.y, embLeft.h);
+  box.lineId = 'L';
+  // the reader, like the text layer, missed the "a": its line starts at "nd"
+  const leftText = 'of JEFFREY EPSTEIN, including';
+  const leftChars = charsFor(leftText);
+  const leftW = leftChars[leftChars.length - 1].x + leftChars[leftChars.length - 1].w;
+  const ocrLeft = span({ type: 'ocr', text: leftText, x: inkEnd(embLeft) - leftW, y: embLeft.y, w: leftW, h: embLeft.h,
+    lineId: 'ocr_L', baseCharPositions: leftChars, ocr: { clean: true } });
+  const rightText = 'nd GHISLAINE MAXWELL.';
+  const ocrRight = span({ type: 'ocr', text: rightText, x: embRight.x, y: embRight.y,
+    w: widthPx(rightText, 12), h: embRight.h, lineId: 'ocr_L', baseCharPositions: charsFor(rightText), ocr: { clean: true } });
+  utbState.boxes.push(...emb, ocrLeft, ocrRight, box);
+  await R.refineRedaction(box);
+  assert.equal(box.refineInfo.source, 'ocr');
+  assert.equal(box.refineInfo.right.kind, 'fragment');
+  assert.equal(box.refineInfo.right.word, 'and');
+  assert.equal(box.refineInfo.exact, false, 'the hidden "a" is a guess: not lattice-exact');
 });
 
 // ── Adjacent bars ──────────────────────────────────────────
@@ -717,7 +764,18 @@ test('a whole word a space away is never read as a fragment (FORD → afford)', 
   utbState.boxes.push(left, right, box);
   await R.refineRedaction(box);
   assert.equal(box.refineInfo.right.kind, 'word');
-  assert.equal(box.refineInfo.right.reason, 'no-fitting-completion');
+  assert.equal(box.refineInfo.right.reason, 'acronym');               // capitals on a mixed row: a word outright
+
+  // On a row set in capitals the capital token is a fragment candidate, and
+  // the geometry still turns "afFORD" down: the gap is a space, not "AF".
+  reset();
+  const capsLeft = span({ text: 'INCLUDING', x: 100, w: widthPx('INCLUDING', 12), baseCharPositions: charsFor('INCLUDING'), lineId: 'L' });
+  const capsRight = span({ text: 'FORD', x: 254, w: widthPx('FORD', 12), baseCharPositions: charsFor('FORD'), lineId: 'L' });
+  const capsBox = redaction(capsLeft.x + capsLeft.w + 6, 250); capsBox.lineId = 'L';
+  utbState.boxes.push(capsLeft, capsRight, capsBox);
+  await R.refineRedaction(capsBox);
+  assert.equal(capsBox.refineInfo.right.kind, 'word');
+  assert.equal(capsBox.refineInfo.right.reason, 'no-fitting-completion');
   await R.loadDictionary();
 });
 

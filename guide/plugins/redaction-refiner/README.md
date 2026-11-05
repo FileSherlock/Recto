@@ -131,8 +131,13 @@ the right):
   whole word when it is in the shipped English list (`words.txt`, possessives and
   hyphen compounds included), **or** a name from the candidate pool
   (`state.namesData` / custom names, read through a guarded global, and read
-  again whenever `state.namesVersion` moves — a list changed), **or**
-  capitalised (`Wexner` — a proper noun the list cannot know).
+  again whenever `state.namesVersion` moves — a list changed), **or** a name
+  particle in lower case (`de`, `der`, `van`, `da`, …), **or** it begins with a
+  capital: a proper noun the list cannot know (`Wexner`), an abbreviation
+  (`Dr`, `Ms`) or an acronym of up to four letters (`NY`, `IRS`, `CIA`). A capital
+  never starts the visible part of a word the bar cut — except on a row set in
+  capitals, where a short capital token may be one (`ND` of `AND`). Read as a
+  fragment, `Dr ███ said` became `drive` and the bar 20 px too narrow.
 - **A word fragment** — not a word, but a dictionary word *completes* it. This is
   the `including ███ nd GHISLAINE MAXWELL` case: the redaction tool dropped the
   `a` of `and` from the text layer, leaving `nd`. Most-frequent completion first
@@ -149,6 +154,9 @@ the right):
   letters** in from the fragment. If none fits (`FORD` a full space away from
   the bar is a word, not `afFORD`), the token is treated as a whole word. If the
   fragment reading would collapse the bar, it falls back to the word reading.
+  The completion is the most frequent word that fits — a guess (`…nd time`
+  reads as `and` where the page said `second`) — so an edge a fragment set is
+  never `exact`.
 
 Spaces are sized from the **neighbour word's own font and size** with
 `text_tool`'s HarfBuzz shaper (`getNaturalSpaceWidth`, which measures through
@@ -242,7 +250,7 @@ itself needs neither the network sources nor Python. The licence notice is
   bar bounded (`blocked`), which sides the ink held against a distant
   neighbour (`kind: 'ink'`) or run to the margin (`margin`), the `x`/`w` it
   produced, and `exact` — true when both edges came from the reader's OCR
-  pens read whole (never an ink edge), so the width is exact
+  pens read whole (never an ink edge, never a fragment's guessed letters), so the width is exact
   to mupdf's ¼-px lattice. A matcher reads `exact` to match names to a quarter
   pixel instead of a pixel tolerance, a missing side to allow for the
   redactor's padding, and `blocked` to pair bars (`redaction_matching` does).

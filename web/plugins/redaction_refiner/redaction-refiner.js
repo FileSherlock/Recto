@@ -338,17 +338,40 @@
     return _namePool.has(token.toLowerCase().replace(/[’']s$/, ''));
   }
 
+  // Name particles, written in lower case inside names (Jean de …, van der …):
+  // whole words, though no English list has them.
+  const PARTICLES = new Set(['al', 'bin', 'da', 'das', 'de', 'del', 'della', 'den', 'der', 'di', 'do',
+    'dos', 'du', 'el', 'ibn', 'la', 'le', 'ten', 'ter', 'van', 'von']);
+  const ACRONYM_MAX = 4;
+
+  // Is a row set in capitals? Nearly all of its cased letters are upper case.
+  function capsRow(spans) {
+    let upper = 0, lower = 0;
+    for (const s of spans || []) for (const ch of s.text || '') {
+      if (ch !== ch.toLowerCase()) upper++;
+      else if (ch !== ch.toUpperCase()) lower++;
+    }
+    return upper + lower >= 6 && upper >= 0.85 * (upper + lower);
+  }
+
   // What the token facing the bar says about the gap between them.
   //   { kind: 'word' }                  a whole word — a real space separates it
   //   { kind: 'fragment', words: [...] } the visible part of a word whose other
   //                                      letters are missing next to the bar
   // (Punctuation is decided by the caller on the facing character.)
-  function classifyToken(token, side) {
+  // A capital starts a word — an abbreviation (Dr, Ms), an acronym (NY, IRS,
+  // CIA), a name — so a token that begins with one is no visible part of a
+  // word the bar cut; only on a row set in capitals (`caps`) are fragments
+  // capitals too, and then a short capital token may be one ("…ND" of AND).
+  // Read otherwise, "Dr ███ said" became "drive", the bar 20 px too narrow.
+  function classifyToken(token, side, { caps = false } = {}) {
     if (!token) return { kind: 'word', reason: 'no-token' };
     if (isWord(token)) return { kind: 'word', reason: 'dictionary' };
     if (inNamePool(token)) return { kind: 'word', reason: 'name' };
     const cs = caseOf(token);
-    if (cs === 'title' && token.length >= 3) return { kind: 'word', reason: 'proper-noun' };
+    if (cs === 'lower' && PARTICLES.has(token)) return { kind: 'word', reason: 'particle' };
+    if (cs === 'title') return { kind: 'word', reason: token.length >= 3 ? 'proper-noun' : 'abbreviation' };
+    if (cs === 'upper' && token.length <= ACRONYM_MAX && !caps) return { kind: 'word', reason: 'acronym' };
     if (cs === 'mixed') return { kind: 'word', reason: 'mixed-case' };
     const words = completions(token, side);
     if (!words.length) return { kind: 'word', reason: 'no-completion' };
@@ -658,7 +681,7 @@
     const natural = await naturalSpaceWidth(word.span);
     const space = rowSpaceWidth(spans, natural);
     const wordEdge = side === 'left' ? inkEdge + space : inkEdge - space;
-    const cls = classifyToken(token, side);
+    const cls = classifyToken(token, side, { caps: capsRow(spans) });
     const base = { wordEdge, token, inkEdge, space, reason: cls.reason, partial };
 
     if (cls.kind !== 'fragment') return { ...base, edge: wordEdge, kind: 'word' };
@@ -800,9 +823,11 @@
       x: box.x, w: box.w,
       // An edge bounded by a sibling bar is the detector's, not a reader pen,
       // so a pair-adjacent bar is never lattice-exact; nor is an edge read
-      // from a neighbour the bar partly covers, nor one that is the ink's.
+      // from a neighbour the bar partly covers, nor one that is the ink's, nor
+      // one set by a fragment — its hidden letters are the most frequent
+      // completion, a guess ("…nd time" is "and" though the page said "second").
       exact: nb.source === 'ocr' && !!left && !!right && !left.partial && !right.partial &&
-        left.kind !== 'ink' && right.kind !== 'ink',
+        left.kind !== 'ink' && right.kind !== 'ink' && left.kind !== 'fragment' && right.kind !== 'fragment',
     };
     box._refine = { sig, source: nb.source, x: box.x, w: box.w };
     if (changed && typeof renderBox === 'function') renderBox(box);
