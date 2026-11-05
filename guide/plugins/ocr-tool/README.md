@@ -57,8 +57,12 @@ the fallback for older caches).
 A finished whole-document read is kept, slimmed down to exactly the fields
 `ocrAddBoxes` consumes (`ocr-result.js`), under the document's SHA-256
 (`state.docHash`). A later open of the same bytes replays the boxes through
-the normal `ocrAddBoxes` path — no engine, no ~10 MB glyph download — and the
-status line ends in `precomputed`. Two tiers hold the same JSON
+the normal `ocrAddBoxes` path — no engine reads a page — and the status line
+ends in `precomputed`. The glyph bundle (~13 MB) still loads on the main thread
+once a matcher measures a bar in the page's face or tests a name against its
+pixels (`hypothesis-view.js` → `pvEnsureSets`), or the pixel view is turned on:
+on the startup document, which has bars, that is every visit (the engine's
+fetch asks for no caching; the fix belongs in `tol0`). Two tiers hold the same JSON
 (`{ version, readWith, pages }`) under the same check:
 
 1. **Shipped reads** — `web/plugins/ocr_tool/cache/<sha256>.json`, committed
