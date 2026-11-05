@@ -7,7 +7,7 @@
 // paragraph, Shift+Enter = line break, deleting, pasting plain text, Tab),
 // the story is drawn again and the caret put back. The model is the one truth;
 // the DOM is only ever its picture. An input method's composition is left to
-// the browser and taken over when it ends.
+// the browser and taken over when it ends — or when the session does, first.
 //
 // While a story is edited, utbState.editingId names its box (every key guard
 // of text_tool already honours it) and the character and paragraph settings —
@@ -20,7 +20,7 @@
 // step on the box undo stack (utbUndo).
 (function () {
   const SC = globalThis.StoryCore;
-  let session = null;   // { box, flow, sel, pending, undo, redo, step, composing, compRange, lastKind, lastAt }
+  let session = null;   // { box, flow, sel, pending, undo, redo, step, composing, compRange, compText, lastKind, lastAt }
 
   const flowOf = box => document.querySelector(`.utb-group[data-id="${box.id}"] .tt-flow`);
   const groupOf = box => document.querySelector(`.utb-group[data-id="${box.id}"]`);
@@ -321,7 +321,9 @@
     if (!session) return;
     session.composing = true;
     session.compRange = SC.ordered(readSelection() || session.sel);
+    session.compText = '';
   }
+  function onCompositionUpdate(e) { if (session) session.compText = e.data || ''; }
   function onCompositionEnd(e) {
     if (!session) return;
     session.composing = false;
@@ -343,7 +345,7 @@
     if (typeof commitInlineEdit === 'function') commitInlineEdit();
 
     session = { box, flow: null, sel: null, pending: null, undo: [], redo: [], step: window.utbUndo?.capture([box]),
-      composing: false, compRange: null, lastKind: null, lastAt: 0 };
+      composing: false, compRange: null, compText: '', lastKind: null, lastAt: 0 };
     utbState.editingId = box.id;
     utbState.selectedId = box.id;
     window.selectBoxInSVG?.(box.id);
@@ -374,6 +376,15 @@
   function commitStoryEdit({ record = true } = {}) {
     const s = session;
     if (!s) return;
+    const alive = utbState.getBox(s.box.id) === s.box;
+    // An input method's composition still open: the browser commits it as
+    // the text stops being editable — while the session still listens, so
+    // the composed text is the story's (onCompositionEnd). One it leaves open
+    // is taken as it shows.
+    if (alive) {
+      s.flow?.removeAttribute('contenteditable');
+      if (session === s && s.composing) onCompositionEnd({ data: s.compText });
+    }
     session = null;
     setHighlight(null);
     if (s.flow) {
@@ -382,7 +393,7 @@
     }
     groupOf(s.box)?.classList.remove('editing');
     if (utbState.editingId === s.box.id) utbState.editingId = null;
-    if (utbState.getBox(s.box.id) === s.box) {
+    if (alive) {
       window.storySync?.(s.box);
       window.renderBox?.(s.box);
       if (record) window.utbUndo?.commit(s.step, 'edit text');
@@ -398,6 +409,7 @@
     ['cut', e => onCopy(e, true)],
     ['paste', onPaste],
     ['compositionstart', onCompositionStart],
+    ['compositionupdate', onCompositionUpdate],
     ['compositionend', onCompositionEnd],
     ['focus', onFocus],
     ['blur', onBlur],

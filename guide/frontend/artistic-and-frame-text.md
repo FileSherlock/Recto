@@ -74,7 +74,9 @@ Recto's orange for text the user added.)
 
 Double-click a story box, or press on it with either text tool. The browser places the caret,
 extends the selection (Shift, double-click a word, triple-click), moves with the arrow keys and
-runs input methods; every change goes through the story model.
+runs input methods; every change goes through the story model. A composition still open when the
+text is left — a press elsewhere, Undo — is committed into the story first, as the input method
+shows it.
 
 | Keys | |
 |---|---|
