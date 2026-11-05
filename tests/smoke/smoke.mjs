@@ -6,7 +6,8 @@
 // document of tests/golden/documents.json, uploads it through the real file
 // input and then: waits for the page and its text, selects a text box, clicks
 // every toolbar toggle and every formatting switch, turns a page — and fails on
-// ANY console error, page error or failed request. An installed plugin may add
+// ANY console error, page error or failed request, and on any request that goes
+// anywhere but the site itself and Google Fonts. An installed plugin may add
 // its own steps: tests/plugins/<name>/smoke.mjs exporting any of
 //   switches           ids to click on and off along with the core's
 //   settle(page, doc)  wait until the plugin is done with a freshly opened document
@@ -87,6 +88,14 @@ async function main() {
     page.on('console', m => { if (m.type() === 'error') problems.push(`console: ${m.text()}`); });
     page.on('requestfailed', r => { if (!r.url().startsWith('blob:')) problems.push(`request failed: ${r.url()}`); });
     page.on('response', r => { if (r.status() >= 400) problems.push(`${r.status()}: ${r.url()}`); });
+    // The document never leaves the browser: no request goes anywhere but the
+    // site itself — and Google Fonts for the page's icon and UI fonts.
+    const LOCAL = new URL(base).origin, FONTS = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//;
+    page.on('request', r => {
+      const url = r.url();
+      if (/^(blob|data):/.test(url) || url.startsWith(LOCAL + '/') || FONTS.test(url)) return;
+      problems.push(`request to elsewhere: ${url.slice(0, 120)}`);
+    });
 
     await page.goto(base, { waitUntil: 'load' });
     await page.waitForFunction(() => typeof Doc !== 'undefined' && Doc.info && Doc.info.pdfFonts && state.numPages > 0);

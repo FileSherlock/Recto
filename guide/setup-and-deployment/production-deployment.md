@@ -174,12 +174,15 @@ new scripts for that one load, and a reload fixes it. There is nothing to restar
 
 ### The scripted version (rsync over SSH)
 
-`tools/deploy.sh` does exactly that for a host reachable as the SSH alias `unbarpdf`: build, rsync
-everything but `index.html` with `--delete`, then `index.html`. It runs on the development machine,
-not on the server (the server needs no node and no checkout).
+`tools/deploy.sh` does exactly that for a host reachable as the SSH alias `unbarpdf`: run the test
+suites, build, rsync everything but `index.html` with `--delete`, then `index.html` — files compared
+by content (`-c`), so unchanged files stay as they are on the server — and finally check that the
+site serves the very `index.html` just built. It publishes what is committed: a working tree with
+changes under `web/` or `tools/` is refused (`DEPLOY_DIRTY=1` overrides). It runs on the development
+machine, not on the server (the server needs no node and no checkout).
 
 `.github/workflows/deploy.yml` runs the same steps on every push to `main` (and on demand from the
-Actions tab). It needs one repository secret, `DEPLOY_SSH_KEY` — the private half of a key made
+Actions tab); a failing test stops it before anything is uploaded. It needs one repository secret, `DEPLOY_SSH_KEY` — the private half of a key made
 only for this, whose public half is in the server's `authorized_keys` — and it pins the server's
 host key, so that line changes if the server is reinstalled. For another host, change the address,
 the host key and the target path in both files.
