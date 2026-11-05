@@ -45,7 +45,7 @@ feature. Full docs live in `guide/` (start with `guide/architecture/architecture
 - **`PDFHooks` — the event bus** (`web/core/hooks.js`, loaded before everything else): the core emits lifecycle events
   (`ui:ready`, `document:opening`, `viewer:clear`, `page:rendered`, `pages:refresh`, `document:loaded`,
   `zoom:changed`); plugins subscribe with `PDFHooks.on(...)`. The core never calls a plugin function by name —
-  one exception, guarded: `pdf-viewer.js` resets and redraws text_tool's boxes when a document is shown or closed (`utbState.reset`, `clearAllSVGLayers`, `renderAllTextLayers`). Handlers
+  two exceptions, both guarded: `pdf-viewer.js` resets and redraws text_tool's boxes when a document is shown or closed (`utbState.reset`, `clearAllSVGLayers`, `renderAllTextLayers`), and the Add Box tool in `app.js` places its box through text_tool's `handleManualAddBox`. Handlers
   may be async and a throwing handler can't break the core. Per-document plugin state is reset on
   `document:opening`: the new document's first page renders before its `document:loaded` arrives.
 - **`Doc` — the document service** (`web/core/doc-service.js`), the only file that talks to `pdf-worker.js`, the module
