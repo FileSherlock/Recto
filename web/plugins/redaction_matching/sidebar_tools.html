@@ -40,6 +40,13 @@
                   <input type="text" id="ns-ends-with" class="rm-input" maxlength="24" autocomplete="off" spellcheck="false" placeholder="llen"></label>
               </div>
               <p class="rm-hint">One or more letters of the name as the bar writes it. Letters a refiner sees sticking out of the bar fill these in (seen).</p>
+              <div class="rm-genders" role="group" aria-label="Gender">
+                <span class="rm-genders-l">Gender</span>
+                <label class="rm-check"><input type="checkbox" id="ns-gender-f" data-act="gender" data-g="f" checked> Women</label>
+                <label class="rm-check"><input type="checkbox" id="ns-gender-m" data-act="gender" data-g="m" checked> Men</label>
+                <label class="rm-check"><input type="checkbox" id="ns-gender-x" data-act="gender" data-g="x" checked> Not recorded</label>
+              </div>
+              <p class="rm-hint">The lists record a gender for few people (Names says how many), so leave Not recorded on unless yours record more.</p>
             </div>
           </details>
 
@@ -48,4 +55,8 @@
             <div id="rm-names" class="rm-sec-body"></div>
           </details>
         </div>
+
+        <!-- The card of the ℹ behind a fitting name: who it is. Outside the
+             scrolling body, so nothing clips it; api.js fills and places it. -->
+        <div id="rm-info-card" class="rm-info-card hidden" role="dialog" aria-label="About this name" tabindex="-1"></div>
       </aside>
