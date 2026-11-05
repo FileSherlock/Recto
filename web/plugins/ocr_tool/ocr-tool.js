@@ -453,12 +453,18 @@ async function ocrApplyCached(cached) {
   const lastPass = cached.pages[cached.pages.length - 1]?.pass || {};
   const cert = lastPass.tol ? `clean@±${lastPass.tol}` : 'byte-clean';
   const shownFonts = [...new Set([...fonts].map(f => f.includes('+') ? 'mixed fonts' : f))];
+  // pages the read passed over (no paper and ink) — stored as pages with nothing on them
+  const passed = cached.pages.filter(pg => pg.skipped).map(pg => pg.page);
+  const notRead = !passed.length ? ''
+    : passed.length === 1 ? ` · page ${passed[0]} not read: it looks like a photograph — Read this page reads it anyway`
+    : ` · ${passed.length} pages not read: they look like photographs`;
+  if (passed.length === cached.pages.length) { setOcrStatus(`OCR:${notRead.slice(2)} · precomputed`); return true; }
   setOcrStatus(`${totals.lines} lines, ${totals.clean} ${cert}` +
     (totals.unread ? `, ${totals.unread} unread (□)` : '') +
     (totals.boxes ? ` · ${totals.boxes} redaction boxes` : '') +
     ` · ${shownFonts.join(' ') || '—'}` +
     (lastPass.quant ? ' · palette producer' : '') +
-    ' · precomputed');
+    notRead + ' · precomputed');
 }
 
 // ── Which boxes are redactions ────────────────────────────────
