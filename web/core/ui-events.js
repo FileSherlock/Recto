@@ -64,8 +64,9 @@ function renderThumbnails() {
     img.className = 'thumbnail';
     img.draggable = false;
     img.style.width = '180px';
-    img.style.height = `${thumbH}px`;
+    img.style.height = `${thumbH}px`;              // page 1's shape until this page's own arrives
     img.style.display = 'block';
+    img.addEventListener('load', () => { img.style.height = 'auto'; }, { once: true });
 
     const lbl = document.createElement('div');
     lbl.className = 'thumbnail-page-num';

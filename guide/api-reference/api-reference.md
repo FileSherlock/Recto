@@ -61,6 +61,7 @@ Resolves to the document's description — **metadata only**; no page raster is 
   "numPages": 3,
   "pageWidth": 816,
   "pageHeight": 1056,
+  "pxPerPt": 1.3333333333333333,
   "pdfFonts": ["TimesNewRomanPSMT", "TimesNewRomanPS-BoldMT"],
   "suggestedScale": 133,
   "suggestedSize": 12.0,
@@ -72,7 +73,8 @@ Resolves to the document's description — **metadata only**; no page raster is 
 |-------|------|-------------|
 | `sha256` | string | SHA-256 of the file's bytes — the document's identity (`state.docHash`), which plugins key per-document caches off. Computed in a throw-away worker of its own, so neither the page nor the MuPDF worker waits for it |
 | `numPages` | int | Page count (`1` for an image) |
-| `pageWidth` / `pageHeight` | int | The pixel space of the page: 816 × 1056 for a PDF, the image's own size for an image document |
+| `pageWidth` / `pageHeight` | int | Page 1's pixel space (every page has its own: `Doc.pageSize`) — 816 × 1056 for a US-Letter scan, 794 × 1123 for an A4 page; the image's own size for an image document |
+| `pxPerPt` | number | Pixels per PDF point in the pixel space: 96/72 on every page of a PDF; an image document is taken as 8.5 in wide (its width / 612) |
 | `pdfFonts` | array | BaseFont names the PDF declares, the one on the most pages first (equal counts keep first-seen order). `[]` for images |
 | `suggestedScale` | int | px-per-pt as a percentage, measured from the first placed raster of the document (its pixel width over its placed width in points); `133` when no page has one. See [Scale & Size Detection](../architecture/scale-and-size-detection.md) |
 | `suggestedSize` | float | The body-text size in points: the mode of the span sizes (to the nearest 0.5 pt) over the first 25 pages, long spans (≥ 20 characters) first. `12.0` when the document has no text |
@@ -81,7 +83,7 @@ Resolves to the document's description — **metadata only**; no page raster is 
 **`early`.** Opening a PDF has two passes. The first — parse, page count, page size,
 scale — takes milliseconds; the second reads the declared fonts of every page and samples
 the body size, which on a long document takes noticeably longer. `early(info)` fires
-between the two with `{ sha256, numPages, pageWidth, pageHeight, suggestedScale,
+between the two with `{ sha256, numPages, pageWidth, pageHeight, pxPerPt, suggestedScale,
 pageImageType }`: identity and geometry are final, `pdfFonts` and `suggestedSize` are
 still to come. From that moment `Doc.pageImageURL()` works, and a page request goes
 ahead of the typography pass in the worker's queue — which is how the viewer puts page 1
@@ -91,20 +93,38 @@ does not fail the open.
 **Superseded opens.** A second `Doc.open()` started before the first has finished makes
 the first reject with `another document was opened meanwhile`; its answers are dropped.
 
+**Refused documents.** A PDF that needs a password (MuPDF has tried the empty one) rejects
+with `the PDF is password-protected`, and one without pages with `the document has no
+pages` — rather than opening as blank pages. A page that cannot be read does not refuse
+the document: the others open, and that page's requests reject.
+
 After the promise resolves, `Doc.info` holds the same object and `Doc.timings` says where
 the time went, in milliseconds (`readMs`, `initMs`, `parseMs`, `geometryMs`, `readyMs`,
 `typographyMs`, `totalMs`; an image document reports `totalMs` only).
+
+### `Doc.pageSize(n)` → `Promise<{ width, height }>`
+
+Page `n`'s **pixel space** (1-based): what its raster shows, at 96 DPI — the scan's
+placement on a scanned page, the page itself on a rendered one (rounded as MuPDF rounds a
+render, so a rendered page's raster is exactly this size). 816 × 1056 for a US-Letter scan,
+794 × 1123 for an A4 page, 1056 × 816 for a landscape one; the pages of one document may
+differ. Every coordinate on that page — boxes, the SVG `viewBox`, overlays — is in it, and
+the viewer sets `state.pageWidth` / `state.pageHeight` to it for the page it shows. Asked
+once per page and kept; an image document's one page is the image. Rejects like
+`pageImageURL`.
 
 ### `Doc.pageImageURL(n, { thumb })` → `Promise<string>`
 
 A `blob:` URL of page `n`'s raster (1-based), a lossless PNG encoded by MuPDF.
 
-For a PDF page the raster is the page's **embedded scan** — the first image on the page
-that is not a JPEG or JPEG 2000 stream — with its own samples, never resampled. A scan
-taller than the 8.5 × 11 ratio loses its excess bottom rows, so the raster has the ratio
-the pixel coordinate space assumes. A page with no such image is **rendered at 96 DPI**
-instead, which lands in the same pixel space. These are the exact pixels every coordinate
-consumer shares.
+For a PDF page the raster is the page's **own scan** when it has one: the single image
+painted over (nearly) all of the page, axis-aligned, not a JPEG or JPEG 2000 stream — with
+its own samples, never resampled or cropped. A scan placed turned or mirrored (a page
+`/Rotate`, a rotating placement) is set upright by moving whole samples; transparency
+(an image mask, a colour key) is composited over white paper. Any other page — born-digital,
+a logo or a stamp on it, an image only another page paints, a layered or skewed scan — is
+**rendered at 96 DPI**. Either way the raster fills the page's pixel space
+(`Doc.pageSize`). These are the exact pixels every coordinate consumer shares.
 
 `{ thumb: true }` gives the 180 px wide variant for the thumbnail strip (an area average
 of the same raster).
@@ -125,8 +145,8 @@ The same raster as samples, for a plugin that analyses pixels:
 
 ```js
 { width, height,            // pixels
-  components,               // samples per pixel: 1 gray, 3 RGB, one more when alpha is true
-  alpha,                    // boolean
+  components,               // samples per pixel: 1 gray, 3 RGB
+  alpha,                    // false — the core composites any transparency over white
   samples,                  // Uint8Array, width × height × components, rows top to bottom
   source,                   // 'embedded' — the page's scan | 'render' — a 96-DPI render of a born-digital page
   rect }                    // [x0, y0, x1, y1] in PDF points: where the scan is placed on the page; null for a render
@@ -139,7 +159,7 @@ transferred on to the caller's own worker.
 `source` matters to analysis: a plugin looking for marks in a scan has nothing to find on
 a rendered page. `null` for an image document — decode `Doc.pageImageURL(1)` instead.
 
-### `Doc.structuredText(n, { options, imageRect })` → `Promise<object>`
+### `Doc.structuredText(n, { options, imageRect, pageSize })` → `Promise<object>`
 
 The **raw** MuPDF structured text of one page, in PyMuPDF's "rawdict" shape:
 
@@ -153,7 +173,7 @@ The **raw** MuPDF structured text of one page, in PyMuPDF's "rawdict" shape:
                   chars: [{ c, origin, bbox, synthetic }] }] }] },
     { number, type: 1, bbox }                     // an image block: its bbox only
   ],
-  imageRect }                                     // only when asked for
+  imageRect, pageSize }                           // only when asked for
 ```
 
 All coordinates are PDF points. A span is a run of characters of one style; `font` is the
@@ -168,15 +188,16 @@ part of it.
 |--------|---------|-------------|
 | `options` | `'preserve-whitespace'` | A MuPDF structured-text option string |
 | `imageRect` | `false` | `true` adds `.imageRect` — the value of `Doc.pageImageRect(n)` — in the same trip to the worker, which is what a text plugin needs to map points to image pixels |
+| `pageSize` | `false` | `true` adds `.pageSize` — the value of `Doc.pageSize(n)` — in the same trip: the pixel space those points map into |
 
 An image document answers with an empty page: `{ rect: [0, 0, w, h], width, height, blocks: [] }`.
 
 ### `Doc.pageImageRect(n)` → `Promise<rect | null>`
 
-Where the page image sits on the page: the placement `[x0, y0, x1, y1]`, in PDF points, of
-the page's **largest** image by placed area. `null` when the page has no image (it is
-shown as a render of the full page, so the page rectangle is the placement) and for an
-image document.
+Where the page's scan sits on the page: its placement `[x0, y0, x1, y1]`, in PDF points —
+the same choice as the raster's, so text mapped through it lands on the pixels the page
+shows. `null` when the page has no scan (it is shown as a render of the full page, so the
+page rectangle is the placement) and for an image document.
 
 ### `Doc.bytes()`, `Doc.heapMB()`, `Doc.close()`
 
@@ -571,13 +592,13 @@ functions — no DOM, no document service — that turn `Doc.structuredText()` i
 the viewer draws.
 
 ```js
-const raw = await Doc.structuredText(n, { imageRect: true });
-const spans = EtvExtract.extractSpans(raw, n, raw.imageRect || raw.rect);
+const raw = await Doc.structuredText(n, { imageRect: true, pageSize: true });
+const spans = EtvExtract.extractSpans(raw, n, raw.imageRect || raw.rect, raw.pageSize);
 ```
 
 | Member | Description |
 |--------|-------------|
-| `extractSpans(raw, pageNum, imgRect)` | All text spans of one page, in image pixels. `imgRect` is the placement of the page image in PDF points, or the page rectangle when the page has no embedded raster |
+| `extractSpans(raw, pageNum, imgRect, size)` | All text spans of one page, in the page's pixel space. `imgRect` is the placement of the page's scan in PDF points, or the page rectangle when the page has no scan; `size` is the page's pixel space (`Doc.pageSize`), a US-Letter page's 816 × 1056 when omitted |
 | `leanSpan(span)` | The span reduced to `LEAN_FIELDS` — about a tenth of the full span |
 | `LEAN_FIELDS` | `['page', 'text', 'x', 'y', 'w', 'h', 'sizePt', 'font']` |
 | `spanSizePt(rawSpan)` | A raw span's font size in points: bbox height over (ascender − descender), which a text layer's per-word horizontal scaling does not inflate; the raw `size` as fallback |

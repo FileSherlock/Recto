@@ -1,12 +1,17 @@
 // pdf-document.js — a PDF, described and rasterized with MuPDF (WebAssembly).
 //
 // What the core knows about a PDF (held to the recorded reference outputs in
-// tests/golden/): page count, declared
-// fonts, the suggested scale and body size, and any single page's raster —
-// the embedded scan cropped to the 8.5x11 ratio, or a 96-dpi render when the
-// page has none. Plus the two primitives the text plugins build on: the RAW
-// structured text of a page and the placement of its page image. It runs NO
-// analysis; turning structured text into spans is a plugin's job.
+// tests/golden/): page count, declared fonts, the suggested scale and body
+// size, each page's pixel space, and any single page's raster — the page's
+// own scan, turned upright, or a 96-dpi render when the page has none. Plus
+// the two primitives the text plugins build on: the RAW structured text of a
+// page and the placement of its scan. It runs NO analysis; turning structured
+// text into spans is a plugin's job.
+//
+// A page's pixel space is the rectangle its raster shows — the scan's
+// placement, or the whole page when it is rendered — at 96 DPI: 816 × 1056
+// for a US-Letter scan, 794 × 1123 for an A4 page, 1056 × 816 for a landscape
+// one. Points convert to it by 96/72 on every page (geometry.js).
 //
 // An ES module with no DOM in it: pdf-worker.js imports it in the browser,
 // the node:test suites import it directly (tests/documents.test.mjs checks it
@@ -25,7 +30,9 @@
 // collector they hold hundreds of MB of wasm heap.
 //
 // Pixel exactness: a page raster is the embedded image's own samples (never
-// resampled), cropped with exact integer arithmetic (the reference rasters depend on it).
+// resampled, never cropped), turned upright by moving whole samples, its
+// transparency composited over white paper — exact integer arithmetic
+// throughout (the reference rasters depend on it).
 // Coordinates follow geometry.js: image px at 96 DPI, font sizes in points.
 
 export const GEO = {
@@ -34,12 +41,28 @@ export const GEO = {
   PT_TO_PX: 96 / 72,
   PAGE_WIDTH_PX: 816,
   PAGE_HEIGHT_PX: 1056,
-  PAGE_ASPECT: 1056 / 816,
   DEFAULT_SCALE: 133,          // round(100 * PT_TO_PX)
 };
 
 const SPAN_SAMPLE_PAGES = 25;  // body-size sample: the leading pages are plenty
+const SCALE_SAMPLE_PAGES = 3;  // suggestedScale: a scan among the first pages, or none
 export const THUMB_WIDTH = 180;
+
+// An image that covers at least this share of the page's width and of its
+// height is the page's scan (when it is the only one; see scanOf).
+const SCAN_COVERS = 0.9;
+
+// A rectangle in PDF points → its size in px at 96 DPI, rounded the way MuPDF
+// rounds a render of it (fz_round_rect over the float32 scale), so a rendered
+// page's raster is exactly its pixel space. { width, height }
+const F32_PT_TO_PX = Math.fround(GEO.PT_TO_PX);
+export function pxSize(rect) {
+  const px = v => Math.fround(Math.fround(v) * F32_PT_TO_PX);
+  return {
+    width: Math.ceil(px(rect[2]) - 0.001) - Math.floor(px(rect[0]) + 0.001),
+    height: Math.ceil(px(rect[3]) - 0.001) - Math.floor(px(rect[1]) + 0.001),
+  };
+}
 
 // MuPDF structured-text options, by PyMuPDF flag set.
 export const STEXT = {
@@ -52,8 +75,8 @@ export const STEXT = {
   SAMPLE: 'preserve-ligatures,preserve-whitespace,clip,use-cid-for-unknown-unicode',
 };
 
-// Python's round(): half to even. Coordinates depend on the crop height and
-// the scale being exactly these integers (the recorded outputs hold to them).
+// Python's round(): half to even. Coordinates depend on the scale being
+// exactly these integers (the recorded outputs hold to them).
 export function pyRound(x) {
   const f = Math.floor(x), d = x - f;
   if (d < 0.5) return f;
@@ -84,6 +107,9 @@ const STEXT_SYNTHETIC = 4;     // fz_stext_char.flags: FZ_STEXT_SYNTHETIC
 export function openPdf(mupdf, Module, bytes) {
   const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   const doc = mupdf.Document.openDocument(data, 'application/pdf');
+  // MuPDF has tried the empty password already; past that, the pages would
+  // come out as noise drawn from undecrypted streams — refuse instead.
+  if (doc.needsPassword()) { doc.destroy(); throw new Error('the PDF is password-protected'); }
   // A DataView over the wasm heap; re-made only when the heap has grown.
   let heapView = null;
   const view = () => (heapView && heapView.buffer === Module.HEAPU8.buffer) ? heapView : (heapView = new DataView(Module.HEAPU8.buffer));
@@ -236,25 +262,78 @@ export function openPdf(mupdf, Module, bytes) {
 
   // ── image placement (Page.get_image_rects → the stext image block) ───────
 
-  // Where each image is painted on the page: [{ pointer, width, height, bbox }].
+  // Where each image is painted on the page, in painting order and in page
+  // space (rotation applied, y down): [{ pointer, width, height, bbox, matrix }].
+  // `matrix` maps the image's unit square — its first sample row at the top —
+  // onto the page.
   function imagePlacements(page) {
     const out = [];
     const st = page.toStructuredText('preserve-images');
     try {
-      st.walk({ onImageBlock(bbox, _matrix, image) {
-        out.push({ pointer: image.pointer, width: image.getWidth(), height: image.getHeight(), bbox });
+      st.walk({ onImageBlock(bbox, matrix, image) {
+        out.push({ pointer: image.pointer, width: image.getWidth(), height: image.getHeight(), bbox, matrix });
         image.destroy?.();
       } });
     } finally { st.destroy(); }
     return out;
   }
 
-  // The first placement of one image (PyMuPDF matches by digest; the store
-  // hands back the same fz_image while we hold it, size is the fallback).
-  function placementOf(placements, image) {
-    const hit = placements.find(p => p.pointer === image.pointer)
-      || placements.find(p => p.width === image.getWidth() && p.height === image.getHeight());
-    return hit ? hit.bbox : null;
+  // ── the page's scan ───────────────────────────────────────────────────────
+
+  const covers = (bbox, bounds) => {
+    const r = intersect(bbox, bounds);
+    return r[2] - r[0] >= SCAN_COVERS * (bounds[2] - bounds[0]) && r[3] - r[1] >= SCAN_COVERS * (bounds[3] - bounds[1]);
+  };
+
+  // How a placement sets the image on the page: rows and columns swapped (a
+  // quarter turn) and either axis reversed — or null when it is skewed. The
+  // matrix [a b c d e f] runs the image's columns along (a, b) and its rows
+  // along (c, d).
+  function orientation([a, b, c, d]) {
+    const tiny = 1e-3 * Math.max(Math.abs(a), Math.abs(b), Math.abs(c), Math.abs(d));
+    if (Math.abs(b) <= tiny && Math.abs(c) <= tiny) return { swap: false, flipX: a < 0, flipY: d < 0 };
+    if (Math.abs(a) <= tiny && Math.abs(d) <= tiny) return { swap: true, flipX: c < 0, flipY: b < 0 };
+    return null;
+  }
+
+  // A page shows its own scan when it has one: the single image painted over
+  // (nearly) all of it, axis-aligned, its samples stored losslessly. Anything
+  // else — a logo or a stamp, an image only another page paints, two layers of
+  // one scan, a JPEG/JPX scan, a skewed placement — is not the page, and the
+  // page is rendered at 96 DPI instead.
+  // → { rect, entry, turn, width, height } | null: `rect` the placement in
+  // page space (PDF points), `entry` its index in pageImages(page), `turn` its
+  // orientation(), width × height the upright raster's size.
+  function scanOf(page) {
+    const entries = pageImages(page);
+    if (!entries.length) return null;
+    // held while the page runs, so the stext blocks hand back these very images
+    const images = entries.map(e => { try { return doc.loadImage(e.ref); } catch { return null; } });
+    try {
+      const bounds = page.getBounds();
+      const over = imagePlacements(page).filter(p => covers(p.bbox, bounds));
+      if (over.length !== 1) return null;
+      const placed = over[0], turn = orientation(placed.matrix);
+      if (!turn) return null;
+      let i = images.findIndex(im => im && im.pointer === placed.pointer);
+      if (i < 0) i = images.findIndex(im => im && im.getWidth() === placed.width && im.getHeight() === placed.height);
+      if (i < 0 || !isUsableRaster(entries[i])) return null;
+      return { rect: placed.bbox, entry: i, turn,
+               width: turn.swap ? placed.height : placed.width, height: turn.swap ? placed.width : placed.height };
+    } finally {
+      for (const im of images) im?.destroy();
+    }
+  }
+
+  // The choice is kept per page (a few numbers); the pixels are not.
+  const scans = new Map();
+  function scanAt(n, page) {
+    if (!scans.has(n)) {
+      let scan = null;
+      try { scan = scanOf(page); } catch (e) { console.warn(`page ${n}, images: ${e?.message || e}`); }
+      scans.set(n, scan);
+    }
+    return scans.get(n);
   }
 
   // ── rasters ──────────────────────────────────────────────────────────────
@@ -281,34 +360,55 @@ export function openPdf(mupdf, Module, bytes) {
     return pix;
   }
 
-  // crop_to_page_ratio: excess BOTTOM rows go, so the raster has the 8.5x11
-  // ratio the pixel coordinate space assumes. Rows are copied, never resampled.
-  function cropToPageRatio(raster) {
-    const expected = pyRound(raster.width * GEO.PAGE_ASPECT);
-    if (raster.height <= expected) return raster;
-    const rowBytes = raster.width * raster.components;
-    return { ...raster, height: expected, samples: raster.samples.slice(0, expected * rowBytes) };
+  // Transparency composited over white paper — what the page shows, so every
+  // raster a plugin gets is opaque. MuPDF's samples are premultiplied: paper
+  // shows through by 255 − alpha. An image mask (a stencil: alpha only, no
+  // colour of its own) is what B/W scans are often stored as; it paints black.
+  function opaque(raster) {
+    if (!raster.alpha) return raster;
+    const { width, height, components: n, samples } = raster;
+    const colors = n - 1, px = width * height;
+    const out = new Uint8Array(px * Math.max(colors, 1));
+    if (colors === 0) for (let i = 0; i < px; i++) out[i] = 255 - samples[i];
+    else for (let i = 0; i < px; i++) {
+      const paper = 255 - samples[i * n + colors];
+      for (let c = 0; c < colors; c++) out[i * colors + c] = Math.min(255, samples[i * n + c] + paper);
+    }
+    return { ...raster, components: Math.max(colors, 1), alpha: false, samples: out };
   }
 
-  // _first_raster: the first usable embedded raster of a page, cropped.
-  function firstRaster(page) {
-    const images = pageImages(page);
-    let placements = null;
-    for (const entry of images) {
-      if (!isUsableRaster(entry)) continue;
-      let image = null, pix = null;
-      try {
-        image = doc.loadImage(entry.ref);
-        pix = imagePixmap(image);
-        placements = placements || imagePlacements(page);
-        return cropToPageRatio(copyOut(pix, 'embedded', placementOf(placements, image)));
-      } catch (e) {
-        console.warn(`image ${entry.name}: ${e?.message || e}`);
-      } finally {
-        pix?.destroy(); image?.destroy();
+  // The raster set upright as orientation() says: whole samples moved, none
+  // resampled.
+  function orient(raster, { swap, flipX, flipY }) {
+    if (!swap && !flipX && !flipY) return raster;
+    const { width: w, height: h, components: n, samples } = raster;
+    const W = swap ? h : w, H = swap ? w : h;
+    const out = new Uint8Array(samples.length);
+    for (let Y = 0; Y < H; Y++) {
+      const q = flipY ? H - 1 - Y : Y;
+      for (let X = 0; X < W; X++) {
+        const p = flipX ? W - 1 - X : X;
+        const src = ((swap ? p : q) * w + (swap ? q : p)) * n, dst = (Y * W + X) * n;
+        for (let k = 0; k < n; k++) out[dst + k] = samples[src + k];
       }
     }
-    return null;
+    return { ...raster, width: W, height: H, samples: out };
+  }
+
+  // The page's scan as a raster, or null when it cannot be decoded.
+  function scanRaster(page, scan) {
+    const entry = pageImages(page)[scan.entry];
+    let image = null, pix = null;
+    try {
+      image = doc.loadImage(entry.ref);
+      pix = imagePixmap(image);
+      return orient(opaque(copyOut(pix, 'embedded', scan.rect)), scan.turn);
+    } catch (e) {
+      console.warn(`image ${entry?.name}: ${e?.message || e}`);
+      return null;
+    } finally {
+      pix?.destroy(); image?.destroy();
+    }
   }
 
   function renderPage(page) {
@@ -322,13 +422,23 @@ export function openPdf(mupdf, Module, bytes) {
     try { return fn(page); } finally { page.destroy(); }
   }
 
-  // One page's raster: { width, height, components, alpha, samples, source, rect }.
+  // One page's raster: { width, height, components, alpha, samples, source, rect }
+  // — its scan (`rect` the placement), or a 96-dpi render (`rect` null).
   // `gray: true` gives one component per pixel, colour converted by MuPDF
   // (what a plugin that analyses the page's pixels wants).
   function pageRaster(n, { gray = false } = {}) {
-    const raster = withPage(n, page => firstRaster(page) || renderPage(page));
+    const raster = withPage(n, page => {
+      const scan = scanAt(n, page);
+      const own = scan && scanRaster(page, scan);
+      if (scan && !own) scans.set(n, null);      // an undecodable scan: the page is rendered, its space follows
+      return own || renderPage(page);
+    });
     return gray ? toGray(raster) : raster;
   }
+
+  // A page's pixel space: { width, height } in px — its scan's placement, or
+  // the page itself when it is rendered, at 96 DPI.
+  const pageSize = n => withPage(n, page => pxSize(scanAt(n, page)?.rect || page.getBounds()));
 
   function toGray(raster) {
     const { width, height, components: n, alpha, samples } = raster;
@@ -389,25 +499,10 @@ export function openPdf(mupdf, Module, bytes) {
     return rasterPNG(thumb ? thumbnail(raster) : raster);
   }
 
-  // extract.py _page_image_rect: the placement of the page's LARGEST image
-  // (by placed area), or null — the text transform then uses the page rect.
-  const pageImageRect = n => withPage(n, page => {
-    const images = pageImages(page);
-    if (!images.length) return null;
-    const placements = imagePlacements(page);
-    let best = null, bestArea = -1;
-    for (const entry of images) {
-      let image = null;
-      try {
-        image = doc.loadImage(entry.ref);
-        const r = placementOf(placements, image);
-        if (!r) continue;
-        const area = (r[2] - r[0]) * (r[3] - r[1]);
-        if (area > bestArea) { bestArea = area; best = r; }
-      } catch { /* an unreadable image has no placement */ } finally { image?.destroy(); }
-    }
-    return best;
-  });
+  // Where the page's scan sits (PDF points), or null when the page is
+  // rendered — the text transform then uses the page rect. The same choice as
+  // the raster's, so text lands on the pixels the page shows.
+  const pageImageRect = n => withPage(n, page => scanAt(n, page)?.rect ?? null);
 
   const pageRect = n => withPage(n, page => page.getBounds());
 
@@ -557,34 +652,31 @@ export function openPdf(mupdf, Module, bytes) {
   }
 
   const numPages = doc.countPages();
+  if (!numPages) { doc.destroy(); throw new Error('the document has no pages'); }
 
   // load_pdf_meta, in two passes so a viewer can show the first page before
-  // the slower one has run.
+  // the slower one has run. A page that cannot be read is left out of both —
+  // the viewer reports it when it is asked for; the document still opens.
 
-  // Pass 1 — geometry: page count, the page size of the pixel space, and the
-  // pt→px scale measured from the first placed raster of the document
-  // (suggestedScale, px-per-pt as a percentage).
+  // Pass 1 — geometry: page count, page 1's pixel space (every page has its
+  // own: pageSize), and the px per pt of the first scan among the leading
+  // pages (suggestedScale, as a percentage; 96/72 without one).
   function geometry() {
-    let ratio = null;
-    for (let i = 0; i < numPages && ratio === null; i++) {
-      const page = doc.loadPage(i);
+    let first = null, ratio = null;
+    try { first = pageSize(1); } catch (e) { console.warn(`page 1: ${e?.message || e}`); }
+    for (let n = 1; n <= Math.min(numPages, SCALE_SAMPLE_PAGES) && ratio === null; n++) {
       try {
-        const entry = pageImages(page).find(isUsableRaster);
-        if (!entry) continue;
-        let image = null;
-        try {
-          image = doc.loadImage(entry.ref);
-          const r = placementOf(imagePlacements(page), image);
-          ratio = r && r[2] - r[0] > 0 ? image.getWidth() / (r[2] - r[0]) : undefined;
-        } catch { ratio = undefined; } finally { image?.destroy(); }
-      } catch { /* a page that cannot be read has no raster */ } finally { page.destroy(); }
+        const scan = withPage(n, page => scanAt(n, page));
+        if (scan && scan.rect[2] - scan.rect[0] > 0) ratio = scan.width / (scan.rect[2] - scan.rect[0]);
+      } catch { /* a page that cannot be read has no scan */ }
     }
     return {
       pageImageType: 'image/png',
-      pageWidth: GEO.PAGE_WIDTH_PX,
-      pageHeight: GEO.PAGE_HEIGHT_PX,
+      pageWidth: first?.width ?? GEO.PAGE_WIDTH_PX,
+      pageHeight: first?.height ?? GEO.PAGE_HEIGHT_PX,
       numPages,
       suggestedScale: pyRound(100 * (ratio ?? GEO.PT_TO_PX)),
+      pxPerPt: GEO.PT_TO_PX,
     };
   }
 
@@ -594,11 +686,13 @@ export function openPdf(mupdf, Module, bytes) {
     const fontPages = new Map();      // basefont → occurrences, in first-seen order
     const sample = [];
     for (let i = 0; i < numPages; i++) {
-      const page = doc.loadPage(i);
       try {
-        for (const name of pageFontNames(page))
-          if (name && name !== 'unknown') fontPages.set(name, (fontPages.get(name) || 0) + 1);
-      } catch (e) { console.warn(`declared fonts, page ${i + 1}: ${e?.message || e}`); } finally { page.destroy(); }
+        const page = doc.loadPage(i);
+        try {
+          for (const name of pageFontNames(page))
+            if (name && name !== 'unknown') fontPages.set(name, (fontPages.get(name) || 0) + 1);
+        } finally { page.destroy(); }
+      } catch (e) { console.warn(`declared fonts, page ${i + 1}: ${e?.message || e}`); }
 
       if (i < SPAN_SAMPLE_PAGES) {
         try {
@@ -619,9 +713,10 @@ export function openPdf(mupdf, Module, bytes) {
   function close() {
     metricsByFont.clear();
     faceByFont.clear();
+    scans.clear();
     doc.destroy();
     mupdf.emptyStore?.();
   }
 
-  return { numPages, meta, geometry, typography, pageRaster, pagePNG, pageImageRect, pageRect, structuredText, close };
+  return { numPages, meta, geometry, typography, pageRaster, pagePNG, pageSize, pageImageRect, pageRect, structuredText, close };
 }

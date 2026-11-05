@@ -23,7 +23,7 @@ pixel_width = (advance / upem) × font_size_pt × (scale / 100)
 
 ### What "pixel" means here
 
-Box coordinates live in the **embedded image's pixel space**. For scanned government document corpora, page images are always 816 × 1056 px, placed on a 612 × 792 pt PDF page (standard US Letter at 72 dpi):
+Box coordinates live in the **page's pixel space**: what its raster shows — the scan's placement, or the whole page when it is rendered — at 96 DPI (`Doc.pageSize`). For scanned government document corpora, page images are always 816 × 1056 px, placed over 612 × 792 pt (standard US Letter at 72 dpi); an A4 page's space is 794 × 1123, a landscape Letter page's 1056 × 816 — the ratio below is the same on every page:
 
 ```
 image_px / page_pt = 816 / 612 = 4/3 ≈ 1.3333

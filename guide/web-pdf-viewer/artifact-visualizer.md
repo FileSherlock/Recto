@@ -228,10 +228,9 @@ node --test tests/masks.test.mjs
 ```
 
 opens every reference PDF with MuPDF under Node, builds each page's mask with the same
-`mask-core.js`, and compares it with the recorded mask in `tests/golden/` (SHA-256 of the
-gray pixels). One page differs by design: a scan taller than 8.5 × 11 is cropped to the
-page ratio by the core, and the mask is built from the cropped raster the viewer shows —
-its mask equals the top rows of the recorded one.
+`mask-core.js`, and compares its regions with the recorded mask in `tests/golden/`,
+region for region over the whole page: the recorded masks were built on the uncropped
+scan, which is the raster the viewer shows — a scan taller than 8.5 × 11 included.
 
 ---
 

@@ -202,9 +202,9 @@ flowchart LR
 
 ### From structured text to spans — `extract.js`
 
-`EtvExtract.extractSpans(raw, pageNum, imgRect)` is a set of pure functions with no DOM and no document service in them ([span schema](../api-reference/api-reference.md#etvextract--embedded-text-spans-embedded_text_viewer)):
+`EtvExtract.extractSpans(raw, pageNum, imgRect, size)` is a set of pure functions with no DOM and no document service in them ([span schema](../api-reference/api-reference.md#etvextract--embedded-text-spans-embedded_text_viewer)):
 
-1. **Points → image pixels.** `imgRect` is where the page image sits on the page, in PDF points (`Doc.pageImageRect`, delivered in the same call as `raw.imageRect`). Every coordinate is scaled by `816 / imgRect width` and `1056 / imgRect height` — the viewer's page space, not the raster's own resolution, so overlays land correctly whatever the scan's DPI. A page with no embedded raster is shown as a render of the full page, so the page rectangle (`raw.rect`) is the placement. Spans below the 1056 px crop boundary are dropped.
+1. **Points → image pixels.** `imgRect` is where the page's scan sits on the page, in PDF points (`Doc.pageImageRect`, delivered in the same call as `raw.imageRect`), and `size` the page's pixel space (`Doc.pageSize`, delivered as `raw.pageSize`; 816 × 1056 for a US-Letter scan). Every coordinate is scaled by `size.width / imgRect width` and `size.height / imgRect height` — the viewer's page space, not the raster's own resolution, so overlays land correctly whatever the scan's DPI. A page with no scan is shown as a render of the full page, so the page rectangle (`raw.rect`) is the placement. Spans below the bottom of the space are dropped.
 2. **Merge.** Adjacent raw spans on a line that share font, flags and color (sizes within 1 pt) and lie closer than 1.5 em are one run; PDFs often split a visual run into many tiny spans.
 3. **Split.** A run is cut into groups at a tab, at a space followed by a gap wider than 0.4 em, at a run of spaces, and after a character followed by an invisible gap wider than 0.5 em. Each group becomes one span.
 4. **Restore spaces.** A gap between 0.15 em and 0.5 em after a character is a space MuPDF did not report; it is inserted as its own `chars` entry.

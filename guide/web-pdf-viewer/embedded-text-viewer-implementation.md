@@ -78,9 +78,9 @@ Its input is `Doc.structuredText(n)`: MuPDF's structured text in PyMuPDF's "rawd
 
 What `extractSpans` does, in order:
 
-1. **Coordinates.** PDF points map to the viewer's 816 × 1056 pixel space through the image placement: `scaleX = 816 / placement width`, `scaleY = 1056 / placement height`. Scaling by the page space rather than the raster's own pixel size keeps overlay positions right whatever the scan's resolution.
+1. **Coordinates.** PDF points map to the page's pixel space (`Doc.pageSize`, delivered with the text as `raw.pageSize`: 816 × 1056 for a US-Letter scan) through the image placement: `scaleX = page width / placement width`, `scaleY = page height / placement height`. Scaling by the page space rather than the raster's own pixel size keeps overlay positions right whatever the scan's resolution.
 2. **Merge.** Adjacent spans of a line that share font, flags and colour (and sizes within 1 pt) are merged into one run — PDFs often split one visual run into many tiny spans — unless the gap between them exceeds 1.5 em.
-3. **Crop.** A span starting below the page's bottom edge (1056 px) is skipped; one crossing it is clamped.
+3. **Crop.** A span starting below the bottom of the page's pixel space (1056 px on a Letter scan) is skipped; one crossing it is clamped.
 4. **Split into groups.** Each character's advance is the distance to the next character's x (the last one runs to the span's right edge); its *true gap* is that advance minus its own box width. A run is split at a tab, at a space whose gap exceeds 0.4 em, at a second consecutive space, and after a regular character followed by a gap over 0.5 em (whose width is then clamped to its own box). Each group becomes one span, so tabular text does not turn into one over-wide box.
 5. **Recover omitted spaces.** A non-space character followed by a gap between 0.15 em and 0.5 em gets a space inserted after it: MuPDF dropped the space token, the gap says there was one.
 6. **Size.** `sizePt` is the span's bounding-box height divided by the face's (ascender − descender). MuPDF's own `size` is the text matrix expansion, which the per-word horizontal scaling (`Tz`, 60–150 %) of a scanned document's text layer inflates word by word — an 11.46 pt layer reads 11.7–11.95. The vertical extent is not affected by `Tz`, so height over (ascender − descender) is the size the text was set in.

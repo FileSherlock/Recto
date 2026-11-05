@@ -4,8 +4,9 @@
 const state = {
   // PDF Viewer State
   numPages: 0,
-  pageWidth: GEO.PAGE_WIDTH_PX,
+  pageWidth: GEO.PAGE_WIDTH_PX,     // the SHOWN page's pixel space (Doc.pageSize) — pages may differ
   pageHeight: GEO.PAGE_HEIGHT_PX,
+  pxPerPt: null,                    // the document's px per pt (Doc.open's pxPerPt; GEO.docPxPerPt reads it)
   currentPage: 1,
   currentZoom: 1.0,
   minZoom: 0.5,

@@ -1,6 +1,12 @@
 // web/plugins/embedded_text_viewer/extract.js against the recorded reference
 // spans: for every golden PDF page the spans — full (per-character positions)
-// and lean — equal the recording's to within 1e-6.
+// and lean — equal the recording's to within 1e-6, in the page's pixel space
+// (Doc.pageSize, as etv-fetch.js passes it).
+//
+// scan-tall was recorded in a cropped 816 × 1056 space; its pixel space is now
+// the whole scan, 816 × 1078 (tests/golden/README.md, "Departures"). Its spans
+// are held to the recording in the recording's space, and in its own space
+// they are the same spans stretched by 1078/1056 vertically.
 //
 //   node --test tests/*.test.mjs
 
@@ -49,6 +55,7 @@ test('pyRound rounds the exact binary value, ties to even — like Python', () =
 });
 
 const documents = readJSON(path.join(GOLDEN, 'documents.json')).filter(d => d.source.toLowerCase().endsWith('.pdf'));
+const RECORDED_SPACE = { 'scan-tall': { width: 816, height: 1056 } };
 
 for (const d of documents) {
   // a sample that is not in this checkout (tests/samples/ holds a 66 MB one) is skipped, never failed
@@ -61,12 +68,23 @@ for (const d of documents) {
       let count = 0;
       for (const n of d.pages) {
         const rect = pdf.pageImageRect(n) || pdf.pageRect(n);
-        const spans = extractSpans(pdf.structuredText(n), n, rect);
+        const own = pdf.pageSize(n), recorded = RECORDED_SPACE[d.name] || own;
+        const spans = extractSpans(pdf.structuredText(n), n, rect, recorded);
         count += spans.length;
         assert.equal(spans.length, full[n].spans.length, `page ${n}: span count`);
         assert.equal(firstDifference(spans, full[n].spans, `page ${n}`), null);
         assert.equal(firstDifference(spans.map(leanSpan), lean[n].spans, `page ${n} (lean)`), null);
         assert.equal(full[n].num_pages, pdf.numPages);
+        if (recorded !== own) {
+          const k = own.height / recorded.height;
+          const stretched = extractSpans(pdf.structuredText(n), n, rect, own);
+          assert.equal(stretched.length, spans.length, `page ${n}: span count in the page's own space`);
+          stretched.forEach((s, i) => {
+            const r = spans[i], at = `page ${n}, span ${i}`;
+            assert.deepEqual([s.text, s.x, s.w, s.chars], [r.text, r.x, r.w, r.chars], `${at}: unchanged across`);
+            assert.ok(Math.abs(s.y - r.y * k) <= 0.01 && Math.abs(s.h - r.h * k) <= 0.02, `${at}: y ${s.y} h ${s.h} vs ${r.y}·${k} ${r.h}·${k}`);
+          });
+        }
       }
       assert.ok(count > 0, 'the document has text');
     } finally { pdf.close(); }

@@ -180,7 +180,7 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
   page in progress is abandoned (no boxes for it), earlier pages keep theirs;
   loading another document does the same before its own auto read starts.
 - Input pixels are `Doc.pageImageURL(n)` — the core document service's
-  lossless, ratio-cropped page rasters, the very images the viewer displays,
+  lossless page rasters, the very images the viewer displays,
   so OCR coordinates line up with the page by construction. The URL is asked
   for each time a page is read, never stored: the service keeps a small LRU
   and revokes evicted URLs. Coordinates scale into the 816×1056 viewBox space

@@ -4,7 +4,7 @@
 // text in PyMuPDF's "rawdict" shape) and the placement of the page image — and
 // turns it into the spans the viewer draws, in image pixels:
 //
-//   { page, text, x, y, w, h,          left/top/width/height, px in the 816×1056 space
+//   { page, text, x, y, w, h,          left/top/width/height, px in the page's pixel space (Doc.pageSize)
 //     fontSize, sizePt,                font size in px, and in PDF points (see spanSizePt)
 //     font, flags,                     raw PDF font name; PyMuPDF flag bits (bold=16, italic=2, …)
 //     lineId, _blockLineId, blockId, isBlockEnd, blockW,
@@ -16,7 +16,7 @@
 // them (half to even on the exact binary value) — the goldens hold to the
 // last printed digit.
 (function () {
-  const PAGE_W = 816, PAGE_H = 1056;   // the viewer's page space (GEO.PAGE_WIDTH_PX / PAGE_HEIGHT_PX)
+  const PAGE_W = 816, PAGE_H = 1056;   // a Letter page's pixel space (GEO.PAGE_WIDTH_PX / PAGE_HEIGHT_PX), when no size is given
 
   // The fields of a lean span — what a whole-document text scan needs.
   const LEAN_FIELDS = ['page', 'text', 'x', 'y', 'w', 'h', 'sizePt', 'font'];
@@ -65,17 +65,21 @@
   //
   //   raw      Doc.structuredText(pageNum) — blocks → lines → spans → chars
   //   pageNum  1-based
-  //   imgRect  [x0, y0, x1, y1] in PDF points: where the page image sits
+  //   imgRect  [x0, y0, x1, y1] in PDF points: where the page's scan sits
   //            (Doc.pageImageRect), or the page rectangle when the page has no
-  //            embedded raster and is shown as a 96-dpi render of itself.
+  //            scan and is shown as a 96-dpi render of itself.
+  //   size     { width, height }: the page's pixel space (Doc.pageSize) —
+  //            imgRect at 96 DPI; a Letter page's 816 × 1056 when omitted.
   //
-  // Scaling by PAGE_W / PAGE_H (not the raster's own pixels) keeps overlay
-  // positions in the viewer's space whatever the embedded image's resolution.
-  function extractSpans(raw, pageNum, imgRect) {
+  // Scaling imgRect onto the pixel space (not onto the raster's own pixels)
+  // keeps overlay positions in the viewer's space whatever the scan's
+  // resolution.
+  function extractSpans(raw, pageNum, imgRect, size) {
+    const pageW = size?.width ?? PAGE_W, pageH = size?.height ?? PAGE_H;
     const rectW = imgRect[2] - imgRect[0], rectH = imgRect[3] - imgRect[1];
-    const scaleX = rectW ? PAGE_W / rectW : 1.0;
-    const scaleY = rectH ? PAGE_H / rectH : scaleX;
-    const maxY = PAGE_H;   // crop boundary in viewer pixel space
+    const scaleX = rectW ? pageW / rectW : 1.0;
+    const scaleY = rectH ? pageH / rectH : scaleX;
+    const maxY = pageH;    // the bottom of the space: text below it is off the page shown
     const spans = [];
 
     (raw.blocks || []).forEach((block, bIdx) => {

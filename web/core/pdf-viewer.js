@@ -2,11 +2,13 @@
       PDF Viewer — single-page, PNG-based (no PDF.js)
       The document service (doc-service.js → a MuPDF worker)
       opens the document in the browser and hands out each
-      page's original 816×1056 px embedded image on demand as
-      a blob: URL (Doc.pageImageURL) — opening yields metadata
-      only, so huge documents open instantly and the browser
-      only ever holds the pages it shows. All coordinates are
-      in that pixel space throughout.
+      page's raster — its own scan, or a 96-dpi render — on
+      demand as a blob: URL (Doc.pageImageURL) — opening yields
+      metadata only, so huge documents open instantly and the
+      browser only ever holds the pages it shows. Each page is
+      shown in its own pixel space (Doc.pageSize: 816×1056 for
+      a US-Letter scan), and all coordinates of a page are in
+      that space.
       ========================================================= */
 
 // Open a document and bring it on screen. The first page shows as soon as the
@@ -49,6 +51,7 @@ function showNoDocument(message) {
   state.numPages = 0;
   state.currentPage = 1;
   state.docHash = null;
+  state.pxPerPt = null;
   state.hasPdf = false;
   state.currentFile = null;
   if (typeof utbState !== 'undefined') {
@@ -87,8 +90,9 @@ async function showDocument(data, turn) {
     if (typeof clearAllSVGLayers === 'function') clearAllSVGLayers();
   }
   state.numPages = data.numPages || 1;
-  state.pageWidth = data.pageWidth || GEO.PAGE_WIDTH_PX;
+  state.pageWidth = data.pageWidth || GEO.PAGE_WIDTH_PX;       // page 1's; goToPage sets each page's own
   state.pageHeight = data.pageHeight || GEO.PAGE_HEIGHT_PX;
+  state.pxPerPt = data.pxPerPt || state.pageWidth / GEO.PAGE_WIDTH_PT;
   state.docHash = data.sha256 || null;
 
   els.pageCountElem.textContent = `/ ${state.numPages}`;
@@ -158,29 +162,25 @@ async function goToPage(pageNum) {
   pageNum = Math.max(1, Math.min(pageNum, state.numPages));
 
   // The raster first (a blob: URL from the document service), so the page
-  // enters the DOM with its image and plugins reading #page<n> find pixels.
+  // enters the DOM with its image and plugins reading #page<n> find pixels;
+  // with it the page's own pixel space (pages of one document may differ).
   // A later goToPage() or another document overtakes this one while it waits.
   const turn = goToPage.turn = (goToPage.turn || 0) + 1;
   const hash = state.docHash;
-  let src;
-  try { src = await Doc.pageImageURL(pageNum); }
-  catch (e) { console.error(`Page ${pageNum}:`, e.message); return; }
+  let src, size;
+  try { [src, size] = await Promise.all([Doc.pageImageURL(pageNum), Doc.pageSize(pageNum)]); }
+  catch (e) {
+    console.error(`Page ${pageNum}:`, e.message);
+    if (turn === goToPage.turn && hash === state.docHash) showPageError(pageNum, e.message);
+    return;
+  }
   if (turn !== goToPage.turn || hash !== state.docHash) return;
 
-  PDFHooks.emit('viewer:clear');
+  showPage(pageNum);
+  state.pageWidth = size.width;
+  state.pageHeight = size.height;
 
-  state.currentPage = pageNum;
-  els.pageInputElem.value = pageNum;
-  els.viewer.innerHTML = '';
-  els.viewerContainer.scrollTop = 0;
-  updateCSSZoom();
-
-  // Sync active thumbnail
-  document.querySelectorAll('.thumbnail-container').forEach((c, i) => {
-    c.classList.toggle('active', i + 1 === pageNum);
-  });
-
-  // Page container — dimensions match the uploaded image's pixel space
+  // Page container — dimensions match the page's pixel space
   const pageContainer = document.createElement('div');
   pageContainer.className = 'page-container';
   pageContainer.id = `pageContainer${pageNum}`;
@@ -203,6 +203,38 @@ async function goToPage(pageNum) {
   // text layer, …) in response to this event. The core owns no overlay DOM.
   PDFHooks.emit('page:rendered', { pageContainer, pageNum });
   PDFHooks.emit('pages:refresh');
+}
+
+// The viewer turns to page `pageNum`: the old page's overlays and DOM go, the
+// page number, scroll and active thumbnail follow.
+function showPage(pageNum) {
+  PDFHooks.emit('viewer:clear');
+
+  state.currentPage = pageNum;
+  els.pageInputElem.value = pageNum;
+  els.viewer.innerHTML = '';
+  els.viewerContainer.scrollTop = 0;
+  updateCSSZoom();
+
+  document.querySelectorAll('.thumbnail-container').forEach((c, i) => {
+    c.classList.toggle('active', i + 1 === pageNum);
+  });
+}
+
+// A page that cannot be shown says so in its place — the page before it does
+// not stay up under another page number (or another document's title). The
+// other pages still show; no 'page:rendered', as there is no page to draw on.
+function showPageError(pageNum, message) {
+  showPage(pageNum);
+  const box = document.createElement('div');
+  box.className = 'page-error';
+  const icon = document.createElement('span');
+  icon.className = 'material-symbols-outlined';
+  icon.textContent = 'broken_image';
+  const text = document.createElement('p');
+  text.textContent = `Page ${pageNum} cannot be shown: ${message}`;
+  box.append(icon, text);
+  els.viewer.appendChild(box);
 }
 
 

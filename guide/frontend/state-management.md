@@ -11,8 +11,9 @@ contains nothing that would dangle if a plugin folder were deleted.
 const state = {
   // PDF Viewer
   numPages: 0,            // 0 = no document is open
-  pageWidth: 816,         // GEO.PAGE_WIDTH_PX  — pixel width of the page space
-  pageHeight: 1056,       // GEO.PAGE_HEIGHT_PX — pixel height of the page space
+  pageWidth: 816,         // the SHOWN page's pixel space (Doc.pageSize) — 816 × 1056 for a
+  pageHeight: 1056,       // US-Letter scan; set per page by goToPage, as pages may differ
+  pxPerPt: null,          // the document's px per pt (Doc.open): 96/72 for a PDF; GEO.docPxPerPt() reads it
   currentPage: 1,
   currentZoom: 1.0,
   minZoom: 0.5,

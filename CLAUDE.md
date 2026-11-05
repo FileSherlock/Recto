@@ -48,10 +48,11 @@ feature. Full docs live in `guide/` (start with `guide/architecture/architecture
   may be async and a throwing handler can't break the core. Per-document plugin state is reset on
   `document:opening`: the new document's first page renders before its `document:loaded` arrives.
 - **`Doc` — the document service** (`web/core/doc-service.js`), the only file that talks to `pdf-worker.js`, the module
-  worker that owns MuPDF and the open PDF: `Doc.open`, `Doc.pageImageURL(n, { thumb })` (blob: URLs in an LRU — ask
-  each time, never store one), `Doc.pagePixels(n, { gray })`, `Doc.structuredText(n, { options, imageRect })` (raw
-  MuPDF structured text in PyMuPDF's rawdict shape — a primitive, not analysis), `Doc.pageImageRect(n)`,
-  `Doc.bytes()`, `Doc.close()` (terminates the worker: the only way a wasm heap gives memory back).
+  worker that owns MuPDF and the open PDF: `Doc.open`, `Doc.pageSize(n)` (the page's pixel space),
+  `Doc.pageImageURL(n, { thumb })` (blob: URLs in an LRU — ask each time, never store one), `Doc.pagePixels(n, { gray })`,
+  `Doc.structuredText(n, { options, imageRect, pageSize })` (raw MuPDF structured text in PyMuPDF's rawdict shape — a
+  primitive, not analysis), `Doc.pageImageRect(n)`, `Doc.bytes()`, `Doc.close()` (terminates the worker: the only way a
+  wasm heap gives memory back).
   `web/core/pdf-document.js` is the MuPDF side — an ES module with no DOM, imported by the worker and by the node tests.
 - **`assetURL(path)`** (`web/core/hooks.js`): the build stamps every `<script>`/`<link>` with the file's content hash
   and writes the same hashes into `window.RECTO_ASSETS`; a script that fetches a sibling itself (a worker, a word list,
@@ -81,8 +82,9 @@ plugin may use a baseline plugin's global, guarded (`typeof Shaping !== 'undefin
 font lists and metrics, widths — see its README). The suites hold the code to them: rasters and masks pixel for
 pixel, spans within 1e-6, HarfBuzz numbers to the last digit. **A change to anything the goldens cover is done when
 they pass, not when it looks right**; where a golden cannot be met, the page, the difference and the cause are
-written down. Page rasters are the embedded scan's own samples, cropped with exact integer arithmetic — plugins that
-read or redraw a page certify their result against those bytes.
+written down (`tests/golden/README.md`, "Departures"). Page rasters are the page's own scan —
+its samples, never resampled or cropped, set upright with exact integer arithmetic — or a 96-dpi render of a page
+without one; plugins that read or redraw a page certify their result against those bytes.
 
 `web/vendor/` holds the pinned WebAssembly builds (MuPDF 1.28.0, harfbuzzjs 1.6.1 = HarfBuzz 14.4.0); read
 `web/vendor/README.md` before upgrading either — the core reads two MuPDF structs from the wasm heap, and the shaper
@@ -96,7 +98,10 @@ is this one's with `--plugin` (`build({ overlay })`): the site's own page with i
 `web/core/geometry.js` (`window.GEO`) is the single source of truth (`web/core/pdf-document.js` carries the same
 constants for the worker). Two spaces: **image pixels at 96 DPI** (canonical geometry — box x/y/w/h, SVG viewBox) and
 **PDF points at 72 DPI** (canonical typography — `sizePt`). Font size converts to px exactly once, at the SVG render
-boundary. Use the named constants; never re-derive `0.75`, `133`, `816`, etc.
+boundary. Every page has its own pixel space (`Doc.pageSize(n)`: what its raster shows — the scan's placement, or the
+page itself when it is rendered — at 96 DPI; 816 × 1056 for a US-Letter scan, 794 × 1123 for an A4 page);
+`state.pageWidth/pageHeight` are the shown page's, and px per pt is 96/72 on every page of a PDF (`GEO.docPxPerPt()`).
+Use the named constants; never re-derive `0.75`, `133`, `816`, etc.
 
 ## Frontend conventions
 

@@ -47,11 +47,25 @@ widths/
 | `efta00382083` | `tests/samples/EFTA00382083.pdf` | all 25 | |
 | `efta01011184` | `tests/samples/EFTA01011184.pdf` (340 p, 66 MB) | 1, 2, 3, 85, 170, 255, 340 | the large document |
 | `vector` | `_inputs/vector.pdf` | both | born-digital: base-14 Times/Helvetica/Courier, mixed sizes, black rectangles — takes the 96-dpi render path |
-| `scan-tall` | `_inputs/scan-tall.pdf` | 1 | a 1000×1320 raster, taller than 8.5×11, so the ratio crop really crops (to 1294 rows); invisible text layer; bars, a disc and an edge bar for the mask rules |
+| `scan-tall` | `_inputs/scan-tall.pdf` | 1 | a 1000×1320 raster, taller than 8.5×11 (the recording cropped it to 1294 rows; see "Departures"); invisible text layer; bars, a disc and an edge bar for the mask rules |
 | `image-png`, `image-jpg` | `_inputs/image.png`, `image.jpg` | 1 | image documents |
 
-`scan-tall` exists because every corpus raster is exactly 816×1056: without it the crop
-would never be exercised.
+`scan-tall` exists because every corpus raster is exactly 816×1056: it is the one recorded
+page whose scan is not 8.5 × 11.
+
+## Departures
+
+Where the code no longer does what the recording did, on purpose. The suites name each
+page and hold the rest of it to the recording.
+
+- **Scans are not cropped.** The recording cropped every embedded raster to
+  the 8.5 × 11 ratio, so a taller scan (A4, US Legal) lost its bottom rows, and reported
+  816×1056 for every PDF. The core keeps the whole scan, in a pixel space of its own: the
+  scan's placement at 96 DPI (`Doc.pageSize`). `scan-tall` therefore has a 1000×1320
+  raster whose top 1294 rows equal the recording exactly, a pixel space and metadata
+  height of 1078 instead of 1056, a 180×238 thumbnail, and spans that are the recorded
+  ones stretched by 1078/1056 vertically (`tests/spans.test.mjs` checks both).
+  Every other recorded page is unchanged.
 
 ## `pages.json`
 
@@ -73,10 +87,11 @@ would never be exercised.
   and the PNG's file name.
 - `raster` (PDFs) — what is needed to reproduce the raster: `source` (`embedded`
   raster or 96-dpi `render`), the embedded image's size/colourspace/filter
-  **before** the crop, `page_rect`, `rotation`, `rect` (placement of the first
-  usable raster — `suggestedScale` is measured from it) and `text_rect`
-  (placement of the largest image — the span extractor's transform uses it;
-  `null` means the page rectangle is used).
+  **before** the recording's crop, `page_rect`, `rotation`, `rect` (placement of the
+  raster — `suggestedScale` is measured from it) and `text_rect` (the placement the
+  span extractor's transform uses; `null` means the page rectangle is used). On every
+  recorded page the two are the same — the scan's placement, or `null` on a rendered
+  page — which is what the core reports for both.
 
 ## What the recording also asserted (so it is not stored)
 
@@ -89,12 +104,13 @@ would never be exercised.
 
 - The plugin order of `index.html` is reproduced by the `order` values in the
   `plugin.json` files.
-- The metadata reports 816×1056 for every PDF, whatever its raster size.
+- The recording's metadata reports 816×1056 for every PDF, whatever its raster size
+  (see "Departures" for what the core reports).
 - The recorded masks were computed on the **uncropped** first image of the page
-  (`scan-tall`: page image 1000×1294, mask 1000×1320); `mask-core.js` masks the
-  cropped raster the viewer shows, so `tests/masks.test.mjs` compares the top rows
-  there. They were also filled — whatever a region enclosed is mask. No recorded
-  page has an enclosed gap, so the unfilled regions `mask-core.js` produces agree.
+  (`scan-tall`: mask 1000×1320) — the raster the viewer now shows, so
+  `tests/masks.test.mjs` compares whole pages. They were also filled — whatever a
+  region enclosed is mask. No recorded page has an enclosed gap, so the unfilled
+  regions `mask-core.js` produces agree.
 - Thumbnails are LANCZOS downscales to 180 px; a different resampler does not
   reproduce their hashes, so `tests/documents.test.mjs` holds a thumbnail to its
   size, not its hash.

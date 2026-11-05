@@ -2,7 +2,7 @@
 
 `web/core/pdf-viewer.js` opens documents and renders pages. It does **not** use PDF.js — each page is an `<img>` whose source is the page's raster, handed out on demand by the document service as a `blob:` URL (`Doc.pageImageURL(n)`). Opening a document yields metadata only, so a two-thousand-page document opens as fast as a two-page one, and the browser only ever holds the pages it shows.
 
-The raster is the page's embedded scan — its own pixels, cropped to the 8.5 × 11 ratio — or a 96-DPI render when the page has none. Either way it lies in the one pixel space every coordinate in Recto uses. The document itself never leaves the browser: `Doc` hands the bytes to a MuPDF worker in the same page ([`Doc` reference](../api-reference/api-reference.md#doc--the-document-service)).
+The raster is the page's own scan — its own pixels, uncropped, set upright — or a 96-DPI render when the page has none. Either way the page is shown in its own pixel space (`Doc.pageSize`: what the raster shows at 96 DPI, 816 × 1056 for a US-Letter scan), the space every coordinate on that page uses. The document itself never leaves the browser: `Doc` hands the bytes to a MuPDF worker in the same page ([`Doc` reference](../api-reference/api-reference.md#doc--the-document-service)).
 
 The viewer injects **no overlays of any kind**. Once the pages are on screen it emits `document:loaded`
 and stops; plugins put their own content on the page from there. A box-creating plugin's boxes
@@ -54,7 +54,7 @@ An open that fails rethrows its error with `e.superseded` set: `true` when a lat
 Takes `Doc.open()`'s result, or its early form:
 
 1. Resets the text boxes of the previous document (`utbState.reset()`, `clearAllSVGLayers()` — both behind `typeof` guards, so the core runs without `text_tool`)
-2. Stores `state.numPages`, `state.pageWidth`, `state.pageHeight` and `state.docHash` (the file's SHA-256), and resets the page counter
+2. Stores `state.numPages`, `state.pageWidth`, `state.pageHeight` (page 1's pixel space), `state.pxPerPt` and `state.docHash` (the file's SHA-256), and resets the page counter
 3. Navigates to page 1 — which asks for just that page's raster
 4. Renders thumbnails — each one asks for its 180 px raster only when it scrolls into view
 
@@ -84,9 +84,9 @@ The "nothing is open" screen, which is what a failed open leaves: `Doc.open()` c
 
 Switches the viewer to display a specific page:
 
-1. Awaits `Doc.pageImageURL(pageNum)` **first**, so the page enters the DOM with its image and a plugin reading `#page<n>` finds pixels. A later `goToPage()`, or another document, overtakes a call that is still waiting
-2. Emits `viewer:clear` (plugins tear down per-page state — e.g. `webgl_mask` disposes GL contexts)
-3. Creates a new `page-container` div (`#pageContainer<n>`) with CSS custom properties for dimensions
+1. Awaits `Doc.pageImageURL(pageNum)` and `Doc.pageSize(pageNum)` **first**, so the page enters the DOM with its image and a plugin reading `#page<n>` finds pixels. A later `goToPage()`, or another document, overtakes a call that is still waiting. A page that cannot be produced shows its error in its place (`showPageError`, `.page-error`): the page before it does not stay up, and no `page:rendered` follows
+2. Emits `viewer:clear` (plugins tear down per-page state — e.g. `webgl_mask` disposes GL contexts) and sets `state.pageWidth` / `state.pageHeight` to this page's pixel space
+3. Creates a new `page-container` div (`#pageContainer<n>`) with CSS custom properties for those dimensions
 4. Inserts an `<img id="page<n>">` with that URL and appends the container to the viewer
 5. Emits `page:rendered` `{ pageContainer, pageNum }` — plugins draw their overlays (the `webgl_mask` mask canvas, the `text_tool` SVG text layer). **The core itself creates no overlay DOM.**
 6. Emits `pages:refresh` so per-page overlays re-sync

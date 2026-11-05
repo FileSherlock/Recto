@@ -209,9 +209,16 @@ Design points that shape everything built on it:
   which goes ahead of text and pixels, which go ahead of thumbnails.
 - **`Doc.close()` terminates the worker** because a wasm heap never shrinks — ending the
   worker is what returns the memory. `Doc.open()` closes the previous document first.
-- **The raster is the embedded scan itself** when the page has one (the first image that is
-  not a JPEG/JPX stream, its own samples, cropped at the bottom to the 8.5 × 11 ratio, never
-  resampled); a page without one is rendered at 96 DPI. Image documents (PNG, JPEG, TIFF,
+- **The raster is the page's own scan** when it has one — the single image painted over
+  (nearly) all of the page, axis-aligned, not a JPEG/JPX stream — with its own samples, never
+  resampled or cropped, set upright when it is placed turned or mirrored, its transparency
+  composited over white. Any other page (born-digital, a logo or stamp, an image only
+  another page paints, layered or skewed scans) is rendered at 96 DPI. **Each page has its
+  own pixel space** (`Doc.pageSize`): what its raster shows at 96 DPI — the scan's placement,
+  or the page itself — 816 × 1056 for a US-Letter scan, 794 × 1123 for an A4 page,
+  1056 × 816 for a landscape one. Points convert to it by 96/72 everywhere. A
+  password-protected PDF or one with no pages is refused with the reason; a page that
+  cannot be read fails alone, in its place. Image documents (PNG, JPEG, TIFF,
   BMP, WebP) are one page, served as stored, and never enter the worker.
 - **`structuredText` is a primitive, not an analysis.** Turning it into spans is a plugin's
   job (`embedded_text_viewer/extract.js`).

@@ -156,7 +156,7 @@ HarfBuzz applies the `kern` table only when the font offers no `GPOS` kerning **
 pixel_width = (advance / upem) × size_pt × (scale / 100)
 ```
 
-For the width to match a box measured in the 816 × 1056 px page images:
+For the width to match a box measured in a page's pixel space (96 DPI — 816 × 1056 px for a US-Letter scan, the same scale on every page of a PDF):
 
 ```
 scale / 100 = PAGE_WIDTH_PX / PAGE_WIDTH_PT

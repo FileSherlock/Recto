@@ -6,23 +6,31 @@
    MuPDF and the open PDF); the viewer and every plugin go through `Doc`:
 
      Doc.open(fileOrBlobOrArrayBuffer, name, { early })
-         → { sha256, numPages, pageWidth, pageHeight, pdfFonts,
+         → { sha256, numPages, pageWidth, pageHeight, pxPerPt, pdfFonts,
              suggestedScale, suggestedSize, pageImageType }
          `early(info)` is optional: called once pages can be shown — identity
          and geometry known, the typography fields (pdfFonts, suggestedSize)
          still to come — so a viewer can put page 1 on screen meanwhile.
+         pageWidth × pageHeight is page 1's pixel space (every page has its
+         own: Doc.pageSize); pxPerPt is 96/72 for a PDF, an image's width over
+         612 pt for an image document. A password-protected PDF, or one with
+         no pages, is refused (the error says which).
+     Doc.pageSize(n)                 → Promise<{ width, height }> the page's pixel space: what its raster shows (the
+                                        page's scan, or the page itself when it is rendered) at 96 DPI
      Doc.pageImageURL(n, { thumb })  → Promise<string>   blob: URL of the page's lossless raster
      Doc.pagePixels(n, { gray })     → Promise<object>   the same raster as samples, for a plugin that analyses
                                         pixels: { width, height, components, alpha, samples: Uint8Array, source, rect } —
                                         `source` is 'embedded' (the page's scan) or 'render' (a 96-dpi render of a
-                                        born-digital page); `gray: true` gives one component per pixel.
+                                        born-digital page); `gray: true` gives one component per pixel; always opaque.
                                         null for an image document (decode Doc.pageImageURL(1) instead)
-     Doc.structuredText(n, { options, imageRect })
+     Doc.structuredText(n, { options, imageRect, pageSize })
                                      → Promise<object>   RAW MuPDF structured text of one page, in PyMuPDF's
                                         "rawdict" shape: { rect, width, height, blocks → lines → spans → chars }.
                                         `options` is a MuPDF option string (default 'preserve-whitespace');
-                                        `imageRect: true` adds .imageRect (as Doc.pageImageRect) in the same trip
-     Doc.pageImageRect(n)            → Promise<rect|null> where the page image sits on the page (PDF points)
+                                        `imageRect: true` adds .imageRect (as Doc.pageImageRect), `pageSize: true`
+                                        adds .pageSize (as Doc.pageSize), in the same trip
+     Doc.pageImageRect(n)            → Promise<rect|null> where the page's scan sits on the page (PDF points);
+                                        null when the page is rendered
      Doc.bytes()                     → Promise<ArrayBuffer> the document's bytes, for a plugin's own worker
      Doc.heapMB()                    → Promise<number|null> the worker's wasm heap
      Doc.close()
@@ -40,7 +48,7 @@
    ========================================================= */
 (function () {
   const PAGE_URLS = 24, THUMB_URLS = 600;
-  const PRIORITY = { init: 0, open: 0, page: 1, typography: 2, imageRect: 3, text: 3, pixels: 3, heap: 3, thumb: 4 };
+  const PRIORITY = { init: 0, open: 0, page: 1, size: 1, typography: 2, imageRect: 3, text: 3, pixels: 3, heap: 3, thumb: 4 };
 
   const IMAGE_MIMES = {
     '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.tif': 'image/tiff',
@@ -183,12 +191,14 @@
     const kind = documentKind(name || source?.name, blob.type);
     const hashing = sha256Hex(blob);
     hashing.catch(() => {});                                 // reported where it is awaited
-    const doc = { info: null, blob, isImage: kind.isImage, imageURL: null, pages: new Map(), thumbs: new Map() };
+    const doc = { info: null, blob, isImage: kind.isImage, imageURL: null, pages: new Map(), thumbs: new Map(), sizes: new Map() };
     let timings = {};
 
     if (kind.isImage) {
       const bitmap = await createImageBitmap(blob);
+      // an image document is taken as 8.5 in wide: its px per pt is its width over 612 pt
       doc.info = { sha256: await hashing, numPages: 1, pageWidth: bitmap.width, pageHeight: bitmap.height,
+                   pxPerPt: bitmap.width / GEO.PAGE_WIDTH_PT,
                    pdfFonts: [], suggestedScale: Math.round(100 * GEO.PT_TO_PX), suggestedSize: 12.0,
                    pageImageType: kind.mime };
       bitmap.close();
@@ -206,13 +216,14 @@
       // Pages can be shown from here on; the typography pass follows, and a
       // page the viewer asks for meanwhile goes ahead of it (PRIORITY).
       doc.info = api.info = { sha256, ...opened.geometry };
+      doc.sizes.set(1, Promise.resolve({ width: opened.geometry.pageWidth, height: opened.geometry.pageHeight }));
       current = doc;
       const readyMs = performance.now() - t0;
       if (early) try { early({ ...doc.info }); } catch (e) { console.error(e); }
       const typed = await request({ type: 'typography' });
       superseded();
       const g = opened.geometry;
-      doc.info = { sha256, numPages: g.numPages, pageWidth: g.pageWidth, pageHeight: g.pageHeight,
+      doc.info = { sha256, numPages: g.numPages, pageWidth: g.pageWidth, pageHeight: g.pageHeight, pxPerPt: g.pxPerPt,
                    pdfFonts: typed.typography.pdfFonts, suggestedScale: g.suggestedScale,
                    suggestedSize: typed.typography.suggestedSize, pageImageType: g.pageImageType };
       timings = { readMs, initMs: init.initMs, ...opened.timings, readyMs, ...typed.timings };
@@ -248,6 +259,22 @@
     return remember(map, limit, n, made);
   }
 
+  // A page's pixel space, asked once per page (a few numbers, kept for the
+  // document's lifetime). An image document's one page is the image.
+  function pageSize(n) {
+    const doc = current;
+    if (!doc) return Promise.reject(new Error('no document is open'));
+    if (!Number.isInteger(n) || n < 1 || n > doc.info.numPages) return Promise.reject(new RangeError(`no page ${n}`));
+    if (doc.isImage) return Promise.resolve({ width: doc.info.pageWidth, height: doc.info.pageHeight });
+    let have = doc.sizes.get(n);
+    if (!have) {
+      have = request({ type: 'size', n }).then(answer => answer.size);
+      have.catch(() => { if (doc.sizes.get(n) === have) doc.sizes.delete(n); });
+      doc.sizes.set(n, have);
+    }
+    return have;
+  }
+
   const needPdf = () => {
     if (!current) throw new Error('no document is open');
     return !current.isImage;
@@ -258,12 +285,13 @@
     return (await request({ type: 'pixels', n, gray })).raster;
   }
 
-  async function structuredText(n, { options, imageRect = false } = {}) {
+  async function structuredText(n, { options, imageRect = false, pageSize = false } = {}) {
     if (!needPdf()) {
       const { pageWidth: w, pageHeight: h } = current.info;
-      return { rect: [0, 0, w, h], width: w, height: h, blocks: [], ...(imageRect ? { imageRect: null } : {}) };
+      return { rect: [0, 0, w, h], width: w, height: h, blocks: [], ...(imageRect ? { imageRect: null } : {}),
+               ...(pageSize ? { pageSize: { width: w, height: h } } : {}) };
     }
-    return (await request({ type: 'text', n, options, imageRect })).text;
+    return (await request({ type: 'text', n, options, imageRect, pageSize })).text;
   }
 
   async function pageImageRect(n) {
@@ -288,6 +316,6 @@
     stopWorker();
   }
 
-  const api = { open, pageImageURL, pagePixels, structuredText, pageImageRect, bytes, heapMB, close, info: null, timings: null };
+  const api = { open, pageSize, pageImageURL, pagePixels, structuredText, pageImageRect, bytes, heapMB, close, info: null, timings: null };
   window.Doc = api;
 })();

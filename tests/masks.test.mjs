@@ -1,11 +1,9 @@
 // web/plugins/webgl_mask/mask-core.js, in two halves.
 //
 // DETECTION: for every golden PDF page the blacked-out regions (or their
-// absence) must equal the recorded mask's 255 pixels. One page differs by
-// design — scan-tall, whose raster is taller than 8.5x11: the recorded mask
-// covers the UNCROPPED embedded image (1000x1320) while the viewer shows the
-// cropped raster (1000x1294); mask-core masks the pixels the viewer shows, so
-// its regions must equal the golden's top 1294 rows.
+// absence) must equal the recorded mask's 255 pixels — over the whole page:
+// the recorded masks were built on the uncropped embedded image, which is the
+// raster the viewer shows (scan-tall's 1000 × 1320 included).
 //
 // The EDGES are not held to the recordings (their two rings left corners,
 // overlapping rims and flush boxes behind — guide/frontend/webgl-mask.md).
@@ -66,11 +64,7 @@ for (const d of documents) {
         if (!map) continue;
         withMask++;
         const golden = decodeGray(path.join(GOLDEN, d.name, g.file));
-        assert.equal(raster.width, golden.width, `page ${n}: width`);
-        if (raster.height !== golden.height) {
-          assert.equal(d.name, 'scan-tall', `page ${n}: only the tall scan may differ in height`);
-          assert.ok(raster.height < golden.height);
-        }
+        assert.deepEqual([raster.width, raster.height], [golden.width, golden.height], `page ${n}: size`);
         // Region ⇔ 255 in the recording. The recording's rings could reach 255 as well, where a ring ran over
         // black page pixels only: those are not region, and black.
         let strays = 0;

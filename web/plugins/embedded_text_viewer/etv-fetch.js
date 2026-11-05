@@ -166,10 +166,10 @@ async function etvExtractPages(hash, start, count) {
   const spans = [];
   for (let p = start; p <= last; p++) {
     if (hash !== state.docHash) return null;
-    const raw = await Doc.structuredText(p, { imageRect: true });
-    // No embedded raster: the page is displayed as a 96-DPI render of the
-    // full page, so the full page IS the image placement.
-    for (const span of EtvExtract.extractSpans(raw, p, raw.imageRect || raw.rect)) spans.push(span);
+    const raw = await Doc.structuredText(p, { imageRect: true, pageSize: true });
+    // No scan: the page is displayed as a 96-DPI render of the full page, so
+    // the full page IS the image placement. Each page in its own pixel space.
+    for (const span of EtvExtract.extractSpans(raw, p, raw.imageRect || raw.rect, raw.pageSize)) spans.push(span);
   }
   return hash === state.docHash ? spans : null;
 }

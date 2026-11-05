@@ -9,8 +9,9 @@
 //   { type: 'open', buffer }                            → { ok, geometry, timings, heapMB }     pages, page size, scale
 //   { type: 'typography' }                              → { ok, typography, timings }           declared fonts, body size
 //   { type: 'page', n, thumb }                          → { ok, png: ArrayBuffer }      (transferred)
+//   { type: 'size', n }                                 → { ok, size: { width, height } }  the page's pixel space
 //   { type: 'pixels', n, gray }                         → { ok, raster }                the page raster's samples (transferred)
-//   { type: 'text', n, options, imageRect }             → { ok, text }                  raw structured text
+//   { type: 'text', n, options, imageRect, pageSize }   → { ok, text }                  raw structured text
 //   { type: 'imageRect', n }                            → { ok, rect | null }
 //   { type: 'heap' }                                    → { ok, heapMB }
 // A failure answers { ok: false, error }.
@@ -62,9 +63,12 @@ const handlers = {
     return { raster, transfer: [raster.samples.buffer] };
   },
 
-  text({ n, options, imageRect }) {
+  size: ({ n }) => ({ size: pdf.pageSize(n) }),
+
+  text({ n, options, imageRect, pageSize }) {
     const text = pdf.structuredText(n, options);
     if (imageRect) text.imageRect = pdf.pageImageRect(n);       // one round trip for a text plugin
+    if (pageSize) text.pageSize = pdf.pageSize(n);
     return { text };
   },
   imageRect: ({ n }) => ({ rect: pdf.pageImageRect(n) }),

@@ -84,7 +84,7 @@ SVG <text> element in .text-layer[data-page="N"]
            stays in the DOM, unpainted); null (or no plugin) → SVG text as usual
 ```
 
-The SVG layer uses a fixed `viewBox` matching document pixel space (`state.pageWidth` × `state.pageHeight`, 816 × 1056 for a PDF). Zoom is handled entirely by CSS sizing on the layer element — coordinate values in `box.x/y/w/h` never change. Font size is the one quantity kept in points (`box.sizePt`); it becomes pixels exactly once, at this boundary, through `GEO.docPtToPx()`.
+The SVG layer uses a fixed `viewBox` matching the page's pixel space (`state.pageWidth` × `state.pageHeight`, set per page from `Doc.pageSize`: 816 × 1056 for a US-Letter scan). Zoom is handled entirely by CSS sizing on the layer element — coordinate values in `box.x/y/w/h` never change. Font size is the one quantity kept in points (`box.sizePt`); it becomes pixels exactly once, at this boundary, through `GEO.docPtToPx()`.
 
 The layer is drawn by event, not by call: `svg-renderer.js` subscribes to `page:rendered` and runs `renderTextLayer(pageContainer, pageNum)` for the page the core just put into the DOM. When the core opens another document it resets the model through guarded calls (`utbState.reset()`, `clearAllSVGLayers()`), which do nothing when `text_tool` is absent.
 
