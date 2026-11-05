@@ -89,7 +89,10 @@ runs input methods; every change goes through the story model.
 | Escape | Leave the text (the box stays selected) |
 
 With a **caret** (no selection) a character setting applies to the text typed next, as in
-Affinity. While a box is only **selected**, every setting applies to all of its text.
+Affinity. While a box is only **selected**, every setting applies to all of its text. The
+keyboard stays with the text being edited: a button of the Text panel or the tool column never
+takes it, a menu, checkbox or colour gives it back once its change is made, a field typed in at
+Enter — and Escape from the panel leaves the text, as Escape in it does.
 
 ---
 

@@ -43,7 +43,7 @@
   btn?.addEventListener('click', () => arm(!armed()));
   for (const id of OTHER_TOOLS) document.getElementById(id)?.addEventListener('click', () => btn?.classList.remove('active'));
   document.addEventListener('keydown', e => {
-    if (e.key !== 'Escape' || !armed() || utbState.editingId) return;
+    if (e.key !== 'Escape' || e.defaultPrevented || !armed() || utbState.editingId) return;
     const t = e.target;
     if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
     if (utbState.selectedId) {

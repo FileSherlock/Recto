@@ -40,7 +40,7 @@ the order of their manifest's `order` (`embedded_text_viewer` 10, `webgl_mask` 2
 | 17 | `text_tool/story-render.js` | `renderStoryBox`, `storySync`, `ensureStory`, `renderAllStories`, `storyFaceMetrics` | **on:** `zoom:changed` | `StoryCore`, `Shaping`, `GEO` |
 | 18 | `text_tool/drag-resize.js` | IIFE — SVG-native drag/resize event delegation, frame handles | — | `utbState`, `renderBox` |
 | 19 | `text_tool/ruler.js` | `refreshRuler` | **on:** `page:rendered` | `utbState`, `GEO` |
-| 20 | `text_tool/story-edit.js` | `enterStoryEdit`, `commitStoryEdit`, `storyTarget`, `storyCharState`, `storyParaState`, `storyApplyChar`, `storyApplyPara`, `storyApplyParaEach`, `storyApplyFrame`, `storyMapChar`, `storyChangeCase`, `onStoryChange` | **on:** `document:opening` | `StoryCore`, `renderBox`, `utbUndo` |
+| 20 | `text_tool/story-edit.js` | `enterStoryEdit`, `commitStoryEdit`, `storyFocus`, `storyTarget`, `storyCharState`, `storyParaState`, `storyApplyChar`, `storyApplyPara`, `storyApplyParaEach`, `storyApplyFrame`, `storyMapChar`, `storyChangeCase`, `onStoryChange` | **on:** `document:opening` | `StoryCore`, `renderBox`, `utbUndo` |
 | 21 | `text_tool/toolbar.js` | `syncToolbarToBox`, `syncToolbarToSelection`, `syncStoryControls`, `getNaturalSpaceWidth` | — | `utbState`, `renderBox`, `Shaping`, `story-edit.js` |
 | 22 | `text_tool/micro-typo.js` | `enterMicroTypo`, `exitMicroTypo` | — | `utbState`, `computeXPositions`, `renderBox` |
 | 23 | `text_tool/inline-edit.js` | `enterInlineEdit`, `commitInlineEdit`, `cancelInlineEdit` | — | `utbState`, `renderBox`, `exitMicroTypo`, `enterStoryEdit` |

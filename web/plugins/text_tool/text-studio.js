@@ -759,6 +759,20 @@
     apply(scopeKey, { [key]: b.dataset.v });
   });
 
+  // The text being edited keeps the keyboard: a button pressed here never
+  // takes it (story-edit.js), and a menu, a checkbox or a colour gives it back
+  // once its change is made — a field typed in, at Enter — so typing goes on
+  // in the text, in what was just chosen. (Escape leaves the text from here,
+  // as it does from the text.)
+  const typedIn = c => c?.tagName === 'TEXTAREA' || (c?.tagName === 'INPUT' && /^(number|text|search)$/.test(c.type));
+  const handBack = () => { if (window.storyEditing?.()) window.storyFocus?.(); };
+  panel.addEventListener('change', e => { if (!typedIn(e.target)) handBack(); });
+  panel.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || !typedIn(e.target) || !window.storyEditing?.()) return;
+    e.preventDefault();          // the Enter is the field's: no new paragraph where the keyboard goes
+    handBack();
+  });
+
   // Size steps: Affinity steps each run's own size by a point
   function stepSize(by) {
     const t = target();

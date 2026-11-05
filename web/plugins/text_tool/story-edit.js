@@ -419,14 +419,41 @@
 
   // A press outside the edited box — on the page, on another box — ends the
   // session; the ribbon, the tool column and the side panels (the Text panel,
-  // a plugin's) do not.
+  // a plugin's) do not. A button pressed there (B, a tab, a tool) does not
+  // take the keyboard either: typing goes on in the text. (A menu or a field
+  // needs it: the Text panel gives it back once its change is made.)
+  const KEEPS_SESSION = '#unified-options-bar-container, #tool-column, [data-side-panel], .floating-panel, #ribbon-overflow';
+  const FIELD = 'select, textarea, input:not([type=checkbox]):not([type=radio])';
   document.addEventListener('mousedown', e => {
     if (!session) return;
     const t = e.target;
     if (groupOf(session.box)?.contains(t)) return;
-    if (t.closest?.('#unified-options-bar-container, #tool-column, [data-side-panel], .floating-panel, #ribbon-overflow')) return;
+    if (t.closest?.(KEEPS_SESSION)) {
+      if (t.closest('button, summary, label, input') && !t.closest(FIELD)) e.preventDefault();
+      return;
+    }
     commitStoryEdit();
   }, true);
+
+  // Escape leaves the text wherever the keyboard is: in it (onKeyDown), or on
+  // a control that formats it — a menu of the Text panel, a field, a tool.
+  document.addEventListener('keydown', e => {
+    if (!session || e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return;
+    if (session.flow?.contains(e.target)) return;
+    e.preventDefault();          // the tools' Escape (deselect, put down) waits for the next one
+    commitStoryEdit();
+    // …which the control does not keep: the next Escape is the page's
+    if (e.target !== document.body) e.target.blur?.();
+  }, true);
+
+  // Give the keyboard back to the text being edited, at its selection.
+  function storyFocus() {
+    if (!session) return;
+    const flow = session.flow = flowOf(session.box);
+    if (!flow) return;
+    flow.focus({ preventScroll: true });
+    showSelection();
+  }
 
   // ── what the panels read and write ────────────────────────────────────────
 
@@ -555,6 +582,7 @@
   window.storyAfterRender = box => { if (session?.box === box) showSelection(); };
   window.enterStoryEdit = enterStoryEdit;
   window.commitStoryEdit = commitStoryEdit;
+  window.storyFocus = storyFocus;
   window.storyTarget = storyTarget;
   window.storyCharState = storyCharState;
   window.storyParaState = storyParaState;

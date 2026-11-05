@@ -33,6 +33,14 @@ The panel shows and sets the formatting of what is selected — any box — and 
 | **A box with one face** — an OCR line, embedded text, a redaction box's label | Its own fields (`utbPlainChar`, below): font family, size, style, **B I U S** (single lines), colour and opacity, pair kerning, tracking, space width, nudge; a redaction box also its match terms. Everything else is **locked** — greyed, a lock, the reason on hover; the Paragraph, Frame and Typography tabs say so once, at their top |
 | **Nothing** | The font family and size **new text** takes (`TextPanel.newText()`; fonts.js puts the document's face there, a change made here is the user's own default), and the match terms a new redaction box takes |
 
+While Artistic or Frame text is edited the **keyboard stays with the text**: a button pressed in
+the panel or the tool column — **B**, a tab, **−/+**, a tool — never takes it (`story-edit.js`
+keeps the focus in the text), and a menu, a checkbox or a colour gives it back once its change
+is made (`storyFocus`); a field typed in, such as the size, gives it back at **Enter**. So
+choosing **B** at a caret and typing goes on in bold, and the font menu's type-ahead never
+re-fonts the selection. **Escape** leaves the text from the panel as it does from the text (the
+box stays selected; the next Escape is the page's).
+
 A setting the target or the drawing cannot have is locked (`lockOf` in `text-studio.js`):
 a box with one face has no paragraph, frame, OpenType or decoration-colour settings; the Frame
 tab belongs to Frame text (its **Convert to Text Frame** stays usable); and while a **pixel
