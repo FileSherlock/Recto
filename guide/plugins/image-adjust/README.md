@@ -26,25 +26,31 @@ reading the page's own pixels.
   - the **stack** (`#ia-stack`), applied top to bottom like adjustment layers over the page —
     on/off, order, remove; **Add adjustment…** (`#ia-add`);
   - the **editor** (`#ia-editor`) of the selected adjustment, with its **Opacity**:
-    - **Curves** — Channel (Master / Red / Green / Blue), **Linear**, the graph over the page's
-      histogram (click to add a point, drag to move, drag off the graph or Delete to remove,
+    - **Curves** — Channel (Master / Red / Green / Blue), **Linear**, the graph over the
+      histogram of what the curve is given — the page through the adjustments above it (click to add a point, drag to move, drag off the graph or Delete to remove,
       arrow keys nudge), **X: / Y:**, **Min: / Max:** (the input range), the pickers **Add
       Point** (press on the page, drag up or down), **Set Black Point** (press on the ink),
-      **Set White Point** (press on the paper), **Set Grey Point**, **Reset**;
+      **Set White Point** (press on the paper), **Set Grey Point**, **Reset** — the pickers read
+      the tone the curve is given too (after an Invert above it, the ink is light); an emptied
+      Min / Max, or a Min not below Max, changes nothing;
     - **Levels** — Channel, Black Level, White Level, Gamma, Output Black / White Level;
     - **Brightness / Contrast** — both sliders and **Linear**;
     - **Threshold** — the level;
   - **Rounding** (`#ia-rounding`): Affinity's screen rendering (GPU, rounds half up) or its CPU
     rendering (truncates) — at most one level apart;
-  - **Export page as PNG** (`#ia-export`): the page's own pixels through the very same stages.
+  - **Export page as PNG** (`#ia-export`): the page's own pixels through the very same stages —
+    what the view shows: nothing applied while bypassed, and a gray scan's three channels kept as
+    the filter leaves them (`toRGBA`), not folded back into their intensity.
 
 The stack and the rounding are kept in this browser (`localStorage`, `recto.imageAdjust`) and
-apply to every document until reset.
+apply to every document until reset. What is read back is made valid first (`AdjustCore.clean`:
+a field of the wrong shape takes its default), and so is a stack handed to
+`window.imageAdjust.set`; the panel's stored place is kept on screen.
 
 ## How it computes
 
 All on the stored (gamma-encoded) 8-bit values, as Affinity's RGB adjustments do; alpha is
-never touched.
+never touched (a raster is gray, gray + alpha, RGB or RGBA: `components` counts the alpha).
 
 - **Curves** — a natural cubic spline through the points (second derivative 0 at both ends),
   flat beyond the first and last point, the identity outside 0…1; piecewise linear with two
@@ -74,7 +80,8 @@ a run of tables is one `feComponentTransfer` (`type="table"`, 256 values — an 
 table, an opacity an `feComposite`. It applies to `.page-container > img` and, when
 `webgl_mask` is installed and on, to its `.webgl-overlay` canvas; text boxes, rulers and other
 overlays are not adjusted. `adjust-core.js` (`AdjustCore`, no DOM) computes the stages and
-applies them to samples (`applyToSamples`) — what the tests and the export use.
+applies them to samples (`applyToSamples`, and `toRGBA`: RGBA as the view shows it) — what the
+tests and the export use.
 
 On screen the browser applies the tables after it has scaled the page; at 100 % zoom and for
 the export every sample is the table's.
@@ -84,7 +91,7 @@ the export every sample is the table's.
 | File | |
 |---|---|
 | `plugin.json` | order 25; `toolbar_button.html`, `options_bar.html`, `panel.html` (sidebar slot), `styles.css`; scripts `adjust-core.js`, `image-adjust.js` |
-| `adjust-core.js` | `AdjustCore`: `spline`, `secondDerivatives`, `create`, `curvesTables`, `levelsFn`, `brightnessContrastTable`, `thresholdTable`, `compile`, `applyToSamples`, `histogram`, `tableValues`, `PRESETS`, `rounding` |
+| `adjust-core.js` | `AdjustCore`: `spline`, `secondDerivatives`, `create`, `curvesTables`, `levelsFn`, `brightnessContrastTable`, `thresholdTable`, `compile`, `clean`, `applyToSamples`, `toRGBA`, `histogram`, `tableValues`, `PRESETS`, `rounding` |
 | `image-adjust.js` | the filter, the ribbon, the panel, the pickers, the export; `window.imageAdjust` (`stack`, `set(stack)`, `stages()`) |
 
 `tests/plugins/image_adjust/adjust-core.test.mjs` holds the numbers to Affinity's (the second

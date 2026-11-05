@@ -30,7 +30,14 @@
   const NAMES = { curves: 'Curves', levels: 'Levels', brightnessContrast: 'Brightness / Contrast', invert: 'Invert', threshold: 'Threshold' };
   let seq = 0;
   const newId = () => `ia-${Date.now().toString(36)}-${++seq}`;
-  const fresh = a => ({ ...AC.create(a.type), ...a, id: a.id || newId() });
+  // an adjustment made valid (AC.clean: stored or handed-over values of the
+  // wrong shape take their defaults), with an id; null for an unknown type
+  const fresh = a => {
+    const c = AC.clean(a);
+    if (!c) return null;
+    if (c.quick !== 'invert' && c.quick !== 'bc') delete c.quick;
+    return { ...c, id: typeof c.id === 'string' && c.id ? c.id : newId() };
+  };
 
   // ── the stack ─────────────────────────────────────────────────────────────
 
@@ -41,7 +48,7 @@
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(KEY));
-      if (Array.isArray(s?.stack)) stack = s.stack.filter(a => NAMES[a?.type]).map(fresh);
+      if (Array.isArray(s?.stack)) stack = s.stack.filter(a => NAMES[a?.type]).map(fresh).filter(Boolean);
       if (s?.rounding) AC.rounding = s.rounding;
     } catch { stack = []; }
   }
@@ -89,6 +96,7 @@
     $('ia-bypass')?.classList.toggle('active', bypass);
     if (!keep) save();
     syncQuick();
+    if (curveUI) loadHistogram();       // the adjustments above the shown curve may have changed its input
   }
 
   // ── the quick controls ────────────────────────────────────────────────────
@@ -184,8 +192,14 @@
   (function draggable() {
     const head = $('ia-panel-head');
     try {
+      // where it was, kept on screen: a window smaller now than then would
+      // leave a stored place off it, and the panel out of reach
       const pos = JSON.parse(localStorage.getItem(`${KEY}.pos`));
-      if (pos) { panel.style.left = `${pos.x}px`; panel.style.top = `${pos.y}px`; panel.style.right = 'auto'; }
+      if (Number.isFinite(pos?.x) && Number.isFinite(pos?.y)) {
+        panel.style.left = `${Math.max(0, Math.min(innerWidth - 60, pos.x))}px`;
+        panel.style.top = `${Math.max(0, Math.min(innerHeight - 30, pos.y))}px`;
+        panel.style.right = 'auto';
+      }
     } catch { /* the default place */ }
     head?.addEventListener('mousedown', e => {
       if (e.target.closest('button')) return;
@@ -352,7 +366,14 @@
     wrap.appendChild(row('X:', inX, elt('label', 'ia-inline', 'Y:'), inY));
     const inMin = num('Min — the lowest input value the curve spans', 0.01), inMax = num('Max — the highest', 0.01);
     inMin.value = adj.inputMin ?? 0; inMax.value = adj.inputMax ?? 1;
-    for (const [i, k] of [[inMin, 'inputMin'], [inMax, 'inputMax']]) i.addEventListener('change', () => { adj[k] = Math.max(0, Math.min(1, +i.value)); apply(); });
+    // an emptied field, or a Min not below Max, changes nothing (an empty Max
+    // was 0, and the page went black)
+    for (const [i, k] of [[inMin, 'inputMin'], [inMax, 'inputMax']]) i.addEventListener('change', () => {
+      const v = i.value.trim() === '' ? NaN : Math.max(0, Math.min(1, +i.value));
+      const min = k === 'inputMin' ? v : adj.inputMin ?? 0, max = k === 'inputMax' ? v : adj.inputMax ?? 1;
+      if (Number.isFinite(v) && max - min >= 1 / 255) { adj[k] = v; apply(); }
+      else i.value = adj[k] ?? (k === 'inputMin' ? 0 : 1);
+    });
     wrap.appendChild(row('Min:', inMin, elt('label', 'ia-inline', 'Max:'), inMax));
 
     // the pickers: take a tone from the page
@@ -424,7 +445,8 @@
       const list = pts().map(p => [...p]);
       const p = list[ui.sel];
       if (!p) return;
-      p[k] = Math.max(0, Math.min(1, +inp.value || 0));
+      if (inp.value.trim() === '' || !Number.isFinite(+inp.value)) { draw(); return; }   // emptied: the point stays
+      p[k] = Math.max(0, Math.min(1, +inp.value));
       // a point keeps strictly between its neighbours
       const prev = list[ui.sel - 1], next = list[ui.sel + 1];
       if (prev && p[0] <= prev[0]) p[0] = prev[0] + 1 / 255;
@@ -528,7 +550,11 @@
     if (!r || curveUI !== ui) return;
     const x = Math.min(r.width - 1, Math.max(0, Math.floor(fx * r.width))), y = Math.min(r.height - 1, Math.max(0, Math.floor(fy * r.height)));
     const at = (y * r.width + x) * r.components, s = r.samples;
-    const rgb = r.components === 1 ? [s[at], s[at], s[at]] : [s[at], s[at + 1], s[at + 2]];
+    // the tone this curve is given: the page's pixel through the adjustments
+    // above it (after Invert the ink is light — Set Black Point read the
+    // unadjusted ink, and the ink went light and the paper dark)
+    const rgb = Array.from(AC.toRGBA(r.components <= 2 ? Uint8Array.of(s[at], s[at], s[at]) : Uint8Array.of(s[at], s[at + 1], s[at + 2]),
+      3, stagesBefore(ui.adj)).subarray(0, 3));
     const adj = ui.adj;
     if (mode === 'black' || mode === 'white') {
       // each colour channel's own value goes to black (or white): a colour
@@ -570,7 +596,7 @@
   // ── the page's pixels: histogram, pickers, export ────────────────────────
 
   // The page's raster as samples: Doc.pagePixels, or the decoded page image
-  // of an image document.
+  // of an image document. `components` counts alpha (gray + alpha is 2).
   const rasters = new Map();     // `${hash}:${page}` → Promise<{ width, height, components, samples }>
   function raster(page) {
     const key = `${state.docHash}:${page}`;
@@ -578,7 +604,7 @@
       if (rasters.size > 3) rasters.delete(rasters.keys().next().value);
       rasters.set(key, (async () => {
         const r = await Doc.pagePixels(page);
-        if (r) return { width: r.width, height: r.height, components: r.components + (r.alpha && r.components < 4 ? 1 : 0), samples: r.samples };
+        if (r) return { width: r.width, height: r.height, components: r.components, samples: r.samples };
         const blob = await (await fetch(await Doc.pageImageURL(page))).blob();
         const bmp = await createImageBitmap(blob);
         const c = new OffscreenCanvas(bmp.width, bmp.height), g = c.getContext('2d');
@@ -590,29 +616,34 @@
     return rasters.get(key);
   }
 
+  // The stages above an adjustment: what its input is made of (the stack acts
+  // top to bottom). The Curves graph shows the histogram of that input, and
+  // its pickers read tones from it.
+  const stagesBefore = adj => { const i = stack.indexOf(adj); return i > 0 ? AC.compile(stack.slice(0, i)) : []; };
+  const stagesKey = st => st.map(s => (s.kind === 'lut' ? `${s.r}|${s.g}|${s.b}` : `${s.y}|${s.opacity}`)).join('/');
+
   async function loadHistogram() {
     if (!state.numPages || panel.classList.contains('hidden')) return;
-    const key = `${state.docHash}:${state.currentPage}`;
+    const before = curveUI ? stagesBefore(curveUI.adj) : [];
+    const keyNow = () => `${state.docHash}:${state.currentPage}:${stagesKey(curveUI ? stagesBefore(curveUI.adj) : [])}`;
+    const key = keyNow();
     if (histo?.key === key) { curveUI?.draw(); return; }
     const r = await raster(state.currentPage);
-    if (!r || key !== `${state.docHash}:${state.currentPage}`) return;
-    histo = { key, h: AC.histogram(r.samples, r.components) };
+    if (!r || key !== keyNow()) return;
+    histo = { key, h: before.length ? AC.histogram(AC.toRGBA(r.samples, r.components, before), 4) : AC.histogram(r.samples, r.components) };
     curveUI?.draw();
   }
   PDFHooks.on('page:rendered', () => loadHistogram());
   PDFHooks.on('document:opening', () => { rasters.clear(); histo = null; });
 
-  // Export: the page's own pixels through the stages, as a PNG download.
+  // Export: the page's own pixels through the stages, as a PNG download — what
+  // the view shows: nothing applied while bypassed, and a gray scan's three
+  // channels kept as the filter leaves them (AC.toRGBA).
   $('ia-export')?.addEventListener('click', async () => {
     if (!state.numPages) return;
     const r = await raster(state.currentPage);
     if (!r) return;
-    const out = AC.applyToSamples(r.samples, r.components, stages);
-    const rgba = new Uint8ClampedArray(r.width * r.height * 4);
-    for (let i = 0, j = 0; i < rgba.length; i += 4, j += r.components) {
-      if (r.components === 1) { rgba[i] = rgba[i + 1] = rgba[i + 2] = out[j]; rgba[i + 3] = 255; }
-      else { rgba[i] = out[j]; rgba[i + 1] = out[j + 1]; rgba[i + 2] = out[j + 2]; rgba[i + 3] = r.components > 3 ? out[j + 3] : 255; }
-    }
+    const rgba = AC.toRGBA(r.samples, r.components, bypass ? [] : stages);
     const c = new OffscreenCanvas(r.width, r.height);
     c.getContext('2d').putImageData(new ImageData(rgba, r.width, r.height), 0, 0);
     const blob = await c.convertToBlob({ type: 'image/png' });
@@ -627,7 +658,7 @@
 
   window.imageAdjust = {
     get stack() { return stack; },
-    set(next) { stack = (next || []).filter(a => NAMES[a?.type]).map(fresh); apply(); renderPanel(); },
+    set(next) { stack = (Array.isArray(next) ? next : []).filter(a => NAMES[a?.type]).map(fresh).filter(Boolean); apply(); renderPanel(); },
     stages: () => stages,
   };
 

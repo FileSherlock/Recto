@@ -158,3 +158,40 @@ test('every preset is a valid stack that changes the page; Affinity\'s knots kep
   }
   assert.deepEqual(AC.PRESETS.find(p => p.key === 's-curve-stronger').stack()[0].master[1], [0.249609375, 0.15]);
 });
+
+test('gray with alpha (two components) and toRGBA: what the view shows, alpha kept', { skip }, () => {
+  const inv = AC.compile([AC.create('invert')]);
+  // gray + alpha: the gray changes, the alpha stays, the stride is two
+  assert.deepEqual([...AC.applyToSamples(Uint8Array.of(0, 9, 200, 77), 2, inv)], [255, 9, 55, 77]);
+  const h = AC.histogram(Uint8Array.of(0, 9, 200, 77), 2);
+  assert.equal(h.l[0], 1); assert.equal(h.l[200], 1); assert.equal(h.l[9] + h.l[77], 0);
+  // a gray page under a red-only curve: the view shows it tinted, and so does the export
+  const red = AC.compile([{ ...AC.create('curves'), r: [[0, 1], [1, 0]] }]);
+  assert.deepEqual([...AC.toRGBA(Uint8Array.of(10), 1, red)], [245, 10, 10, 255]);
+  assert.deepEqual([...AC.toRGBA(Uint8Array.of(10, 40), 2, red)], [245, 10, 10, 40]);
+  assert.deepEqual([...AC.toRGBA(Uint8Array.of(0, 10, 20, 77), 4, red)], [255, 10, 20, 77]);
+  // three equal channels stay what they are with nothing to apply (their intensity can lose a level)
+  for (const v of [1, 128, 254]) assert.deepEqual([...AC.toRGBA(Uint8Array.of(v), 1, [])], [v, v, v, 255]);
+});
+
+test('clean: a stored or handed-over adjustment is made valid, field by field', { skip }, () => {
+  assert.equal(AC.clean({ type: 'blur' }), null);
+  assert.equal(AC.clean(null), null);
+  // a curve that is not a list of points: the identity, and the stack compiles
+  const c = AC.clean({ type: 'curves', master: 5, r: [[0, 1], [1, 0]], g: [[0, 'x']], id: 'keep' });
+  assert.deepEqual(c.master, [[0, 0], [1, 1]]);
+  assert.deepEqual(c.r, [[0, 1], [1, 0]]);
+  assert.deepEqual(c.g, [[0, 0], [1, 1]]);
+  assert.equal(c.id, 'keep');
+  assert.doesNotThrow(() => AC.compile([c]));
+  // an input range that is empty or backwards: the whole range (an empty Max made the page black)
+  assert.deepEqual([AC.clean({ type: 'curves', inputMin: 0, inputMax: 0 }).inputMin, AC.clean({ type: 'curves', inputMin: 0, inputMax: 0 }).inputMax], [0, 1]);
+  assert.deepEqual([AC.clean({ type: 'curves', inputMin: 0.2, inputMax: 0.8 }).inputMin, AC.clean({ type: 'curves', inputMin: 0.2, inputMax: 0.8 }).inputMax], [0.2, 0.8]);
+  // numbers out of range are clamped, of the wrong kind take the default
+  const l = AC.clean({ type: 'levels', master: { black: 'a', white: 2, gamma: 0 }, opacity: 7, enabled: 'yes' });
+  assert.deepEqual(l.master, { black: 0, white: 1, gamma: 0.01, outBlack: 0, outWhite: 1 });
+  assert.equal(l.opacity, 1); assert.equal(l.enabled, true);
+  assert.deepEqual(AC.clean({ type: 'brightnessContrast', brightness: 3, contrast: null }), { ...AC.create('brightnessContrast'), brightness: 1 });
+  // a valid adjustment comes back as it was
+  for (const p of AC.PRESETS) for (const a of p.stack()) assert.deepEqual(AC.clean(a), a, p.key);
+});

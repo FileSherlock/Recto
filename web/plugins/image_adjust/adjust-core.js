@@ -122,6 +122,45 @@
     }
   }
 
+  // An adjustment as stored or handed over, made valid: an unknown type is
+  // null; a field of the wrong shape takes its default — a stored
+  // `master: 5` threw at every start, an input range that is empty or
+  // backwards blacked the page out. Other fields (an id) are kept.
+  const num = (v, lo, hi, d) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
+  const validPoints = v => Array.isArray(v) && v.length >= 2 &&
+    v.every(p => Array.isArray(p) && typeof p[0] === 'number' && Number.isFinite(p[0]) && typeof p[1] === 'number' && Number.isFinite(p[1]));
+  function clean(a) {
+    const d = a && typeof a === 'object' ? create(a.type) : null;
+    if (!d) return null;
+    const out = { ...a, type: d.type, enabled: typeof a.enabled === 'boolean' ? a.enabled : d.enabled, opacity: num(a.opacity, 0, 1, d.opacity) };
+    switch (d.type) {
+      case 'curves': {
+        for (const ch of ['master', ...CHANNELS]) out[ch] = validPoints(a[ch]) ? a[ch].map(p => [p[0], p[1]]) : d[ch];
+        out.linear = Object.fromEntries(['master', ...CHANNELS].map(ch => [ch, !!a.linear?.[ch]]));
+        out.inputMin = num(a.inputMin, 0, 1, 0);
+        out.inputMax = num(a.inputMax, 0, 1, 1);
+        if (!(out.inputMax - out.inputMin >= 1 / 255)) { out.inputMin = 0; out.inputMax = 1; }
+        break;
+      }
+      case 'levels':
+        for (const ch of ['master', ...CHANNELS]) {
+          const l = a[ch] && typeof a[ch] === 'object' ? a[ch] : {}, dl = d[ch];
+          out[ch] = { black: num(l.black, 0, 1, dl.black), white: num(l.white, 0, 1, dl.white), gamma: num(l.gamma, 0.01, 10, dl.gamma),
+            outBlack: num(l.outBlack, 0, 1, dl.outBlack), outWhite: num(l.outWhite, 0, 1, dl.outWhite) };
+        }
+        break;
+      case 'brightnessContrast':
+        out.brightness = num(a.brightness, -1, 1, 0);
+        out.contrast = num(a.contrast, -1, 1, 0);
+        out.linear = !!a.linear;
+        break;
+      case 'threshold':
+        out.level = num(a.level, 0, 1, 0.5);
+        break;
+    }
+    return out;
+  }
+
   // Curves: each channel's own curve first, then the master curve, inside the
   // input range Min…Max (identity at the default 0…1).
   function curvesTables(adj) {
@@ -248,36 +287,63 @@
   const K = f32(0.003921569);
   const luma = (r, g, b) => clamp8(trunc(f32(f32(f32(f32(r * K) * f32(0.299)) + f32(f32(g * K) * f32(0.587)) + f32(f32(b * K) * f32(0.114))) * 255)));
 
-  // Apply the stages to a raster's samples: 1 component (gray), 3 (RGB) or 4
-  // (RGBA, alpha kept). A gray raster is three equal channels.
+  // One pixel through the stages: rgb (three levels) in, changed in place.
+  function stagePixel(stages, rgb) {
+    let [r, g, b] = rgb;
+    for (const s of stages) {
+      if (s.kind === 'lut') { r = s.r[r]; g = s.g[g]; b = s.b[b]; continue; }
+      const y = s.y[luma(r, g, b)];
+      if (s.opacity >= 1) { r = g = b = y; continue; }
+      r = Math.floor(r + (y - r) * s.opacity + 0.5);
+      g = Math.floor(g + (y - g) * s.opacity + 0.5);
+      b = Math.floor(b + (y - b) * s.opacity + 0.5);
+    }
+    rgb[0] = r; rgb[1] = g; rgb[2] = b;
+    return rgb;
+  }
+
+  // Apply the stages to a raster's samples: `components` per pixel, alpha
+  // included — 1 (gray), 2 (gray + alpha), 3 (RGB) or 4 (RGBA); alpha kept.
+  // A gray raster is three equal channels, written back as their intensity.
   function applyToSamples(samples, components, stages) {
     const out = new Uint8Array(samples.length);
-    const n = samples.length / components;
+    const n = samples.length / components, gray = components <= 2, rgb = [0, 0, 0];
     for (let p = 0; p < n; p++) {
       const at = p * components;
-      let r, g, b;
-      if (components === 1) r = g = b = samples[at];
-      else { r = samples[at]; g = samples[at + 1]; b = samples[at + 2]; }
-      for (const s of stages) {
-        if (s.kind === 'lut') { r = s.r[r]; g = s.g[g]; b = s.b[b]; continue; }
-        const y = s.y[luma(r, g, b)];
-        if (s.opacity >= 1) { r = g = b = y; continue; }
-        r = Math.floor(r + (y - r) * s.opacity + 0.5);
-        g = Math.floor(g + (y - g) * s.opacity + 0.5);
-        b = Math.floor(b + (y - b) * s.opacity + 0.5);
-      }
-      if (components === 1) { out[at] = luma(r, g, b); continue; }
-      out[at] = r; out[at + 1] = g; out[at + 2] = b;
+      if (gray) rgb[0] = rgb[1] = rgb[2] = samples[at];
+      else { rgb[0] = samples[at]; rgb[1] = samples[at + 1]; rgb[2] = samples[at + 2]; }
+      stagePixel(stages, rgb);
+      if (gray) { out[at] = luma(rgb[0], rgb[1], rgb[2]); if (components === 2) out[at + 1] = samples[at + 1]; continue; }
+      out[at] = rgb[0]; out[at + 1] = rgb[1]; out[at + 2] = rgb[2];
       for (let k = 3; k < components; k++) out[at + k] = samples[at + k];
     }
     return out;
   }
 
-  // A raster's histogram per channel (256 counts each) and of its intensity.
+  // The stages applied as the browser shows a raster under the filter: RGBA
+  // (4 per pixel), a gray raster's three equal channels kept as three — a
+  // channel's own curve tints it, and its intensity would lose a level —,
+  // alpha kept, 255 without. What "Export page as PNG" writes, and the input a
+  // later adjustment is given.
+  function toRGBA(samples, components, stages) {
+    const n = samples.length / components, gray = components <= 2, alpha = components === 2 || components === 4;
+    const out = new Uint8ClampedArray(n * 4), rgb = [0, 0, 0];
+    for (let p = 0, at = 0, o = 0; p < n; p++, at += components, o += 4) {
+      if (gray) rgb[0] = rgb[1] = rgb[2] = samples[at];
+      else { rgb[0] = samples[at]; rgb[1] = samples[at + 1]; rgb[2] = samples[at + 2]; }
+      stagePixel(stages, rgb);
+      out[o] = rgb[0]; out[o + 1] = rgb[1]; out[o + 2] = rgb[2];
+      out[o + 3] = alpha ? samples[at + components - 1] : 255;
+    }
+    return out;
+  }
+
+  // A raster's histogram per channel (256 counts each) and of its intensity
+  // (`components` as for applyToSamples; alpha is not counted).
   function histogram(samples, components) {
     const h = { r: new Uint32Array(N), g: new Uint32Array(N), b: new Uint32Array(N), l: new Uint32Array(N) };
-    if (components === 1) {
-      for (let i = 0; i < samples.length; i++) { const v = samples[i]; h.r[v]++; h.g[v]++; h.b[v]++; h.l[v]++; }
+    if (components <= 2) {
+      for (let i = 0; i < samples.length; i += components) { const v = samples[i]; h.r[v]++; h.g[v]++; h.b[v]++; h.l[v]++; }
       return h;
     }
     for (let i = 0; i < samples.length; i += components) {
@@ -323,9 +389,9 @@
   ];
 
   globalThis.AdjustCore = {
-    N, CHANNELS, sortPoints, spline, secondDerivatives, isIdentityCurve, create,
+    N, CHANNELS, sortPoints, spline, secondDerivatives, isIdentityCurve, create, clean,
     curvesTables, levelsFn, levelsTables, bcExponents, brightnessContrastTable, thresholdTable, stageOf,
     get rounding() { return rounding; }, set rounding(v) { rounding = v === 'cpu' ? 'cpu' : 'gpu'; },
-    compile, isIdentity, tables, tableValues, luma, applyToSamples, histogram, PRESETS,
+    compile, isIdentity, tables, tableValues, luma, applyToSamples, toRGBA, histogram, PRESETS,
   };
 })();
