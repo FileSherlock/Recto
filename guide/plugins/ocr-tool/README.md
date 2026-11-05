@@ -56,7 +56,7 @@ A finished whole-document read is kept, slimmed down to exactly the fields
 (`state.docHash`). A later open of the same bytes replays the boxes through
 the normal `ocrAddBoxes` path — no engine, no ~10 MB glyph download — and the
 status line ends in `precomputed`. Two tiers hold the same JSON
-(`{ version, pages }`) under the same version check:
+(`{ version, readWith, pages }`) under the same check:
 
 1. **Shipped reads** — `web/plugins/ocr_tool/cache/<sha256>.json`, committed
    to the repository. The **startup document** (the PDF in
@@ -72,7 +72,8 @@ status line ends in `precomputed`. Two tiers hold the same JSON
    is best-effort: in a private window or on a full disk the next open simply
    reads again.
 
-A miss in both tiers falls back to the live engine read.
+A miss in both tiers falls back to the live engine read, and so does a stored
+read that fails the check.
 
 - **Shipping a read** after swapping the startup PDF: open the app, let the
   automatic read finish, run `ocrExportCache()` in the browser console — it
@@ -84,9 +85,18 @@ A miss in both tiers falls back to the live engine read.
 - `version` (`OCR_CACHE_VERSION`, currently 4 — the rules are kept beside the
   bars, and an entry carries its glyph's `ink`; 3: only black boxes are kept;
   2: per-page `spaceAdv`, per-line `phy`, per-entry `src`) guards the payload
-  shape; a file or a stored read with another version is ignored. It does not
-  follow the engine or the glyph bundle: after a sync a document this browser
-  already read replays its old read until **All pages** is run on it again.
+  shape; a file or a stored read with another version is ignored.
+- `readWith` (`ocrReadStamp`, `ocr-result.js`) says what the read was read with:
+  the build's content hashes (`window.RECTO_ASSETS`) of `engine/*`, `glyphs/*`
+  and `ocr-worker.js`, the files that decide what a read says. A stored read
+  with another stamp is ignored, so the first open after a sync reads the
+  document again and stores the new read; a read stored before the stamp existed
+  has none and goes the same way. Comparing the stamp needs neither the engine
+  nor the bundle, so a shipped read still replays without them.
+- **After a sync** the shipped read is stale by this rule, and until it is
+  regenerated every visitor reads the startup document live. Regenerate it with
+  tol0's `node tools/recto-cache.mjs` in the same change;
+  `tests/plugins/ocr_tool/read-stamp.test.mjs` fails until then.
 - A fresh browser profile has no second tier, so tol0's `npm run recto-test`
   (which uploads its certified document in a fresh browser profile and waits
   for the auto cycle) always exercises the real engine.

@@ -1,7 +1,7 @@
 # Shipped OCR reads
 
 One `<sha256-of-document>.json` per document: the slimmed result of a finished
-whole-document read (`{ version, pages }`, see `ocr-result.js`). The OCR plugin
+whole-document read (`{ version, readWith, pages }`, see `ocr-result.js`). The OCR plugin
 looks a document's hash up here first — the build's asset map tells it whether
 the file exists — so visitors get the startup document's text boxes instantly
 instead of waiting for the in-browser engine and its glyph bundle. Reads of
@@ -11,4 +11,8 @@ here.
 After swapping the startup PDF (`web/assets/pdfs/`): open the app, let the
 automatic read finish, run `ocrExportCache()` in the browser console, and
 commit the downloaded file here. Stale files for old documents can be deleted.
-A file whose `version` is not the plugin's `OCR_CACHE_VERSION` is ignored.
+A file whose `version` is not the plugin's `OCR_CACHE_VERSION`, or whose
+`readWith` is not the site's engine, glyph bundle and worker (`ocrReadStamp`), is
+ignored. So after a sync of the engine or the bundle, regenerate the file with
+tol0's `node tools/recto-cache.mjs`; until then every visitor reads the startup
+document live, and `tests/plugins/ocr_tool/read-stamp.test.mjs` fails.

@@ -39,6 +39,7 @@ const OCR_CACHE_DIR = 'plugins/ocr_tool/cache/';       // shipped caches: <docum
 const OCR_CACHE_DB = 'recto-ocr-cache';                // IndexedDB: this browser's own reads
 const OCR_CACHE_KEEP = 8;                              // documents kept there, most recent first
 const OCR_CACHE_VERSION = 4;   // bump when the slim payload shape changes (2: spaceAdv + entry src; 3: only black boxes are kept; 4: rules kept, entry ink)
+const OCR_READ_STAMP = ocrReadStamp(window.RECTO_ASSETS);  // the engine, bundle and worker a read made now is read with (ocr-result.js)
 
 function setOcrStatus(msg) {
   const el = document.getElementById('ocr-status');
@@ -309,12 +310,17 @@ async function ocrLearnProducer(pageNum, res) {
 // A finished whole-document read is kept, slimmed, under the document's
 // sha256 (state.docHash), and a later open of the same bytes replays the boxes
 // through ocrAddBoxes without the engine — or the ~10 MB glyph download.
-// Two tiers, the same JSON ({ version, pages }) and the same version check:
+// Two tiers, the same JSON ({ version, readWith, pages }) and the same check:
+// the payload's shape, and the engine, bundle and worker it was read with.
 //   1. shipped: plugins/ocr_tool/cache/<sha256>.json, committed to the repo —
 //      the startup document reads instantly for every visitor. The build's
 //      asset map says whether a file exists, so a miss costs no request.
 //   2. IndexedDB: what this browser read itself. It never leaves the browser;
 //      the last OCR_CACHE_KEEP documents are kept.
+// A stored read that fails the check is passed over, and the document is read
+// again. So a sync of the engine or the bundle needs a new shipped read, or
+// every visitor reads the startup document live (tol0's tools/recto-cache.mjs;
+// tests/plugins/ocr_tool/read-stamp.test.mjs holds the file to the site).
 // A fresh browser profile has no second tier, so tol0's recto smoke test
 // (which uploads its certified document) still exercises the real engine.
 // To ship a cache after swapping the startup PDF: open the app, let the read
@@ -325,7 +331,7 @@ async function ocrLearnProducer(pageNum, res) {
 // the worker posts slim results, the cache stores them, and a live inline
 // read is slimmed here — one shape, one code path (ocrAddBoxes).
 
-const ocrCacheValid = data => data?.version === OCR_CACHE_VERSION && Array.isArray(data.pages);
+const ocrCacheValid = data => data?.version === OCR_CACHE_VERSION && data.readWith === OCR_READ_STAMP && Array.isArray(data.pages);
 
 function ocrCacheDb() {
   return new Promise((resolve, reject) => {
@@ -355,7 +361,7 @@ async function ocrFetchCache(hash) {
     const db = await ocrCacheDb();
     try {
       const row = await ocrIdb(db.transaction('documents').objectStore('documents').get(hash));
-      return ocrCacheValid(row) ? { version: row.version, pages: row.pages } : null;
+      return ocrCacheValid(row) ? { version: row.version, readWith: row.readWith, pages: row.pages } : null;
     } finally { db.close(); }
   } catch { return null; }
 }
@@ -515,7 +521,7 @@ async function ocrRun(allPages) {
         pass: ocrSlimPass(out.pass), res: ocrSlimResult(out.res) });
     }
     if (collected?.length === nums.length && !ocrToolState.cancel)      // every page read: worth replaying
-      ocrStoreCache(runHash, { version: OCR_CACHE_VERSION, pages: collected });
+      ocrStoreCache(runHash, { version: OCR_CACHE_VERSION, readWith: OCR_READ_STAMP, pages: collected });
     window.utbConnectRedactionsToLines?.();
     if (typeof renderAllTextLayers === 'function') renderAllTextLayers();
     if (typeof calculateAllWidths === 'function') calculateAllWidths();

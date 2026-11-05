@@ -10,7 +10,7 @@
 // slims to itself.
 //
 // Loaded as a plain script on the main thread (plugin.json) and by the worker
-// through importScripts; defines two globals, no side effects.
+// through importScripts; defines three globals, no side effects.
 
 function srcAt(L) {
   const m = new Map();
@@ -58,3 +58,12 @@ function ocrSlimResult(res) {
 function ocrSlimPass(pass) {
   return { tol: pass?.tol || 0, quant: !!pass?.quant, union: !!pass?.union };
 }
+
+// What a stored read was read with: the build's content hashes (RECTO_ASSETS)
+// of the files that decide what a read says — the engine, the glyph bundle and
+// the worker that hands the page to them. A stored read carries it, and one
+// with another stamp is not replayed. The rest of the adapter works on the
+// replay as well (ocrAddBoxes), and the payload's shape has OCR_CACHE_VERSION.
+const OCR_READ_FILES = /^plugins\/ocr_tool\/((engine|glyphs)\/|ocr-worker\.js$)/;
+globalThis.ocrReadStamp = assets => Object.keys(assets || {}).filter(f => OCR_READ_FILES.test(f)).sort()
+  .map(f => `${f.slice('plugins/ocr_tool/'.length)}:${assets[f]}`).join(' ');
