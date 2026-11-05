@@ -1,7 +1,9 @@
 /* =========================================================
    PDFHooks — plugin lifecycle bus
    =========================================================
-   The core (pdf_core) never calls a plugin function by name.
+   The core (pdf_core) never calls a plugin function by name — one
+   exception, guarded: pdf-viewer.js resets and redraws text_tool's
+   boxes when a document is shown or closed.
    Instead it *emits* lifecycle events; plugins *subscribe* with
    PDFHooks.on(event, handler). Deleting a plugin folder removes its
    subscriptions, so the core keeps emitting into the void with zero

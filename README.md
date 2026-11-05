@@ -32,7 +32,8 @@ A plugin is a folder under `web/plugins/` with a `plugin.json`. **Drop a folder 
 tool; drag it out to remove it.** The manifest declares the UI slots the plugin fills (toolbar
 button, ribbon bar, sidebar, scripts, styles); `tools/build.mjs` scans the manifests and
 writes the page. At run time the plugin subscribes to lifecycle events on the `PDFHooks` bus —
-so the core never calls a plugin by name, and removing one leaves nothing dangling.
+so the core never calls a plugin by name (one exception, guarded: `pdf-viewer.js` resets and redraws text_tool's boxes when a document is shown or closed (`utbState.reset`, `clearAllSVGLayers`, `renderAllTextLayers`)), and removing one leaves nothing
+dangling.
 
 See [`guide/tool-expansion-guide.md`](guide/tool-expansion-guide.md) to write one.
 

@@ -396,4 +396,4 @@ fields, which sit inert when the plugin is gone. See [Unified Text Box](./unifie
 `true`). `pdfFonts` are the document's declared BaseFont names, most used first; `sizePt` is
 the sampled body size (see [Scale & Size Detection](./scale-and-size-detection.md)).
 
-The core never calls a plugin function by name and owns no plugin DOM. Plugins that contribute a subtoolbar register their toggle button with `window.registerSubtoolbar(button)` so the generic `openSubtoolbar` can manage it without naming the plugin.
+The core never calls a plugin function by name and owns no plugin DOM — one exception, guarded: `pdf-viewer.js` resets and redraws text_tool's boxes when a document is shown or closed (`utbState.reset`, `clearAllSVGLayers`, `renderAllTextLayers`). Plugins that contribute a subtoolbar register their toggle button with `window.registerSubtoolbar(button)` so the generic `openSubtoolbar` can manage it without naming the plugin.
