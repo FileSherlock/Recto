@@ -82,6 +82,7 @@
 
     const pop = document.createElement('div');
     pop.className = 'utb-nudge-popover';
+    pop.dataset.pageUi = '';          // over the page, not the page: page tools leave its presses alone
     pop.innerHTML = `
       <div class="nudge-char-preview"></div>
       <label>x nudge (px)</label>

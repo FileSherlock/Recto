@@ -106,7 +106,7 @@
   const READ_LAYER = new Set(['ocr', 'embedded']);
   // what sits over the page but is not the page: the ruler's marker, a
   // nudge's slider, a control a plugin puts there — pressed, it is used
-  const PAGE_UI = '.ruler-layer, .utb-nudge-popover, button, input, select, textarea, label, a[href]';
+  const PAGE_UI = '[data-page-ui], .ruler-layer, .utb-nudge-popover, button, input, select, textarea, label, a[href]';
 
   els.viewer.addEventListener('mousedown', e => {
     if (!armed() || e.button !== 0 || e.target.closest(PAGE_UI)) return;

@@ -218,8 +218,9 @@ Design points that shape everything built on it:
   or the page itself — 816 × 1056 for a US-Letter scan, 794 × 1123 for an A4 page,
   1056 × 816 for a landscape one. Points convert to it by 96/72 everywhere. A
   password-protected PDF or one with no pages is refused with the reason; a page that
-  cannot be read fails alone, in its place. Image documents (PNG, JPEG, TIFF,
-  BMP, WebP) are one page, served as stored, and never enter the worker.
+  cannot be read fails alone, in its place. Image documents (PNG, JPEG, BMP,
+  WebP) are one page, served as stored, and never enter the worker; a TIFF, which
+  only Safari decodes, is turned into a PNG of its first image by MuPDF first.
 - **`structuredText` is a primitive, not an analysis.** Turning it into spans is a plugin's
   job (`embedded_text_viewer/extract.js`).
 

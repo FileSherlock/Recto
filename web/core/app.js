@@ -73,11 +73,14 @@
       });
       els.zoomInputElem.addEventListener('change', () => triggerZoomCheck());
 
-      // Click to add box/text tool logic
+      // Click to add box/text tool logic. What sits over the page but is not
+      // the page — a control, or anything a plugin marks [data-page-ui] (a
+      // ruler, a popover) — is used when pressed, never placed on.
       els.viewer.addEventListener('mousedown', async (e) => {
         const pageEl = e.target.closest('.page-container');
         if (!pageEl) return;
-        
+        if (e.target.closest('[data-page-ui], button, input, select, textarea, label, a[href]')) return;
+
         const pageNum = parseInt(pageEl.id.replace('pageContainer', ''));
 
         // Map screen click → document-space coordinates via the SVG text layer's
@@ -145,6 +148,7 @@
 
       // Regular file select
       els.pdfFile.addEventListener('change', handleFileUpload);
+      document.getElementById('upload-pdf-btn')?.addEventListener('click', () => els.pdfFile.click());
 
       // Jump to page
       els.pageInputElem.addEventListener('change', (e) => {
@@ -182,16 +186,20 @@
         await new Promise(r => document.addEventListener('DOMContentLoaded', r, { once: true }));
       }
       // generated/default-document.json (written by the build) names the PDF
-      // in assets/pdfs/, if there is one.
+      // in assets/pdfs/, if there is one. A document the user opens while it
+      // is still on its way wins: the startup one then stands down.
+      const userOpened = () => !!(state.currentFile || openDocument.turn);
       try {
         const resp = await fetch('generated/default-document.json', { cache: 'no-cache' });
         const startup = resp.ok ? await resp.json() : null;
-        if (startup?.file) {
+        if (startup?.file && !userOpened()) {
           const file = await fetch(`${startup.file}?v=${startup.v}`);
           if (!file.ok) throw new Error(`${startup.file}: ${file.status}`);
+          const blob = await file.blob();
+          if (userOpened()) return;
           state.hasPdf = true;
           els.titleElem.textContent = startup.name || 'Sample document';
-          await openDocument(await file.blob(), startup.name, null);
+          await openDocument(blob, startup.name, null);
         }
       } catch (e) {
         console.warn('Auto-load of the sample document failed:', e.message);

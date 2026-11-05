@@ -203,19 +203,32 @@
     const kind = documentKind(name || source?.name, blob.type);
     const hashing = sha256Hex(blob);
     hashing.catch(() => {});                                 // reported where it is awaited
-    const doc = { info: null, blob, isImage: kind.isImage, imageURL: null, pages: new Map(), thumbs: new Map(), sizes: new Map() };
+    // `shown`: what the page shows of an image document when the browser
+    // cannot show the file itself (a TIFF); `blob` stays the file
+    const doc = { info: null, blob, shown: null, isImage: kind.isImage, imageURL: null, pages: new Map(), thumbs: new Map(), sizes: new Map() };
     let timings = {};
 
     if (kind.isImage) {
+      if (kind.mime === 'image/tiff') {
+        // only Safari decodes TIFF: MuPDF, in the worker, makes a PNG of its
+        // first image's own samples, and that is what the page shows
+        const starting = startWorker();
+        const buffer = await blob.arrayBuffer();
+        await starting;
+        superseded();
+        const answer = await request({ type: 'convert', buffer }, { transfer: [buffer] });
+        superseded();
+        doc.shown = new Blob([answer.png], { type: 'image/png' });
+      }
       // only the image's size is wanted here: the decoded bitmap goes at once
-      const bitmap = await createImageBitmap(blob);
+      const bitmap = await createImageBitmap(doc.shown || blob);
       const { width, height } = bitmap;
       bitmap.close();
       // an image document is taken as 8.5 in wide: its px per pt is its width over 612 pt
       doc.info = { sha256: await hashing, numPages: 1, pageWidth: width, pageHeight: height,
                    pxPerPt: width / GEO.PAGE_WIDTH_PT,
                    pdfFonts: [], suggestedScale: Math.round(100 * GEO.PT_TO_PX), suggestedSize: 12.0,
-                   pageImageType: kind.mime };
+                   pageImageType: doc.shown ? doc.shown.type : kind.mime };
       superseded();
       current = doc;
     } else {
@@ -258,9 +271,10 @@
 
     let made;
     if (doc.isImage) {
-      // the stored bytes themselves — nothing is re-encoded
-      made = thumb ? imageThumbURL(doc.blob, doc.info)
-                   : Promise.resolve(doc.imageURL || (doc.imageURL = URL.createObjectURL(doc.blob)));
+      // the stored bytes themselves — nothing is re-encoded (a TIFF: MuPDF's PNG of it)
+      const image = doc.shown || doc.blob;
+      made = thumb ? imageThumbURL(image, doc.info)
+                   : Promise.resolve(doc.imageURL || (doc.imageURL = URL.createObjectURL(image)));
     } else {
       made = request({ type: 'page', n, thumb }, { priority: thumb ? PRIORITY.thumb : PRIORITY.page })
         .then(answer => {

@@ -89,6 +89,8 @@ const server = http.createServer((req, res) => {
   let pathname;
   try { pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname); }
   catch { return send(res, 400, 'Bad request', { 'Content-Type': 'text/plain' }); }
+  // a NUL names no file — and fs throws on one at once, which would take the server down
+  if (pathname.includes('\0')) return send(res, 400, 'Bad request', { 'Content-Type': 'text/plain' });
   if (pathname.endsWith('/')) pathname += 'index.html';
 
   let base = WEB, rel = pathname;

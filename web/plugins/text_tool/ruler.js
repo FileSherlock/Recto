@@ -44,6 +44,7 @@
     svg = document.createElementNS(SVG_NS, 'svg');
     svg.classList.add('ruler-layer');
     svg.dataset.page = pageNum;
+    svg.dataset.pageUi = '';          // over the page, not the page: page tools leave its presses alone
     svg.setAttribute('viewBox', `0 0 ${pw} ${RULER_H}`);
     svg.setAttribute('preserveAspectRatio', 'none');
     svg.setAttribute('xmlns', SVG_NS);

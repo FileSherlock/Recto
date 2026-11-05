@@ -24,7 +24,7 @@ Core chrome only: `web/core/index.template.html`, wired in `web/core/app.js`. In
 | Toggle thumbnails | `toggle-sidebar` | `core/index.template.html` | `core/app.js` |
 | Previous / Next Page, page number | `prev-page`, `next-page`, `page-input` | `core/index.template.html` | `core/app.js` |
 | Zoom out / in, zoom % (also Ctrl+wheel) | `zoom-out`, `zoom-in`, `zoom-input` | `core/index.template.html` | `core/app.js` |
-| Upload PDF (and drag-and-drop) | `upload-pdf-btn` + hidden `pdf-file` input | `core/index.template.html` | inline onclick + `core/app.js` |
+| Upload PDF (and drag-and-drop) | `upload-pdf-btn` + hidden `pdf-file` input | `core/index.template.html` | `core/app.js` (the button clicks the hidden input) |
 | Settings | `toggle-settings` | `core/index.template.html` | `core/app.js` — opens `#settings-panel`; hidden while no section is in it (a section a plugin moves elsewhere — into the Text panel's Display — no longer counts) |
 
 ## Tool column (`#tool-column`, left of the page)

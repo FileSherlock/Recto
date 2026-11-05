@@ -14,6 +14,7 @@
 //   { type: 'text', n, options, imageRect, pageSize }   → { ok, text }                  raw structured text
 //   { type: 'imageRect', n }                            → { ok, rect | null }
 //   { type: 'heap' }                                    → { ok, heapMB }
+//   { type: 'convert', buffer }                         → { ok, png: ArrayBuffer }      an image file's first image as a PNG (transferred)
 // A failure answers { ok: false, error }.
 //
 // The URLs come from the page so they carry the build's content hashes
@@ -73,6 +74,30 @@ const handlers = {
   },
   imageRect: ({ n }) => ({ rect: pdf.pageImageRect(n) }),
   heap: () => ({ heapMB: heapMB() }),
+
+  // An image file the browser cannot show (TIFF: only Safari decodes it) as a
+  // PNG of its first image's own samples — anything but gray and RGB converted
+  // to RGB — for the page to show as an image document. No document is open.
+  convert({ buffer }) {
+    const image = new mupdf.Image(new Uint8Array(buffer));
+    let pix = null;
+    try {
+      pix = image.toPixmap();
+      const cs = pix.getColorSpace();
+      if (cs && !cs.isGray() && !cs.isRGB()) {
+        const rgb = pix.convertToColorSpace(mupdf.ColorSpace.DeviceRGB, true);
+        pix.destroy();
+        pix = rgb;
+      }
+      cs?.destroy();
+      const png = pix.asPNG().slice();
+      const out = png.buffer.byteLength === png.byteLength ? png.buffer : png.slice().buffer;
+      return { png: out, transfer: [out] };
+    } finally {
+      pix?.destroy();
+      image.destroy();
+    }
+  },
 };
 
 self.onmessage = async e => {
@@ -80,7 +105,7 @@ self.onmessage = async e => {
   try {
     if (!handlers[type]) throw new Error(`unknown request "${type}"`);
     if (type !== 'init' && !openPdf) throw new Error('worker not initialised');
-    if (!['init', 'open', 'heap'].includes(type) && !pdf) throw new Error('no document is open');
+    if (!['init', 'open', 'heap', 'convert'].includes(type) && !pdf) throw new Error('no document is open');
     const { transfer, ...answer } = await handlers[type](e.data);
     self.postMessage({ id, ok: true, ...answer }, transfer || []);
   } catch (err) {

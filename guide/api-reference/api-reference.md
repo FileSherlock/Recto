@@ -218,9 +218,12 @@ whole document's text therefore never delays the page the user just turned to.
 
 ### Image documents
 
-A PNG, JPEG, TIFF, BMP or WebP file is a one-page document that MuPDF never sees. Its
+A PNG, JPEG, BMP or WebP file is a one-page document that MuPDF never sees. Its
 size comes from `createImageBitmap`; `pageImageURL(1)` is a URL of **the file itself**
-(nothing is re-encoded), and the thumbnail is a 180 px canvas downscale. `pagePixels` and
+(nothing is re-encoded), and the thumbnail is a 180 px canvas downscale. A TIFF, which
+only Safari decodes, goes through the worker once: MuPDF makes a PNG of its first image's
+own samples (`pageImageType` `image/png`), and that PNG is what the page shows;
+`Doc.bytes()` is still the file. `pagePixels` and
 `pageImageRect` answer `null`, `structuredText` an empty page, `pdfFonts` is `[]`,
 `suggestedScale` `133`, `suggestedSize` `12.0`. `early` is not called.
 
