@@ -103,10 +103,12 @@ text clicked on a line takes that line's space and stops already (`artistic-tool
 create()`). The button is locked, with the reason, on a box with one face, on text no line of
 the page is under, and over a line with neither a single space between two words nor a tab.
 
-Which line: `utbLineAt(page, { x, y, h })` (`unified-text-box.js`) — the shown OCR or embedded
-line whose band overlaps the band of the paragraph's first line by half the smaller height at
-least (`storyParaStarts`: its first character's box, an empty paragraph's caret line); of a row
-cut by redaction bars, the piece the text starts in. How much: `utbLineWordSpacing(line,
+Which line: `utbLineAt(page, { x, y, h })` (`unified-text-box.js`) — the OCR or embedded line
+from the most accurate source on that row (`utbLineRank`: certified OCR > embedded > tolerant
+OCR, regardless of whether its overlay is hidden) whose band overlaps the band of the
+paragraph's first line by half the smaller height at least (`storyParaStarts`: its first
+character's box, an empty paragraph's caret line); of a row cut by redaction bars, the piece
+the text starts in. How much: `utbLineWordSpacing(line,
 face)` —
 
 - the line's measured characters (`baseCharPositions`: a reader's pens, a PDF's positions) say
@@ -295,7 +297,7 @@ opens it on a tab.
 
 The click itself is caught by the core (`app.js`, a `mousedown` on the viewer), which maps it to document pixel space and, for the add-box tool, calls `handleManualAddBox` behind a `typeof` guard. Text is added with the Artistic and Frame Text tools, which catch their own presses (below).
 
-- `window.handleManualAddBox(pageNum, x, y)`: delegates to `createNewRedaction()` if a plugin supplies it, otherwise creates a `type='redaction'` box directly. Takes the nearest shown line from `utbFindNearestLine` (`unified-text-box.js`); without one, the font and size new text takes (`newTextFont()`, the Text panel's).
+- `window.handleManualAddBox(pageNum, x, y)`: delegates to `createNewRedaction()` if a plugin supplies it, otherwise creates a `type='redaction'` box directly. Takes the nearest line from `utbFindNearestLine` (`unified-text-box.js`, preferring the most accurate source on that row regardless of whether its overlay is hidden); without one, the font and size new text takes (`newTextFont()`, the Text panel's).
 
 ### Artistic and Frame text
 
@@ -305,7 +307,7 @@ story boxes; `storyConvert(box, 'frame' | 'artistic')` converts between them. Se
 
 ### Deleting a box
 
-`window.utbDeleteBox(id)` is the one removal path for every box type — the Text panel's Delete button and the Delete / Backspace keys both use it. A live inline-edit or micro-typo session on the box is torn down first, so no id in `utbState` outlives the box it points at. The keys are ignored while the caret is in a field, where they mean "erase a character". `utbDeleteBox(id, { silent: true })` is the undo stack taking a box out again — not a step of its own.
+`window.utbDeleteBox(id)` is the one removal path for every box type — the Text panel's Delete button and the Delete / Backspace keys both use it. Any live story-edit (`commitStoryEdit`), inline-edit (`cancelInlineEdit`), or micro-typo (`exitMicroTypo`) session on the box is torn down first, so no id in `utbState` outlives the box it points at. The keys are ignored while the caret is in a field, where they mean "erase a character". `utbDeleteBox(id, { silent: true })` is the undo stack taking a box out again — not a step of its own.
 
 ## Label seams — `labelColor`, `labelAlign`
 

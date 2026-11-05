@@ -17,13 +17,17 @@
 // 'document:loaded' the viewer already shows the new document's pages.
 async function openDocument(source, name, file) {
   const turn = openDocument.turn = (openDocument.turn || 0) + 1;
+  const check = () => { if (turn !== openDocument.turn) throw new Error('another document was opened meanwhile'); };
   try {
     // Before anything changes: per-document plugin state (a finished flag, a
     // run in progress) belongs to the document that is about to go away.
     await PDFHooks.emit('document:opening', { file, name, isDefault: !file });
+    check();
     let shown = null;
-    const data = await Doc.open(source, name, { early: info => { shown = showDocument(info); } });
-    await (shown || showDocument(data));
+    const data = await Doc.open(source, name, { early: info => { if (turn === openDocument.turn) shown = showDocument(info, turn); } });
+    check();
+    await (shown || showDocument(data, turn));
+    check();
     await announceDocument(data, file);
     return data;
   } catch (e) {
@@ -76,7 +80,7 @@ function showNoDocument(message) {
 // `data` is Doc.open()'s result (or its early form). Page rasters are not part
 // of it: whoever shows a page — the viewer, a thumbnail scrolled into view, an
 // OCR pass — asks Doc.pageImageURL(n) at that moment.
-async function showDocument(data) {
+async function showDocument(data, turn) {
   state.numPages = 0;
   if (typeof utbState !== 'undefined') {
     utbState.reset();
@@ -92,6 +96,7 @@ async function showDocument(data) {
   els.pageInputElem.max = state.numPages;
 
   await goToPage(1);
+  if (turn && turn !== openDocument.turn) return;
   renderThumbnails();
 }
 

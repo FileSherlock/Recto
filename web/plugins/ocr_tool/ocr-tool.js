@@ -405,9 +405,10 @@ function ocrApplyCached(cached) {
     totals.unread += t.unread; totals.boxes += t.boxes;
     for (const L of pg.res.lines) if (L.font) fonts.add(L.font);
   }
-  window.utbConnectRedactionsToLines?.();
   if (typeof renderAllTextLayers === 'function') renderAllTextLayers();
-  if (typeof calculateAllWidths === 'function') calculateAllWidths();
+  Promise.resolve(window.utbConnectRedactionsToLines?.()).then(() => {
+    if (typeof calculateAllWidths === 'function') calculateAllWidths();
+  });
   ocrEmitTypography();
   // same status wording as a live run, flagged as precomputed
   const lastPass = cached.pages[cached.pages.length - 1]?.pass || {};
@@ -507,9 +508,10 @@ async function ocrRun(allPages) {
     const collected = (allPages && runHash) ? [] : null;
     let lastPass = null, fonts = new Set();
     for (const p of nums) {
-      if (ocrToolState.cancel) break;
+      if (ocrToolState.cancel || runHash !== state.docHash) break;
       const label = allPages ? `OCR ${p}/${state.numPages}` : `OCR p${p}`;
       const out = await ocrReadOnePage(p, label, carry);
+      if (runHash !== state.docHash || ocrToolState.cancel) break;
       if (!out) continue;
       ocrClearPage(p);
       const t = ocrAddBoxes(p, out.img, out.res, out.pass);
@@ -520,10 +522,12 @@ async function ocrRun(allPages) {
       collected?.push({ page: p, w: out.img.naturalWidth, h: out.img.naturalHeight,
         pass: ocrSlimPass(out.pass), res: ocrSlimResult(out.res) });
     }
+    if (runHash !== state.docHash) return;
     if (collected?.length === nums.length && !ocrToolState.cancel)      // every page read: worth replaying
       ocrStoreCache(runHash, { version: OCR_CACHE_VERSION, readWith: OCR_READ_STAMP, pages: collected });
-    window.utbConnectRedactionsToLines?.();
     if (typeof renderAllTextLayers === 'function') renderAllTextLayers();
+    await window.utbConnectRedactionsToLines?.();
+    if (runHash !== state.docHash) return;
     if (typeof calculateAllWidths === 'function') calculateAllWidths();
     ocrEmitTypography();
     if (lastPass) {
@@ -612,13 +616,20 @@ async function ocrAutoRead() {
   let applied = false;
   if (typeof utbState !== 'undefined') {
     const cached = await ocrFetchCache(state.docHash);
-    if (!live() || ocrToolState.running) return;
+    if (!live()) return;
+    if (ocrToolState.running) {
+      while (ocrToolState.running) { await sleep(150); if (!live()) return; }
+      ocrToolState.autoDone = true;
+      return;
+    }
     if (cached) { ocrApplyCached(cached); applied = true; }
   }
   if (!applied) {
     await ocrRun(true);
+    if (!live()) return;
     // still running here = ocrRun bounced off a manual run that won the race
-    if (!live() || ocrToolState.running || ocrToolState.cancel) return;
+    while (ocrToolState.running) { await sleep(150); if (!live()) return; }
+    if (ocrToolState.cancel) { ocrToolState.autoDone = true; return; }
   }
   // the embedded span fetch races the (much slower) OCR run — normally it
   // finished long ago, but give a long document's scan a moment before comparing
@@ -664,6 +675,8 @@ PDFHooks.on('document:opening', () => {
   ocrToolState.autoSeq++;                 // an auto read still waiting for the old document gives up
   if (ocrToolState.running) ocrCancel();
   ocrToolState.autoDone = false;
+  ocrProducer.clear();
+  ocrDropped.clear();
 });
 
 // New document: boxes were already reset by the core; drop page-derived state,

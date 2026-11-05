@@ -369,18 +369,19 @@ function _spacebadge(g, midX, topY, label, color) {
 // The distance from the last glyph before a redaction box to its left edge,
 // and from its right edge to the first glyph after it, in that neighbour's
 // own space (the space its line was set with) and in px. The neighbour is
-// any text box on the same line — an OCR line, the embedded text, typed
-// text — on a layer that is shown; its glyphs' extent comes from its
-// measured character positions when it has them (a span's own box may run
+// any text box on the same line — from the most accurate text source on that
+// row (certified OCR > embedded text > tolerant OCR, plus any user-typed text)
+// regardless of whether its overlay is hidden; its glyphs' extent comes from
+// its measured character positions when it has them (a span's own box may run
 // on past its last glyph). The neighbour's space is the median of its
 // measured space characters, else its face's natural space, else what a
 // reader calibrated for its line (box.ocr.spaceAdv), else a quarter em.
 // Returns { left, right }, each { gap, space } or null when nothing is there.
 function utbBarGaps(box) {
   if (typeof utbState === 'undefined') return { left: null, right: null };
-  const cl = document.body.classList;
-  const shown = b => !(b.type === 'embedded' && cl.contains('hide-embedded-text')) &&
-                     !(b.type === 'ocr' && cl.contains('hide-ocr-text'));
+  const rank = window.utbLineRank || (b => b.type === 'ocr'
+    ? (b.ocr?.unread ? 0 : (!b.ocr || (b.ocr.trusted ?? b.ocr.clean)) ? 3 : 1)
+    : b.type === 'embedded' ? 2 : 0);
   const extent = b => {
     const cps = (b.baseCharPositions || []).filter(cp => cp.c !== ' ' && cp.w > 0);
     if (!cps.length) return { x0: b.x, x1: b.x + b.w };
@@ -395,10 +396,12 @@ function utbBarGaps(box) {
   };
   const sameLine = b => (box.lineId && b.lineId === box.lineId) ||
     Math.min(box.y + box.h, b.y + b.h) - Math.max(box.y, b.y) >= Math.min(box.h, b.h) * 0.5;
+  const row = utbState.boxes.filter(b => b !== box && b.page === box.page && b.text && sameLine(b) &&
+    (b.type === 'harfbuzz' || rank(b) > 0));
+  const bestRank = row.reduce((m, b) => Math.max(m, rank(b)), 0);
   let left = null, right = null, lx = -Infinity, rx = Infinity;
-  for (const b of utbState.boxes) {
-    if (b === box || b.page !== box.page || !b.text || !sameLine(b) || !shown(b)) continue;
-    if (b.type !== 'ocr' && b.type !== 'embedded' && b.type !== 'harfbuzz') continue;
+  for (const b of row) {
+    if (b.type !== 'harfbuzz' && rank(b) < bestRank) continue;
     const { x0, x1 } = extent(b);
     if (x1 <= box.x + 1 && x1 > lx) { lx = x1; left = b; }
     if (x0 >= box.x + box.w - 1 && x0 < rx) { rx = x0; right = b; }

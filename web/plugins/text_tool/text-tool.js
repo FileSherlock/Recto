@@ -66,7 +66,10 @@ window.utbDeleteBox = function (id, { silent = false } = {}) {
   const box = id ? utbState.getBox(id) : null;
   if (!box) return;
 
-  if (utbState.editingId === box.id && typeof cancelInlineEdit === 'function') cancelInlineEdit();
+  if (utbState.editingId === box.id) {
+    window.commitStoryEdit?.();
+    if (typeof cancelInlineEdit === 'function') cancelInlineEdit();
+  }
   if (utbState.microTypoId === box.id && typeof exitMicroTypo === 'function') exitMicroTypo();
 
   if (!silent) window.utbUndo?.recordDelete(box, utbState.boxes.indexOf(box), 'delete box');

@@ -234,7 +234,7 @@ async function etvFetchFull(pageNum) {
 
     spans.forEach(span => utbState.addBox(spanToUnified(span)));
     renderAllTextLayers();
-    utbConnectRedactionsToLines();
+    await utbConnectRedactionsToLines();
     if (typeof calculateAllWidths === 'function') calculateAllWidths();
   } catch (err) {
     console.warn('UTB: span fetch error', err);
@@ -378,9 +378,8 @@ function utbConnectRedactionsToLines() {
 
   // Announce that redactions are now line-associated. Generic lifecycle event
   // (names no plugin); listeners such as a redaction refiner react to it on both
-  // the span-load path and after an OCR pass. Fire-and-forget — a slow/async
-  // subscriber must not block line connection.
-  window.PDFHooks?.emit('redactions:connected');
+  // the span-load path and after an OCR pass.
+  return window.PDFHooks?.emit('redactions:connected');
 }
 
 

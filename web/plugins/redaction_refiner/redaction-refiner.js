@@ -840,13 +840,13 @@
       changed = true;
     }
     // Widths depend on box.w — recompute matches for the redrawn bars.
-    if (changed && typeof calculateAllWidths === 'function') calculateAllWidths();
+    if (changed && !opts.skipWidths && typeof calculateAllWidths === 'function') calculateAllWidths();
   }
 
   // Run whenever redactions have just been (re)connected to their text lines —
   // this fires on the span-load path (per hydrated page) and after an OCR pass.
   if (window.PDFHooks) {
-    PDFHooks.on('redactions:connected', () => { refineAllRedactions(); });
+    PDFHooks.on('redactions:connected', () => refineAllRedactions({ skipWidths: true }));
   }
 
   // Guarded globals for manual re-runs / tooling.

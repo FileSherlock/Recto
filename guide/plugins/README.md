@@ -149,6 +149,46 @@ Affinity's presets, and a floating panel with the adjustment stack and the Curve
 
 ## Dependency order
 
+```mermaid
+flowchart TB
+  subgraph Build["Build & Dev Tooling (tools/)"]
+    B["build.mjs"] -->|"Scans plugin.json"| IDX["web/index.html + web/generated/*"]
+    S["serve.mjs"] -->|"Rebuilds on request"| IDX
+  end
+
+  subgraph Core["Core Shell (web/core/)"]
+    H["hooks.js (PDFHooks + assetURL)"]
+    G["geometry.js (GEO: 96 DPI px / 72 DPI pt)"]
+    ST["state.js (state + els)"]
+    DS["doc-service.js (Doc API + LRU Blob URLs)"]
+    PW["pdf-worker.js + pdf-document.js (MuPDF 1.28.0 WASM)"]
+    PV["pdf-viewer.js + ui-events.js + app.js"]
+    DS <-->|"Priority Queue RPC"| PW
+    PV --> DS
+    PV -->|"Emits lifecycle events"| H
+  end
+
+  subgraph Baseline["Baseline Plugins (web/plugins/)"]
+    TT["text_tool (HarfBuzz 14.4.0, StoryCore, SVG/ForeignObject, TextPanel)"]
+    ETV["embedded_text_viewer (Two-tier lean/full span extraction)"]
+    WM["webgl_mask (MaskCore worker + WebGL rim transmission shader)"]
+  end
+
+  subgraph Optional["Optional Plugins (web/plugins/)"]
+    OCR["ocr_tool (BlindOCR, FreeType 2.13 port, Producer Law, Pixel/Hypothesis View)"]
+    RR["redaction_refiner (20k word corpus, sibling bar & remnant solver)"]
+    RM["redaction_matching (Candidate templates, linked pairs, hypothesis ranking)"]
+    IA["image_adjust (Affinity Photo cubic splines, Levels/Curves SVG filters)"]
+    B64["base64_tool (OCR base64 block recovery, MIME sniffer, CRC/DER verifier)"]
+  end
+
+  H ==> Baseline
+  H ==> Optional
+  OCR -.->|"Guarded seams (utbPixelRender, ocrTestHypothesis)"| TT
+  OCR -.-> RM
+  RR -.->|"redaction:refined"| RM
+```
+
 ```
 redaction_matching ──runtime globals──> text_tool ──> core (web/core/)
 ocr_tool           ──runtime globals──> text_tool ──> core

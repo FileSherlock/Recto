@@ -279,25 +279,31 @@ window.normUtbFont = normUtbFont;
 
 // ── Adapter functions for legacy consumers ────────────────────
 
-// The page's own lines on a page — embedded spans and OCR-read lines — on a
-// layer that is shown: a line on a hidden layer is not what the user clicked
-// beside (when the OCR layer is shown and the embedded one hidden, the
-// embedded line's face — the text layer's declared substitute — must not
-// become a new box's).
+// The page's own lines on a page — OCR-read lines and embedded spans —
+// ranked by how accurately they measure the text on the page: a line the
+// reader certified with letters (3) beats the PDF's embedded text layer (2),
+// which beats an uncertified tolerant read (1); an unread placeholder band (0)
+// has no text or face to offer. Layer visibility (hide-ocr-text /
+// hide-embedded-text) never hides a line from snapping: on a file where OCR
+// read only part of the page (or while an overlay is toggled off to see the
+// page), a new box in an area OCR did certify still snaps to the accurate OCR
+// line there, and falls back to the embedded line elsewhere.
+const utbLineRank = b => b.type === 'ocr'
+  ? (b.ocr?.unread ? 0 : (!b.ocr || (b.ocr.trusted ?? b.ocr.clean)) ? 3 : 1)
+  : b.type === 'embedded' ? 2 : 0;
+
 function utbShownLines(pageNum) {
-  const cl = document.body.classList;
-  const shown = b => !(b.type === 'embedded' && cl.contains('hide-embedded-text')) &&
-                     !(b.type === 'ocr' && cl.contains('hide-ocr-text'));
-  return utbState.boxes.filter(b => b.page === pageNum && (b.type === 'embedded' || b.type === 'ocr') && shown(b));
+  return utbState.boxes.filter(b => b.page === pageNum && utbLineRank(b) > 0);
 }
 // A row cut by redaction bars is several lines (a bold "To: " label, then a
-// regular address): of `line`'s row, the one x is in, else the one nearest
-// beside it.
+// regular address): of `line`'s row and source, the one x is in, else the one
+// nearest beside it.
 function utbPieceAt(lines, line, x) {
   if (x == null) return line;
-  const cy = line.y + line.h / 2;
+  const cy = line.y + line.h / 2, r = utbLineRank(line);
   const off = b => Math.max(0, b.x - x, x - (b.x + b.w));
-  for (const b of lines) if (Math.abs(b.y + b.h / 2 - cy) < 1 && off(b) < off(line)) line = b;
+  for (const b of lines)
+    if (b.type === line.type && utbLineRank(b) === r && Math.abs(b.y + b.h / 2 - cy) < 1 && off(b) < off(line)) line = b;
   return line;
 }
 
@@ -385,8 +391,9 @@ async function utbLineWordSpacing(line, face) {
 }
 
 /**
- * Find the nearest text line (embedded span or OCR-read line) to a point on a
- * page — `at` is { x, y }, or a y alone — what a new box beside it takes.
+ * Find the nearest text line (OCR-read line or embedded span, preferring the
+ * most accurate source on that row) to a point on a page — `at` is { x, y },
+ * or a y alone — what a new box beside it takes.
  * Returns { x, y, h, w, lineId, font, bold, italic, sizePt, space, pieces,
  * tabs } (utbLineInfo) or null.
  */
@@ -400,25 +407,40 @@ function utbFindNearestLine(pageNum, at, threshold = 2.0) {
   for (const b of pageBoxes) {
     const cy = b.y + b.h / 2;
     const d = Math.abs(cy - y);
-    if (d < minDist) { minDist = d; nearest = b; }
+    if (d < minDist || (nearest && d === minDist && utbLineRank(b) > utbLineRank(nearest))) {
+      minDist = d; nearest = b;
+    }
   }
   if (!nearest || minDist > nearest.h * threshold) return null;
+  // On the row of `nearest`, prefer the most accurate source (certified OCR >
+  // embedded > tolerant OCR) even if the embedded span's vertical midpoint sits
+  // a fraction of a pixel closer to `y`.
+  for (const b of pageBoxes) {
+    const o = Math.min(nearest.y + nearest.h, b.y + b.h) - Math.max(nearest.y, b.y);
+    if (o >= Math.min(nearest.h, b.h) * 0.5 && Math.abs((b.y + b.h / 2) - y) <= b.h * threshold &&
+        utbLineRank(b) > utbLineRank(nearest)) {
+      nearest = b;
+    }
+  }
   return utbLineInfo(utbPieceAt(pageBoxes, nearest, x));
 }
 
 /**
  * The line of the page a line of text sits on — `at` is { x, y, h }, the
- * text line's band and where it starts: the shown page line whose band
- * overlaps it the most, by half the smaller height at least (of a row cut by
- * redaction bars, the piece x is in, else the one nearest beside it). Same
- * shape as utbFindNearestLine; null when the text is on no line of the page.
+ * text line's band and where it starts: the page line from the most accurate
+ * source on that row whose band overlaps it the most, by half the smaller
+ * height at least (of a row cut by redaction bars, the piece x is in, else
+ * the one nearest beside it). Same shape as utbFindNearestLine; null when the
+ * text is on no line of the page.
  */
 function utbLineAt(pageNum, at) {
   const lines = utbShownLines(pageNum);
-  let best = null, most = 0;
+  let best = null, bestRank = 0, most = 0;
   for (const b of lines) {
     const o = Math.min(at.y + at.h, b.y + b.h) - Math.max(at.y, b.y);
-    if (o >= Math.min(at.h, b.h) * 0.5 && o > most) { most = o; best = b; }
+    if (o < Math.min(at.h, b.h) * 0.5) continue;
+    const r = utbLineRank(b);
+    if (r > bestRank || (r === bestRank && o > most)) { best = b; bestRank = r; most = o; }
   }
   return best ? utbLineInfo(utbPieceAt(lines, best, at.x)) : null;
 }
@@ -444,6 +466,7 @@ function utbGetSpansCompat() {
     }));
 }
 
+window.utbLineRank = utbLineRank;
 window.utbFindNearestLine = utbFindNearestLine;
 window.utbLineAt = utbLineAt;
 window.utbLineSpace = utbLineSpace;

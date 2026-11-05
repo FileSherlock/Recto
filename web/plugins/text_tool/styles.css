@@ -60,8 +60,6 @@ body.hide-embedded-text .utb-group[data-type="embedded"] { display: none; }
   fill: rgba(0, 200, 255, 0.70);
 }
 
-.hide-ocr .utb-group[data-type="ocr"] { display: none; }
-
 /* Selection highlight — subtle glow on bbox */
 .utb-group.selected .utb-bbox {
   stroke-width: 1.5;

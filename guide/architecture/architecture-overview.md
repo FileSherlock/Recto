@@ -20,6 +20,40 @@ conclusion about the document listens for that event and does its own work on th
 primitives. `webgl_mask` — which finds the blacked-out regions of a page and tints them on the
 GPU — is a plugin like any other, and deleting its folder leaves the core untouched.
 
+```mermaid
+flowchart TB
+  subgraph Build["Build & Dev Tooling (tools/)"]
+    B["build.mjs"] -->|"Scans plugin.json"| IDX["web/index.html + web/generated/*"]
+    S["serve.mjs"] -->|"Rebuilds on request"| IDX
+  end
+
+  subgraph Core["Core Shell (web/core/)"]
+    H["hooks.js (PDFHooks + assetURL)"]
+    G["geometry.js (GEO: 96 DPI px / 72 DPI pt)"]
+    ST["state.js (state + els)"]
+    DS["doc-service.js (Doc API + LRU Blob URLs)"]
+    PW["pdf-worker.js + pdf-document.js (MuPDF 1.28.0 WASM)"]
+    PV["pdf-viewer.js + ui-events.js + app.js"]
+    DS <-->|"Priority Queue RPC"| PW
+    PV --> DS
+    PV -->|"Emits lifecycle events"| H
+  end
+
+  subgraph Baseline["Baseline Plugins (web/plugins/)"]
+    TT["text_tool (HarfBuzz 14.4.0, StoryCore, SVG/ForeignObject, TextPanel)"]
+    ETV["embedded_text_viewer (Two-tier lean/full span extraction)"]
+    WM["webgl_mask (MaskCore worker + WebGL rim transmission shader)"]
+  end
+
+  subgraph Optional["Optional Plugins (web/plugins/)"]
+    OPT["Drop-in analysis, matching & adjustment plugins\n(see guide/plugins/)"]
+  end
+
+  H ==> Baseline
+  H ==> Optional
+  OPT -.->|"Guarded seams (utbPixelRender, utbAutoKerning, …)"| TT
+```
+
 ## Technology Stack
 
 | Layer | Technology | Purpose |
