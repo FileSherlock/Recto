@@ -90,3 +90,22 @@ for (const d of documents) {
     } finally { pdf.close(); }
   });
 }
+
+test('a line MuPDF split into 40,000 spans merges in linear time, and the raw text is left as it was', () => {
+  // the spans alternate 10 / 10.5 pt (MuPDF starts a span at each change) and merge into one;
+  // concatenating the run at every merge took 3.9 s here, 17 s at 80,000
+  const n = 40000, spans = [];
+  for (let i = 0; i < n; i++) {
+    const x = 10 + i * 0.006;
+    spans.push({ font: 'Helvetica', size: i % 2 ? 10 : 10.5, flags: 0, color: 0, bbox: [x, 100, x + 0.005, 111],
+      chars: [{ c: 'a', bbox: [x, 100, x + 0.005, 111], origin: [x, 109] }] });
+  }
+  const raw = { blocks: [{ type: 0, lines: [{ spans }] }] };
+  const t0 = performance.now();
+  const out = extractSpans(raw, 1, [0, 0, 612, 792]);
+  const ms = performance.now() - t0;
+  assert.equal(out.length, 1);
+  assert.equal(out[0].chars.length, n);
+  assert.ok(spans.every(s => s.chars.length === 1), 'no raw span gained characters');
+  assert.ok(ms < 2000, `${ms.toFixed(0)} ms`);
+});

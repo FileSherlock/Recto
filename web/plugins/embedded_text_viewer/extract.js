@@ -89,9 +89,13 @@
         // Merge adjacent spans on the same line that share font/size/flags/color.
         // PDFs often split a single visual run into many tiny spans; merging
         // them avoids spurious per-span coordinate noise.
+        // (Each merged span gets a chars list of its own, which later spans are
+        // pushed onto: concatenating copied the run each time, and a line
+        // MuPDF split into 80,000 spans took 17 s.)
         const merged = [];
+        const own = span => ({ ...span, chars: (span.chars || []).slice() });
         for (const span of line.spans || []) {
-          if (!merged.length) { merged.push({ ...span }); continue; }
+          if (!merged.length) { merged.push(own(span)); continue; }
           const last = merged[merged.length - 1];
           if (span.font === last.font && Math.abs((span.size ?? 12) - (last.size ?? 12)) <= 1.0
               && span.flags === last.flags && span.color === last.color) {
@@ -99,14 +103,14 @@
             const gap = (b1 && b2) ? b2[0] - b1[2] : 0;
             const emSize = span.size ?? 12;
             if (gap > emSize * 1.5) {
-              merged.push({ ...span });   // suspiciously far apart: not one run
+              merged.push(own(span));   // suspiciously far apart: not one run
             } else {
               if (b1 && b2)
                 last.bbox = [Math.min(b1[0], b2[0]), Math.min(b1[1], b2[1]), Math.max(b1[2], b2[2]), Math.max(b1[3], b2[3])];
-              last.chars = (last.chars || []).concat(span.chars || []);
+              for (const ch of span.chars || []) last.chars.push(ch);
             }
           } else {
-            merged.push({ ...span });
+            merged.push(own(span));
           }
         }
 

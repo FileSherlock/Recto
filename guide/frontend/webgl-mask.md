@@ -92,6 +92,8 @@ What the pages show (measured on a redacted corpus page, EFTA00173953): a redact
 ← { id, error }                                on failure — the overlay treats it as "no mask"
 ```
 
+Jobs wait in a queue on the main thread and go to the worker one at a time (`maskNext`). A job for a document no longer open is dropped, and a detection still running when another document opens (`document:opening`) stops with its worker — terminating it is the only way to stop a detection; the next job starts a new one. A detection that runs past `MASK_TIMEOUT_MS` (60 s) ends the same way, and that page has no mask: one pathological page never holds every later page up.
+
 The worker is started on first use (`maskWorkerReady`) from `assetURL('plugins/webgl_mask/mask-worker.js')`; the URL of `mask-core.js` is made absolute before it is handed over, because a worker resolves relative URLs against its own script. The `samples` buffer `Doc.pagePixels` returned is transferred straight on to the worker — the pixels are never copied on the main thread.
 
 The mask comes back as a PNG blob because that is what the overlay loads into its texture. Gray `v` is written as `(v, v, v, 255)`, so nothing is premultiplied away and the texture's red channel is the mask.
@@ -99,14 +101,14 @@ The mask comes back as a PNG blob because that is what the overlay loads into it
 ## Functions
 
 ### `setupWebGLOverlay(pageContainer, canvas, pageNum)`
-Registers a page container with the `IntersectionObserver`. When a page becomes visible, `initWebGLOverlay(canvas, pageNum)` is called, which builds that page's mask on demand; a page that scrolls out of view has its context destroyed (`destroyWebGLOverlay`).
+Registers a page container with the `IntersectionObserver`. When a page becomes visible while Reveal is on, `initWebGLOverlay(canvas, pageNum)` is called, which builds that page's mask on demand — no page is analysed while Reveal is off; a page that scrolls out of view has its context destroyed (`destroyWebGLOverlay`), and its canvas is replaced by a fresh one: a canvas whose context was lost hands the same lost context back forever. A context the browser takes away itself (`webglcontextlost`: a GPU reset, too many contexts) is handled the same way, and the overlay is set up again while Reveal is on.
 
 **Texture setup:**
 - Page texture (`uPage`): `gl.RGBA`, `gl.LINEAR` filtering, uploaded from the page's `<img id="page<n>">` — the page stays in color
 - Mask texture (`uMask`): `gl.LUMINANCE` (single-channel), `gl.NEAREST` filtering (preserves hard pixel boundaries)
 - Wrapping: `gl.CLAMP_TO_EDGE`
 
-The canvas takes the mask's pixel size (the scan's own resolution); `webgl-mask.css` stretches it over the page container like the image beneath it, and the inline `mix-blend-mode: normal` composites it directly over the page.
+The canvas takes the mask's pixel size (the scan's own resolution) — up to the GPU's limit (`MAX_TEXTURE_SIZE`, `MAX_VIEWPORT_DIMS`): past it, the page and the mask are both drawn scaled down to it (a texture too large samples as black; an 8,300-px scan against 8,192 is common on phones). The division holds for the averages of both alike; `webgl-mask.css` stretches it over the page container like the image beneath it, and the inline `mix-blend-mode: normal` composites it directly over the page.
 
 ### `clearWebGLContexts()`
 Destroys all active WebGL contexts (`WEBGL_lose_context`) and disconnects the observer. Subscribed to the `viewer:clear` event (fired before each page change).
@@ -115,7 +117,7 @@ Destroys all active WebGL contexts (`WEBGL_lose_context`) and disconnects the ob
 Reads `#edge-subtract` value `/ 255.0` → `uStrength` uniform and redraws. No texture re-upload needed — instant 60fps updates. (The slider element is looked up directly by the plugin; the core `els` cache does not hold it.)
 
 ### `refreshWebGLCanvases()`
-For every page container on screen: initializes an overlay that has no context yet, otherwise redraws it and shows or hides the canvas according to the toggle.
+For every page container on screen: shows or hides the canvas as Reveal is on or off, initializes an overlay that has no context yet (while Reveal is on), otherwise redraws it.
 
 ## Shaders
 
@@ -124,7 +126,8 @@ Draws a full-screen quad; maps clip-space coords to UV with Y-flip.
 
 ### Fragment Shader
 ```glsl
-vec3 page = texture2D(uPage, vTexCoord).rgb;
+vec4 pageRGBA = texture2D(uPage, vTexCoord);
+vec3 page = pageRGBA.rgb * pageRGBA.a + vec3(1.0 - pageRGBA.a);   // over the page's white, as the viewer shows it
 float mask = texture2D(uMask, vTexCoord).r;
 vec3 result;
 if (mask > 0.999) {
@@ -152,11 +155,11 @@ The multiplicative recovery correctly reverses anti-aliasing: dark text under a 
 
 | Control | ID | Effect |
 |---------|-----|--------|
-| WebGL toggle | `toggle-webgl` | Shows/hides all `.webgl-overlay` canvases and opens the plugin's options bar (`#webgl-options-bar`) through `openSubtoolbar` |
+| WebGL toggle | `toggle-webgl` | Reveal on (the overlays show, masks are built) with the plugin's options bar (`#webgl-options-bar`, through `openSubtoolbar`); pressed again with that bar open, Reveal off. Reveal's state is the plugin's own (`revealOn`): another options bar taking the ribbon leaves it on — the button keeps its on colour (`.reveal-on`) and a press brings the bar back |
 | Reveal strength | `edge-subtract` | 0–255 → `uStrength` uniform |
 
 Both come from the plugin's own fragments (`toolbar_button.html`, `options_bar.html`), which the build inlines into the page.
 
 ## Context Limits
 
-Browsers enforce ~16 simultaneous WebGL contexts. The lazy `IntersectionObserver` strategy ensures contexts are only allocated for pages with actual masked regions, preventing `CONTEXT_LOST_WEBGL` crashes on large documents.
+Browsers enforce ~16 simultaneous WebGL contexts. The lazy `IntersectionObserver` strategy ensures contexts are only allocated for pages with actual masked regions while Reveal is on, preventing `CONTEXT_LOST_WEBGL` crashes on large documents; a context lost anyway is replaced (see `setupWebGLOverlay`).

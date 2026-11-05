@@ -8,13 +8,19 @@ const webglContexts = new Map();
 const maskBlobCache = new Map();
 let maskCacheHash = null;
 
+// Reveal is on: the overlays show, and a page's mask is built when the page
+// comes into view (not before: detection costs a second or more a page). The
+// state is the plugin's own — the button's `active` class only says its
+// options bar is the open one, and opening any other bar clears it.
+let revealOn = false;
+
 const webglObserver = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     const pageNum = parseInt(entry.target.dataset.pageNum);
     const canvas = entry.target.querySelector('.webgl-overlay');
 
     if (entry.isIntersecting) {
-      if (!webglContexts.has(pageNum) && canvas) {
+      if (revealOn && !webglContexts.has(pageNum) && canvas) {
         initWebGLOverlay(canvas, pageNum);
       }
     } else {
@@ -41,14 +47,23 @@ function clearWebGLContexts() {
   webglObserver.disconnect();
 }
 
+// A canvas whose context was lost never draws again: getContext() hands the
+// same lost context back. The page gets a fresh canvas in its place (same id,
+// class and style), drawn on when the page is shown again.
+function freshOverlayCanvas(canvas) {
+  const fresh = canvas.cloneNode(false);
+  canvas.replaceWith(fresh);
+  return fresh;
+}
+
 function destroyWebGLOverlay(pageNum) {
   const ctx = webglContexts.get(pageNum);
   if (!ctx) return;
-  if (ctx.gl) {
-    const loseCtx = ctx.gl.getExtension('WEBGL_lose_context');
-    if (loseCtx) loseCtx.loseContext();
-  }
   webglContexts.delete(pageNum);
+  if (ctx.gl) {
+    if (ctx.gl.canvas?.isConnected) freshOverlayCanvas(ctx.gl.canvas);
+    ctx.gl.getExtension('WEBGL_lose_context')?.loseContext();
+  }
 }
 
 // ── The mask worker ────────────────────────────────────────────
@@ -56,29 +71,59 @@ function destroyWebGLOverlay(pageNum) {
 // a scan are masked — a born-digital page (shown as a render) has none. An
 // image document is its own
 // scan: Doc has no pixels for it, so the worker decodes the page image itself.
-let maskWorker = null, maskJobId = 0;
-const maskJobs = new Map();   // id -> resolve
+// One page at a time goes to the worker, the rest wait here: a job the
+// document no longer wants (another one opened) or one that runs past
+// MASK_TIMEOUT_MS ends with the worker — terminating it is the only way to
+// stop a detection — and the next job gets a new one. A page whose detection
+// is cut short has no mask.
+let maskWorker = null, maskJobId = 0, maskBusy = null, maskGeneration = 0;
+const maskQueue = [];          // { id, page, generation, message, transfer, resolve }
+const MASK_TIMEOUT_MS = 60000;
 
 function maskWorkerReady() {
   if (maskWorker) return maskWorker;
   const absolute = path => new URL(assetURL(path), document.baseURI).href;
   maskWorker = new Worker(assetURL('plugins/webgl_mask/mask-worker.js'));
   maskWorker.onmessage = e => {
-    const resolve = maskJobs.get(e.data.id);
-    maskJobs.delete(e.data.id);
     if (e.data.error) console.warn('webgl_mask: mask failed', e.data.error);
-    resolve?.(e.data.png || null);
+    if (maskBusy && e.data.id === maskBusy.id) maskDone(maskBusy, e.data.png || null);
   };
   maskWorker.onerror = e => {
     console.warn('webgl_mask: mask worker failed', e.message);
-    for (const resolve of maskJobs.values()) resolve(null);
-    maskJobs.clear();
+    if (maskBusy) maskDone(maskBusy, null);
   };
   maskWorker.postMessage({ type: 'init', core: absolute('plugins/webgl_mask/mask-core.js') });
   return maskWorker;
 }
 
+function maskStopWorker() {
+  maskWorker?.terminate();
+  maskWorker = null;
+}
+
+function maskDone(job, png) {
+  clearTimeout(job.timer);
+  if (maskBusy === job) maskBusy = null;
+  job.resolve(png);
+  maskNext();
+}
+
+function maskNext() {
+  while (!maskBusy && maskQueue.length) {
+    const job = maskQueue.shift();
+    if (job.generation !== maskGeneration) { job.resolve(null); continue; }   // another document's page
+    maskBusy = job;
+    job.timer = setTimeout(() => {
+      console.warn(`webgl_mask: page ${job.page}: no mask — detection ran past ${MASK_TIMEOUT_MS / 1000} s`);
+      maskStopWorker();
+      maskDone(job, null);
+    }, MASK_TIMEOUT_MS);
+    maskWorkerReady().postMessage(job.message, job.transfer);
+  }
+}
+
 async function buildPageMask(pageNum) {
+  const generation = maskGeneration;
   let raster = null, image = null;
   try {
     raster = await Doc.pagePixels(pageNum, { gray: true });
@@ -87,11 +132,18 @@ async function buildPageMask(pageNum) {
   if (raster ? raster.source !== 'embedded' : !image) return null;
   return new Promise(resolve => {
     const id = ++maskJobId;
-    maskJobs.set(id, resolve);
-    if (raster) maskWorkerReady().postMessage({ id, gray: raster.samples, width: raster.width, height: raster.height }, [raster.samples.buffer]);
-    else maskWorkerReady().postMessage({ id, image });
+    const message = raster ? { id, gray: raster.samples, width: raster.width, height: raster.height } : { id, image };
+    maskQueue.push({ id, page: pageNum, generation, message, transfer: raster ? [raster.samples.buffer] : [], resolve });
+    maskNext();
   });
 }
+
+// Another document: its pages' jobs are dropped, and a detection still running
+// for the old one stops with its worker.
+PDFHooks.on('document:opening', () => {
+  maskGeneration++;
+  if (maskBusy) { maskStopWorker(); maskDone(maskBusy, null); }
+});
 
 async function initWebGLOverlay(canvas, pageNum) {
   // This run's own entry. The page's overlay can be torn down while its mask
@@ -152,15 +204,42 @@ async function initWebGLOverlay(canvas, pageNum) {
       const proceed = () => {
         if (!mine()) return;
 
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.style.mixBlendMode = 'normal';
-
-        const gl = canvas.getContext('webgl', { antialias: false }) || canvas.getContext('experimental-webgl', { antialias: false });
-        if (!gl) {
+        const contextOf = c => c.getContext('webgl', { antialias: false }) || c.getContext('experimental-webgl', { antialias: false });
+        let gl = contextOf(canvas);
+        if (gl?.isContextLost() && canvas.isConnected) { canvas = freshOverlayCanvas(canvas); gl = contextOf(canvas); }
+        if (!gl || gl.isContextLost()) {
           webglContexts.delete(pageNum);
           return;
         }
+        // A texture larger than the GPU takes (an 8,300-px scan against 8,192,
+        // common on phones) samples as black and blacked the whole page out:
+        // past the limit both textures are drawn scaled down to it — the
+        // page / (1 − mask) division holds for averages of both alike.
+        const limit = Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE), ...gl.getParameter(gl.MAX_VIEWPORT_DIMS));
+        const k = Math.min(1, limit / Math.max(img.naturalWidth, img.naturalHeight));
+        const W = Math.max(1, Math.floor(img.naturalWidth * k)), H = Math.max(1, Math.floor(img.naturalHeight * k));
+        const fit = source => {
+          const sw = source.naturalWidth, sh = source.naturalHeight;
+          if (sw === W && sh === H && sw <= limit && sh <= limit) return source;
+          const c = document.createElement('canvas');
+          c.width = W; c.height = H;
+          const g2 = c.getContext('2d');
+          g2.imageSmoothingQuality = 'high';
+          g2.drawImage(source, 0, 0, W, H);
+          return c;
+        };
+        canvas.width = W;
+        canvas.height = H;
+        canvas.style.mixBlendMode = 'normal';
+
+        // A context the browser takes away (GPU reset, too many contexts):
+        // the page gets a fresh canvas and, while Reveal shows, a new overlay.
+        canvas.addEventListener('webglcontextlost', () => {
+          if (webglContexts.get(pageNum)?.gl !== gl) return;   // given up by the plugin itself
+          webglContexts.delete(pageNum);
+          const fresh = canvas.isConnected ? freshOverlayCanvas(canvas) : null;
+          if (fresh && revealOn) initWebGLOverlay(fresh, pageNum);
+        }, { once: true });
 
         const vsSource = `
           attribute vec2 aPosition;
@@ -178,7 +257,10 @@ async function initWebGLOverlay(canvas, pageNum) {
           uniform sampler2D uMask;
           uniform float uStrength;
           void main() {
-            vec3 page = texture2D(uPage, vTexCoord).rgb;
+            // the page as the viewer shows it: over the page's white (a
+            // transparent PNG's paper is transparent black, not black paper)
+            vec4 pageRGBA = texture2D(uPage, vTexCoord);
+            vec3 page = pageRGBA.rgb * pageRGBA.a + vec3(1.0 - pageRGBA.a);
             float mask = texture2D(uMask, vTexCoord).r;
             vec3 result;
             if (mask > 0.999) {
@@ -235,7 +317,7 @@ async function initWebGLOverlay(canvas, pageNum) {
         // RGBA, not LUMINANCE: the page raster is color (letterhead art,
         // hyperlink blue) and the overlay must not desaturate the view —
         // only the MASK below is inherently single-channel.
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, pageImg);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, fit(pageImg));
 
         const maskTexture = gl.createTexture();
         gl.activeTexture(gl.TEXTURE1);
@@ -244,7 +326,7 @@ async function initWebGLOverlay(canvas, pageNum) {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, gl.LUMINANCE, gl.UNSIGNED_BYTE, img);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, gl.LUMINANCE, gl.UNSIGNED_BYTE, fit(img));
 
         gl.uniform1i(gl.getUniformLocation(program, "uPage"), 0);
         gl.uniform1i(gl.getUniformLocation(program, "uMask"), 1);
@@ -257,8 +339,7 @@ async function initWebGLOverlay(canvas, pageNum) {
 
         requestAnimationFrame(() => {
           updateWebGLUniforms(pageNum);
-          const isActive = document.getElementById('toggle-webgl')?.classList.contains('active');
-          if (isActive) canvas.style.display = 'block';
+          if (revealOn) canvas.style.display = 'block';
         });
       };
 
@@ -298,18 +379,16 @@ function updateWebGLUniforms(specificPage = null) {
 }
 
 function refreshWebGLCanvases() {
-  const webglActive = document.getElementById('toggle-webgl')?.classList.contains('active');
-
   document.querySelectorAll('.page-container').forEach(pageContainer => {
     const pageNum = parseInt(pageContainer.dataset.pageNum);
     const canvas = pageContainer.querySelector('.webgl-overlay');
     if (!canvas) return;
+    canvas.style.display = revealOn ? 'block' : 'none';
 
     if (!webglContexts.has(pageNum)) {
-      initWebGLOverlay(canvas, pageNum);
+      if (revealOn) initWebGLOverlay(canvas, pageNum);   // masks are built for Reveal only
     } else if (webglContexts.get(pageNum)?.gl) {
       updateWebGLUniforms(pageNum);
-      canvas.style.display = webglActive ? 'block' : 'none';
     }
   });
 }
@@ -334,8 +413,7 @@ PDFHooks.on('page:rendered', ({ pageContainer, pageNum }) => {
   canvas.style.pointerEvents = 'none';
   canvas.width = state.pageWidth;
   canvas.height = state.pageHeight;
-  const active = document.getElementById('toggle-webgl')?.classList.contains('active');
-  canvas.style.display = active ? 'block' : 'none';
+  canvas.style.display = revealOn ? 'block' : 'none';
   pageContainer.appendChild(canvas);
 
   setupWebGLOverlay(pageContainer, canvas, pageNum);
@@ -355,17 +433,20 @@ PDFHooks.on('ui:ready', () => {
 
   if (toggleBtn) {
     window.registerSubtoolbar?.(toggleBtn);
+    // Off → on, with its options bar. On with the bar open → off. On while
+    // another bar took the ribbon → its bar again, Reveal stays on (the
+    // button keeps the "on" colour, webgl-mask.css).
     toggleBtn.addEventListener('click', () => {
-      const isActive = toggleBtn.classList.contains('active');
-      document.querySelectorAll('.webgl-overlay').forEach(c => {
-        c.style.display = !isActive ? 'block' : 'none';
-      });
-      if (!isActive) {
-        window.openSubtoolbar?.(optionsBar, toggleBtn);
-        refreshWebGLCanvases();
-      } else {
+      const barOpen = !optionsBar?.classList.contains('hidden');
+      if (revealOn && barOpen) {
+        revealOn = false;
         window.openSubtoolbar?.(null, null);
+      } else {
+        revealOn = true;
+        window.openSubtoolbar?.(optionsBar, toggleBtn);
       }
+      toggleBtn.classList.toggle('reveal-on', revealOn);
+      refreshWebGLCanvases();
     });
   }
 

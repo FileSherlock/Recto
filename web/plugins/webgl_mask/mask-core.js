@@ -400,8 +400,16 @@
       if (L >= NO_EDGE || L < 1 || (d > 1 && (pc.L[d - 1] === 255 || L < pc.L[d - 1] - TOL))) { pc.L[d] = 255; return; }
       for (let i = pc.i0; i <= pc.i1; i++) if (s.px[d][i] >= 0) known[s.px[d][i]] *= L / 255;
     };
-    const settleCorners = () => {
-      for (const c of corners) {
+    // A corner waits for a level of its two sides' pieces: after one side's
+    // line settles, only that side's corners can change (in corner order, as
+    // a pass over all of them would take them — the same products into
+    // `known`). A pass over every corner after every waiting line made a page
+    // of many small boxes quadratic: minutes for a grid of cells.
+    const cornersOf = new Map();
+    for (const c of corners)
+      for (const s of [c.hs, c.vs]) { if (!cornersOf.has(s)) cornersOf.set(s, []); cornersOf.get(s).push(c); }
+    const settleCorners = (list = corners) => {
+      for (const c of list) {
         const hp = pieceAt(c.hs, c.hi), vp = pieceAt(c.vs, c.vi);
         for (const q of c.px) {
           if (q.t >= 0 || vp.L[q.dx] < 0 || hp.L[q.dy] < 0) continue;
@@ -435,7 +443,7 @@
       pc.L[d] = levelOf(values);
       if (pc.L[d] < 0) pc.L[d] = 255;
       settle(s, pc, d);
-      settleCorners();
+      settleCorners(cornersOf.get(s) || []);
     }
     for (const s of sides) for (const pc of s.pieces) for (let d = 2; d <= DEPTH; d++) if (pc.L[d - 1] === 255) pc.L[d] = 255;
 

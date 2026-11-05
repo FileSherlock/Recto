@@ -1,5 +1,8 @@
 /* WebGL mask overlay canvas. The core's generic `.page-container > canvas`
    rule excludes `.webgl-overlay`, so this rule fully controls its rendering. */
+/* Reveal on while another options bar has the ribbon: the icon keeps the on colour */
+#toggle-webgl.reveal-on { color: #8ab4f8; }
+
 .webgl-overlay {
   display: block;
   width: 100%;
