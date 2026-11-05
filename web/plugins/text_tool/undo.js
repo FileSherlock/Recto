@@ -13,7 +13,8 @@
 //
 // The stack is text_tool's, the buttons are text_tool's (#tt-undo, #tt-redo),
 // the keys are the platform's: Ctrl/⌘+Z undoes, Ctrl/⌘+Shift+Z and Ctrl/⌘+Y
-// redo — never while a field has the caret, where they are the field's own.
+// redo — never while a field typed in has the caret, where they are the
+// field's own (a menu or a checkbox with the keyboard leaves them to the page).
 (function initUndo() {
   const LIMIT = 200;
   const entries = [];      // done: entries[0 … index); undone (redo): entries[index …)
@@ -170,7 +171,10 @@
 
   // ── keys and buttons ────────────────────────────────────────
 
-  const inField = t => t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName));
+  // a field typed in, whose own the keys are — not a menu, a checkbox or a
+  // colour, which keep the keyboard right after a change in the Text panel
+  const TYPED = /^(text|search|number|email|url|tel|password)$/;
+  const inField = t => t && (t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && TYPED.test(t.type)));
   document.addEventListener('keydown', e => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
     const k = e.key.toLowerCase();

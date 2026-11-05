@@ -98,6 +98,15 @@ the reason on hover); a tab locked as a whole says why at its top (`.tt-pane-loc
 | Typography | `tt-ot-*`: hide irrelevant features `tt-ot-hide`; ligatures; alternates; figures; capitals (`tt-ch-caps`); stylistic sets `tt-ot-ss` |
 | Display (`tt-view`, the panel's foot) | **Space widths** `toggle-space-labels` (`setShowSpaceWidthLabels`); a plugin's Settings section marked `data-text-panel` lands here |
 
+## Over the page (text_tool)
+
+Drawn into each page's `.page-container`; an armed Artistic or Frame tool leaves presses on them to them.
+
+| Label / tooltip | Element | Wired in |
+|---|---|---|
+| Ruler above the page — its marker (drag: the selected box's left edge, snapping to ⅛ inch; Alt: free) | `svg.ruler-layer` → `.ruler-marker` (one per page, no id) | `text_tool/ruler.js` — built on `page:rendered`; a drag is one undo step (`move:<id>`, collapsing with drags of the box) |
+| Nudge popover — the pressed character's x nudge slider | `.utb-nudge-popover` | `text_tool/micro-typo.js` — opened by pressing a character while **Nudge characters** (`fabric-nudge-mode`) is on |
+
 ## Panels
 
 - **Left thumbnails sidebar** — `#sidebar` in `core/index.template.html`, toggled

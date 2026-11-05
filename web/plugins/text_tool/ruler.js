@@ -134,6 +134,7 @@
     const start = toSVGPoint(svgEl, e.clientX, e.clientY);
     const origX = box.x || 0;
     const eighth = eighthPx();
+    const step = window.utbUndo?.capture([box]);   // one undo step, as a drag of the box is
 
     function onMove(ev) {
       const cur = toSVGPoint(svgEl, ev.clientX, ev.clientY);
@@ -146,6 +147,7 @@
     function onUp() {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+      window.utbUndo?.commit(step, 'move', `move:${box.id}`);
     }
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
