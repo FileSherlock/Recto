@@ -107,7 +107,17 @@
     const black = blackness(page, ob);
     const out = { keep: true, why: null, black: +black.toFixed(3), onLine: null, gap: null, hPitch: null };
     if (black < BLACK_FRACTION) return { ...out, keep: false, why: 'not black' };
-    if (!g) return out;                                   // no grid to judge by
+    if (!g) {
+      // no grid to judge by (fewer than MIN_ROWS rows): the lines' own bands
+      // stand in for the pitch in the one test a size decides — a bar covers
+      // text and is never shorter than GRID_MIN_H of a line; a thick rule is
+      // (a 4-pt rule under a few lines read black once a box's last row was
+      // no longer counted inside it)
+      const bands = (lines || []).map(L => L.bot - L.top).filter(h => h > 0).sort((p, q) => p - q);
+      const band = bands.length ? bands[bands.length >> 1] : 0;
+      if (band && ob.y1 - ob.y0 < GRID_MIN_H * band) return { ...out, keep: false, why: 'shorter than a line' };
+      return out;
+    }
     const h = ob.y1 - ob.y0, w = ob.x1 - ob.x0;
     const a = anchoring(lines, ob);
     Object.assign(out, { onLine: +a.onLine.toFixed(2), gap: Number.isFinite(a.gap) ? a.gap : null, hPitch: +(h / g.pitch).toFixed(2) });

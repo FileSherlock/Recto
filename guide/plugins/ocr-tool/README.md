@@ -295,14 +295,15 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
   the boxes, applied
   before the read is slimmed (the cache, payload version 3, holds only what
   stays): **black** — the interior, one pixel in from every
-  side, is ≥ 90 % ≤ 48/255 (a box too thin to have an interior keeps the
-  reader's word); and **where the text is** — on a page with ≥ 8 distinct
+  side of the reader's half-open box `[x0, x1) × [y0, y1)`, is ≥ 90 % ≤ 48/255
+  (a box too thin to have an interior keeps the reader's word); and **where the text is** — on a page with ≥ 8 distinct
   text rows (unread bands count) the box either shares its rows with a line
   (a band overlaps ≥ 0.4 of its height) or stands on the text grid (a line
   within 0.6 × pitch above or below, and the box ≥ 0.6 × pitch tall — one
   line's bar or a block of lines); a box narrower than 40 px and taller than
   1.6 lines is a border or two bars' junction, never a name's bar. A page
-  with fewer rows keeps every black box. Measured 2026-09-22: every real bar
+  with fewer rows keeps every black box but one shorter than 0.6 of its
+  lines' median band (a thick rule under a heading and a few lines). Measured 2026-09-22: every real bar
   on the corpus and on EFTA00173953 overlaps a line by 0.47–0.84 of its
   height or lies 0–11 px from one and is 0.78–1.27 lines tall, so the rules
   drop nothing real there. `OCRTool.dropped(page)` lists what went (`why`,

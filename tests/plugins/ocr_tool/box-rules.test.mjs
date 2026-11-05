@@ -82,10 +82,14 @@ test('verdicts on a text page', { skip }, () => {
   assert.deepEqual([v(rects[5]).keep, v(rects[5]).why], [false, 'narrow and taller than a line']);
   assert.equal(v(rects[6]).keep, true);
   assert.deepEqual([v(rects[7]).keep, v(rects[7]).why], [false, 'not black']);
-  // without a grid every black box stays — a page the reader could not read, an image
+  // without a grid every black box stays — a page the reader could not read, an image —
+  // but one shorter than the lines read there: a thick rule under a few lines is no bar
   assert.equal(v(rects[4], rows(3)).keep, true);
   assert.equal(v(rects[3], []).keep, true);
   assert.equal(v(rects[7], []).keep, false);
+  assert.deepEqual([v(rects[3], rows(3)).keep, v(rects[3], rows(3)).why], [false, 'shorter than a line']);
+  assert.equal(v(rects[0], rows(3)).keep, true);
+  assert.equal(v(rects[6], rows(3)).keep, true);
 });
 
 test('the corpus bars stay: measured overlaps, gaps and heights', { skip }, () => {
