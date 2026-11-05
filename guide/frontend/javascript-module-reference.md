@@ -41,7 +41,7 @@ the order of their manifest's `order` (`embedded_text_viewer` 10, `webgl_mask` 2
 | 18 | `text_tool/drag-resize.js` | IIFE — SVG-native drag/resize event delegation, frame handles | — | `utbState`, `renderBox` |
 | 19 | `text_tool/ruler.js` | `refreshRuler` | **on:** `page:rendered` | `utbState`, `GEO` |
 | 20 | `text_tool/story-edit.js` | `enterStoryEdit`, `commitStoryEdit`, `storyFocus`, `storyTarget`, `storyCharState`, `storyParaState`, `storyApplyChar`, `storyApplyPara`, `storyApplyParaEach`, `storyApplyFrame`, `storyMapChar`, `storyChangeCase`, `onStoryChange` | **on:** `document:opening` | `StoryCore`, `renderBox`, `utbUndo` |
-| 21 | `text_tool/toolbar.js` | `syncToolbarToBox`, `syncToolbarToSelection`, `syncStoryControls`, `getNaturalSpaceWidth` | — | `utbState`, `renderBox`, `Shaping`, `story-edit.js` |
+| 21 | `text_tool/toolbar.js` | `syncToolbarToBox`, `syncToolbarToSelection`, `getNaturalSpaceWidth`, `utbPlainChar` | — | `utbState`, `renderBox`, `Shaping`, `story-edit.js` |
 | 22 | `text_tool/micro-typo.js` | `enterMicroTypo`, `exitMicroTypo` | — | `utbState`, `computeXPositions`, `renderBox` |
 | 23 | `text_tool/inline-edit.js` | `enterInlineEdit`, `commitInlineEdit`, `cancelInlineEdit` | — | `utbState`, `renderBox`, `exitMicroTypo`, `enterStoryEdit` |
 | 24 | `text_tool/text-tool.js` | `handleManualAddBox`, `utbDeleteBox` | — | `utbState`, `renderBox`, all above |

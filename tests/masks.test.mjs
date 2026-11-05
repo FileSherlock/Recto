@@ -13,6 +13,7 @@
 //   node --test tests/*.test.mjs
 
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -78,6 +79,34 @@ for (const d of documents) {
     } finally { pdf.close(); }
   });
 }
+
+// ── the drawn masks of the golden pages ───────────────────────────────────────
+// The recordings hold the regions; the mask the overlay draws (buildMask: the
+// regions plus the rims taken off their edges) is held to the SHA-256 of what
+// this repository built on 2026-11-05 (tests/golden/masks-built.json) — a
+// lock on the rim model, not a recording of the earlier implementation. A
+// deliberate change of the rims records them again:
+//   RECORD_MASKS=1 node --test tests/masks.test.mjs
+const BUILT = path.join(GOLDEN, 'masks-built.json');
+test('the drawn mask of every golden page with a scan equals the one recorded here', () => {
+  const recorded = fs.existsSync(BUILT) ? readJSON(BUILT) : {};
+  const now = {};
+  for (const d of documents) {
+    if (!fs.existsSync(path.join(ROOT, d.source))) continue;
+    const pdf = openPdf(mupdf, Module, fs.readFileSync(path.join(ROOT, d.source)));
+    try {
+      for (const n of d.pages) {
+        const raster = pdf.pageRaster(n, { gray: true });
+        if (raster.source !== 'embedded') continue;
+        const mask = buildMask(raster.samples, raster.width, raster.height);
+        now[`${d.name}/${n}`] = mask ? createHash('sha256').update(mask).digest('hex') : null;
+      }
+    } finally { pdf.close(); }
+  }
+  if (process.env.RECORD_MASKS) { fs.writeFileSync(BUILT, JSON.stringify(now, null, 1) + '\n'); return; }
+  assert.ok(Object.values(now).some(Boolean), 'some golden page has a mask');
+  for (const [page, hash] of Object.entries(now)) assert.equal(hash, recorded[page], `${page}: the drawn mask`);
+});
 
 // ── pages built here ──────────────────────────────────────────────────────────
 // A white page; boxes are black rectangles [x0, x1) × [y0, y1) with a rim: per

@@ -1,7 +1,7 @@
 # Reference outputs
 
-Frozen recordings the suites in `tests/` hold the code to: page rasters and masks pixel
-for pixel, spans within 1e-6, HarfBuzz numbers to the last digit. Nothing here is edited
+Frozen recordings the suites in `tests/` hold the code to: page rasters and mask regions
+pixel for pixel, spans within 1e-6, HarfBuzz numbers to the last digit. Nothing here is edited
 by hand except this README and the `source` paths in `documents.json`.
 
 Where the numbers come from: an earlier, Python-based implementation of Recto ran the
@@ -114,3 +114,12 @@ page and hold the rest of it to the recording.
 - Thumbnails are LANCZOS downscales to 180 px; a different resampler does not
   reproduce their hashes, so `tests/documents.test.mjs` holds a thumbnail to its
   size, not its hash.
+
+## The drawn masks (`masks-built.json`)
+
+Not a recording of the earlier implementation: the SHA-256 of the mask `MaskCore.buildMask`
+draws (regions plus the rims taken off their edges) on every golden page with a scan, as this
+repository built them on 2026-11-05 — a lock on the rim model, which the recordings' two-ring
+masks never described. `tests/masks.test.mjs` holds the code to it; a deliberate change of the
+rims records it again with `RECORD_MASKS=1 node --test tests/masks.test.mjs`, in the same
+change, with what moved and why.

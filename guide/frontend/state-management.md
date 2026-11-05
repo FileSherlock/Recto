@@ -94,6 +94,7 @@ fragment supplies the element — it comes from `text_tool`'s bar. `app.js` chec
 > **Plugin-owned controls are not in `els`.** The core cache holds no plugin elements — not the
 > webgl mask toggle (`#toggle-webgl`), the reveal-strength slider (`#edge-subtract`), nor the
 > Artistic Text Tool button (`#tt-art-text-btn`). Each plugin looks up its own DOM with
-> `document.getElementById(...)` and optional chaining (`?.`), typically from a
-> `PDFHooks.on('ui:ready', …)` handler — see the
+> `document.getElementById(...)` and optional chaining (`?.`) — from a
+> `PDFHooks.on('ui:ready', …)` handler in a `scripts_before_viewer` script, at module scope in a
+> `scripts_after_app` one (`ui:ready` has fired before those run) — see the
 > [`PDFHooks` events](../api-reference/api-reference.md#pdfhooks-events).

@@ -55,7 +55,7 @@ the plugin is installed.
 |---|---|---|---|
 | `ocr_tool` | [ocr-tool/](ocr-tool/) | Byte-exact blind-reader OCR of the page rasters (client-side); certified lines land as editable `ocr` text boxes, detected redaction rectangles as `redaction` boxes. **MuPDF pixel view**: draws any text box from the reader's glyph bitmaps on mupdf's ¼-px lattice and diffs it against the page (via text_tool's `utbPixelRender` seam). Defines two optional seams a matcher may call: `window.ocrTestHypothesis` (a candidate name judged by the page pixels) and `window.ocrMeasureWidths` (candidates measured in the page's own face) | Shipped reads of the startup document in `web/plugins/ocr_tool/cache/<sha256>.json`; this browser's own reads in IndexedDB (`recto-ocr-cache`) |
 
-- **Requires `text_tool`** (renders through the unified text box system); works with or without `embedded_text_viewer`.
+- **Requires `text_tool`** (renders through the unified text box system). It reads without `embedded_text_viewer` too, but the redaction boxes it detects are tied to their lines by that plugin (`utbConnectRedactionsToLines`, guarded): without it no bar has a line, and a refiner or matcher has nothing to work with on it.
 - Its `engine/` + `glyphs/` folders (`web/plugins/ocr_tool/engine/`, `…/glyphs/`) are synced verbatim from the external `tol0` repo by its `tools/sync-recto.mjs` (`npm run sync:recto` there), which knows the `web/plugins/ocr_tool/` layout — edit the engine there, never in this repo. Cache-busters need no attention: the build stamps every script with its content hash. `npm run recto-test` there smoke-tests the embedded engine and the pixel view end to end.
 
 ## Base64 attachment decoder
@@ -127,8 +127,10 @@ snapping redactions to lines.
   found sticking out of a bar — the hidden name's own first/last letters.
   `redaction_matching` listens and fills that box's starts-with / ends-with filter from
   them; without a refiner the event never fires and the filter stays manual.
-- **Needs `redaction` boxes and surrounding text** (an `embedded_text_viewer` or
-  `ocr_tool` line). With neither it no-ops. The hook emission is generic and names no
+- **Needs `redaction` boxes tied to the text around them** — an `embedded_text_viewer` or
+  `ocr_tool` line, tied by `embedded_text_viewer` (`utbConnectRedactionsToLines`, the
+  `redactions:connected` event it emits): without that plugin no bar is tied to a line, even
+  on a page OCR read, and the refiner no-ops. The hook emission is generic and names no
   plugin, so it stays put — emitting into the void — if the refiner is removed.
 
 ## Image adjustments

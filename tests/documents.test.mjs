@@ -119,3 +119,11 @@ test('the full-size PNG of a page decodes to the golden pixels', () => {
     pix.destroy(); image.destroy();
   } finally { pdf.close(); }
 });
+
+test('every golden document is in the checkout; only the large samples of tests/samples/ may be left out', () => {
+  // a missing document skips its tests: a misspelt `source` skipped 12 of them without a word
+  const all = readJSON(path.join(GOLDEN, 'documents.json'));
+  const missing = all.filter(d => !fs.existsSync(path.join(ROOT, d.source)));
+  assert.deepEqual(missing.filter(d => !d.source.startsWith('tests/samples/')).map(d => d.source), []);
+  for (const d of missing) console.log(`# ${d.name}: ${d.source} is not in this checkout — its tests are skipped`);
+});

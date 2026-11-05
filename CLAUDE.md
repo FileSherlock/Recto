@@ -79,7 +79,7 @@ plugin may use a baseline plugin's global, guarded (`typeof Shaping !== 'undefin
 ## Goldens and exactness
 
 `tests/golden/` holds recorded reference outputs (open metadata, decoded-pixel hashes of page rasters, spans, masks,
-font lists and metrics, widths — see its README). The suites hold the code to them: rasters and masks pixel for
+font lists and metrics, widths — see its README). The suites hold the code to them: rasters and mask regions pixel for
 pixel, spans within 1e-6, HarfBuzz numbers to the last digit. **A change to anything the goldens cover is done when
 they pass, not when it looks right**; where a golden cannot be met, the page, the difference and the cause are
 written down (`tests/golden/README.md`, "Departures"). Page rasters are the page's own scan —

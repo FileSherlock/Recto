@@ -26,7 +26,8 @@ Doc.pagePixels(n, { gray: true })        ← core document service: the page ras
 
 `mask-core.js` is pure loops with no DOM in it: the worker runs it in the browser, and
 `tests/masks.test.mjs` loads the very same file under Node and holds its regions to the
-recorded reference masks pixel for pixel, its edges to pages built with known rims and ink.
+recorded reference masks pixel for pixel, the drawn masks to the hashes recorded in
+`tests/golden/masks-built.json`, its edges to pages built with known rims and ink.
 
 ---
 
@@ -243,7 +244,7 @@ scan, which is the raster the viewer shows — a scan taller than 8.5 × 11 incl
   disappears in the opening.
 - **Scanned pages only** — a mask is built only when the page raster is the page's
   embedded scan (`source: 'embedded'`). A born-digital page, shown as a 96-dpi render, gets
-  none, and neither does an image document (PNG, JPEG, …), for which `Doc.pagePixels`
-  returns `null`.
+  none. An image document (PNG, JPEG, …) is its own scan: `Doc.pagePixels` returns `null`
+  for it, and the worker decodes the page image itself (over white).
 - **The disc rule is a shape test**, not a circle fit: a square-ish black blob of 16–44 px
   that happens to fill about π/4 of its box is dropped as a disc.

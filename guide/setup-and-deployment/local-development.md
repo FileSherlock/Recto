@@ -133,7 +133,7 @@ runs every suite with Node's built-in test runner — nothing to install.
 | `tests/documents.test.mjs` | `web/core/pdf-document.js`: open metadata, page rasters (decoded-pixel hashes), image placements, thumbnail sizes |
 | `tests/spans.test.mjs` | The embedded-text extractor, full and lean spans |
 | `tests/shaping.test.mjs` | HarfBuzz widths and font-metrics tables, equal to the last digit |
-| `tests/masks.test.mjs` | The redaction-mask builder, pixel for pixel |
+| `tests/masks.test.mjs` | The redaction-mask builder: regions against the recordings pixel for pixel, the drawn masks against the hashes recorded here, rims on pages built with known rims |
 | `tests/index-page.test.mjs` | The generated page's markup and script order; a plugin that is absent leaves no trace |
 | `tests/page-controls.test.mjs` | Every control the core and each installed baseline plugin owns is on the page, and the scripts whose order matters load in that order |
 | `tests/plugins/<name>/` | An optional plugin's own suites (`*.test.mjs`) and its steps for the browser smoke test (`smoke.mjs`); the folder travels with the plugin |

@@ -267,7 +267,7 @@ core.
 
 | Event | Payload | Emitted |
 |-------|---------|---------|
-| `ui:ready` | — | By `app.js`, once the core toolbar is wired. The place to attach plugin buttons and to call `registerSubtoolbar` / `openSubtoolbar` |
+| `ui:ready` | — | By `app.js`, once the core toolbar is wired — synchronously, before any `scripts_after_app` script has run: the place to attach buttons and call `registerSubtoolbar` / `openSubtoolbar` from a `scripts_before_viewer` script. A `scripts_after_app` script never sees it (the bus does not replay) and wires its controls at module scope |
 | `document:opening` | `{ file, name, isDefault }` | By `openDocument()`, before anything changes: `state` still describes the previous document. Reset per-document plugin state here (a finished flag, a run in progress) — pages of the new document show, with `page:rendered`, **before** its `document:loaded` arrives |
 | `viewer:clear` | — | By `goToPage()`, just before the viewer is emptied for a page change. Tear down per-page resources |
 | `page:rendered` | `{ pageContainer, pageNum }` | By `goToPage()`, after the page container (with its `<img>`) entered the DOM. Draw per-page overlays |
@@ -314,10 +314,11 @@ All paths are relative to the plugin's folder.
 | `name` | string | — | Must equal the folder name |
 | `order` | number | — | Sorts the plugins; ties are broken by name. A manifest without a finite `order` sorts as `1000`. The order decides the sequence of every slot below — toolbar buttons left to right, bars, scripts |
 | `styles` | list | `<!-- @plugins:styles -->` in `<head>` | Stylesheets, one `<link>` each |
-| `toolbar_button` | file \| `null` | `<!-- @plugins:toolbar_buttons -->` | HTML fragment: the plugin's button in the top toolbar |
+| `toolbar_button` | file \| `null` | `<!-- @plugins:toolbar_buttons -->` | HTML fragment: the plugin's button in the tool column at the left (the user reorders and trims it: Customise tools) |
 | `ribbon_bar` | file \| `null` | `<!-- @plugins:bars -->` | HTML fragment: a persistent bar in the options row. `openSubtoolbar` never hides a `.ribbon-bar` |
 | `options_bar` | file \| `null` | `<!-- @plugins:bars -->` | HTML fragment: a contextual bar (class `options-bar`), one visible at a time. Per plugin the ribbon bar comes first, then the options bar |
 | `sidebar` | file \| `null` | `<!-- @plugins:sidebars -->` | HTML fragment: a right panel. The fragment supplies its own container; the core hosts no right panel |
+| `settings` | file \| `null` | `<!-- @plugins:settings -->` | HTML fragment: a section of the Settings panel (shown only while some plugin has one); marked `data-text-panel`, it moves into text_tool's Text panel instead |
 | `scripts_before_viewer` | list | `<!-- @plugins:scripts_before_viewer -->` | Classic scripts loaded after `doc-service.js` and before `pdf-viewer.js` — for globals that must exist before the viewer runs. They cannot call `app.js` globals at module scope; defer to `PDFHooks.on('ui:ready', …)` |
 | `scripts_after_app` | list | `<!-- @plugins:scripts_after_app -->` | Classic scripts loaded after `app.js`, in the listed order |
 
@@ -669,12 +670,12 @@ a gray mask of the same size, or `null` when the page has no blacked-out region:
 |------------|---------|
 | `255` | Inside a blacked-out region |
 | `0` | Clear page |
-| mid-gray | On the two pixel rings around a region: `255 −` the brightest page pixel along that edge run — the paper's brightness, which the shader un-blends the anti-aliased border with |
+| `255 · (1 − t)` | On a box's rim, where the page shows through the box as `page × t` (`MaskCore.transmission`, per side of every box, corners included); the shader divides `t` out again, so text under the rim comes back. A rim pixel declared paper (`t = 0`) is `255`, shown white like the region |
 
 A region is a solid block of pure black (`gray ≤ 0`): thin strokes are opened away with a
 5 × 5 element, components smaller than 17 × 10 px or with `area / perimeter < 2` are
-dropped, and so are discs (punched holes, bullets). What remains is filled, holes
-included.
+dropped, and so are discs (punched holes, bullets). Nothing is filled: a gap the region
+encloses stays page, not mask.
 
 `MaskCore` also exports the steps — `labelComponents`, `filterComponents`, `removeDiscs` —
 for tests. See [WebGL Mask](../frontend/webgl-mask.md).

@@ -8,8 +8,8 @@ The file is a classic script with two layers:
 
 | Layer | Global | Contents |
 |-------|--------|----------|
-| The measuring core | `ShapingCore` (`createShaper`, `parseKernTable`, `CHARS`) | No DOM, no `fetch`. `createShaper({ hb, catalogue, loadFont })` takes the HarfBuzz module, the catalogue object and a function that loads a face file's bytes, and returns `{ widths, fontMetrics, resolve }`. The `node:test` suite loads this very file |
-| The browser glue | `window.Shaping` (`widths`, `fontMetrics`) | Builds one shaper lazily from `vendor/harfbuzz/index.mjs` (through `assetURL`) and `generated/fonts.json` |
+| The measuring core | `ShapingCore` (`createShaper`, `parseKernTable`, `CHARS`) | No DOM, no `fetch`. `createShaper({ hb, catalogue, loadFont })` takes the HarfBuzz module, the catalogue object and a function that loads a face file's bytes, and returns `{ widths, fontMetrics, faceMetrics, resolve }`. The `node:test` suite loads this very file |
+| The browser glue | `window.Shaping` (`widths`, `fontMetrics`, `faceMetrics`) | Builds one shaper lazily from `vendor/harfbuzz/index.mjs` (through `assetURL`) and `generated/fonts.json` |
 
 Other plugins call it guarded — `typeof Shaping !== 'undefined'` — so they keep working when `text_tool` is absent.
 
@@ -76,6 +76,19 @@ This is the table a plugin judges a page's measured pen positions against to lea
 `size_px` defaults to `16` and must lie in `(0, 512]`; `bold` / `italic` accept `true`, `1` or `'1'`. The answer is `null` when the size is out of range or no file is installed for the family. Tables are cached per face file and size — the first call shapes every pair once (up to 150 × 150 shapings), later calls are free.
 
 ---
+
+### `Shaping.faceMetrics({ family, bold, italic })` → `Promise<object | null>`
+
+A face's own numbers in font units (no size): `upem`; HarfBuzz's `ascender`, `descender`,
+`lineGap`; the tables' own values — `hheaAscender` / `hheaDescender` / `hheaLineGap`,
+`postUnderlinePosition` / `postUnderlineThickness`, `os2StrikeoutSize` /
+`os2StrikeoutPosition`, `typoAscender` / `typoDescender` / `typoLineGap`, `winAscent` /
+`winDescent`, `os2XHeight` / `os2CapHeight` (OS/2 version 2 and later), `null` where the face
+has no such table —; the outlines' `topH`, `topX`, `topL` and `bottomQ`; HarfBuzz's metric
+positions (`capHeight`, `xHeight`, the underline, strikeout, superscript and subscript
+values); the space's advance (`space`); and `features`, the GSUB and GPOS feature tags. What
+Artistic and Frame text set a line with — the leading, decorations and capitals the way
+Affinity reads a face (`story-core.js`). `null` when the family resolves to no file.
 
 ## Font Resolution
 

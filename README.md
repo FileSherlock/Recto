@@ -69,8 +69,8 @@ node tests/smoke/smoke.mjs          # the whole site in headless Chrome, once pe
 ```
 
 The suites hold each computation to recorded reference outputs in `tests/golden/`: page
-rasters and masks pixel for pixel, embedded-text spans within 1e-6, HarfBuzz widths to the
-last digit. They also check the generated page — script order, every control, and that a
+rasters and mask regions pixel for pixel (the drawn masks to hashes recorded here), embedded-text
+spans within 1e-6, HarfBuzz widths to the last digit. They also check the generated page — script order, every control, and that a
 plugin which is not there leaves no trace. A suite skips a sample document that is not in
 the checkout (`tests/samples/` holds a 66 MB one).
 
@@ -124,8 +124,8 @@ tests/
 guide/                   documentation
 ```
 
-A clean checkout is about 119 MB: `web/` 49 MB — fonts 24, plugins 14, MuPDF 11, HarfBuzz
-0.5, the startup PDF 0.6 — and `tests/` 69 MB, of which the sample documents are 67.
+A clean checkout is about 120 MB: `web/` 50 MB — fonts 24, plugins 15, MuPDF 10, HarfBuzz
+0.5, the startup PDF 0.6 — and `tests/` 69 MB, of which the sample documents are 66.
 
 ## Vendored binaries
 

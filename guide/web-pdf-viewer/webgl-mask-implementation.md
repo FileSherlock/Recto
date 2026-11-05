@@ -56,14 +56,15 @@ Browsers limit ~16 simultaneous WebGL contexts. An `IntersectionObserver` (one v
 
 ### Fragment Shader
 ```glsl
-vec3 page = texture2D(uPage, vTexCoord).rgb;
+vec4 pageRGBA = texture2D(uPage, vTexCoord);
+vec3 page = pageRGBA.rgb * pageRGBA.a + vec3(1.0 - pageRGBA.a);   // over the page's white
 float mask = texture2D(uMask, vTexCoord).r;
-float alpha = mask * uStrength;
 if (mask > 0.999) {
-  result = vec3(uStrength);                           // interior: show white
+  result = vec3(1.0);                                 // interior (or a rim pixel declared paper): white
 } else {
-  result = min(page / max(1.0 - alpha, 0.001), 1.0);  // border: multiplicative recovery, per channel
+  result = min(page / max(1.0 - mask, 0.001), 1.0);   // rim: multiplicative recovery, per channel
 }
+result = mix(page, result, uStrength);                // Reveal Strength: a linear fade
 ```
 
 Anti-aliasing blends edge pixels as `P_edge = (1 - α) × P_orig`. Dividing by `(1 - α)` recovers `P_orig` exactly — dark text stays dark, white background returns to white. The additive approach (`page + mask`) would wash out dark pixels.
@@ -86,4 +87,4 @@ No `document:loaded` handler is needed: masks are built lazily, and the cache in
 
 ## 4. Tests
 
-`tests/masks.test.mjs` runs `mask-core.js` under Node over every reference PDF page and requires the mask — or its absence — to equal the recorded one pixel for pixel. `tests/page-controls.test.mjs` checks that `#toggle-webgl`, `#webgl-options-bar` and `#edge-subtract` are on the generated page.
+`tests/masks.test.mjs` runs `mask-core.js` under Node over every reference PDF page: the regions — or their absence — must equal the recorded masks' 255 pixels (a recording's ring may reach 255 over black page pixels, up to 4 of them), the drawn mask (`buildMask`, rims included) must hash as recorded in `tests/golden/masks-built.json`, and the rims are held to pages built with known rims and ink. `tests/page-controls.test.mjs` checks that `#toggle-webgl`, `#webgl-options-bar` and `#edge-subtract` are on the generated page.

@@ -11,8 +11,8 @@ A reference for adding new plugins to Recto. Read the architecture section first
 > that do not fit the width move under the ribbon's "More" button by themselves. `settings`
 > is a section of the **Settings** panel (the gear in the top toolbar) — or, marked
 > `data-text-panel`, of the Text panel's Display section, where switches about how text is
-> drawn belong. No *baseline* plugin fills the `ribbon_bar` slot — see
-> [Optional Plugins](./plugins/) for a worked example.
+> drawn belong. No plugin fills the `ribbon_bar` slot yet: a bar there stays up while the
+> contextual bars come and go (`openSubtoolbar` never hides a `.ribbon-bar`).
 
 ---
 
@@ -243,8 +243,8 @@ There are two distinct plugin UI patterns. Choose one based on what your tool ne
 
 | Pattern | Used by | Adds |
 |---|---|---|
-| **Subtoolbar** | `webgl_mask`, `text_tool` | A tool-column button that swaps the options bar row |
-| **Right Panel** | (e.g. a matching sidebar) | A tool-column button that opens a full-height side panel |
+| **Subtoolbar** | `webgl_mask` | A tool-column button that swaps the options bar row |
+| **Right Panel** | `text_tool` (its Text panel) | A tool-column button that opens a full-height side panel |
 
 ---
 
@@ -403,16 +403,20 @@ one's id arrives — so each panel's tool switches the right side to it (text_to
 panel and any plugin's panel work this way):
 
 ```js
-// my-panel.js
-const panel = document.getElementById('my-panel');
-const btn   = document.getElementById('toggle-my-panel');
-function show(on) {
-  panel?.classList.toggle('hidden', !on);
-  btn?.classList.toggle('active', on);
-  if (on) PDFHooks.emit('sidepanel:shown', { id: panel.id });
-}
-btn?.addEventListener('click', () => show(!!panel?.classList.contains('hidden')));
-PDFHooks.on('sidepanel:shown', ({ id } = {}) => { if (id !== panel?.id) show(false); });
+// my-panel.js — in a function of its own: every plugin's classic scripts share one global
+// scope, and a second plugin's top-level `const panel` would stop with "Identifier 'panel'
+// has already been declared"
+(function () {
+  const panel = document.getElementById('my-panel');
+  const btn   = document.getElementById('toggle-my-panel');
+  function show(on) {
+    panel?.classList.toggle('hidden', !on);
+    btn?.classList.toggle('active', on);
+    if (on) PDFHooks.emit('sidepanel:shown', { id: panel.id });
+  }
+  btn?.addEventListener('click', () => show(!!panel?.classList.contains('hidden')));
+  PDFHooks.on('sidepanel:shown', ({ id } = {}) => { if (id !== panel?.id) show(false); });
+})();
 ```
 
 A panel that shows itself at load (a remembered state, a default) does so only when no

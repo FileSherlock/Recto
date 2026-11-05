@@ -321,8 +321,10 @@ redaction_refiner ──'redactions:connected' hook──> embedded_text_viewer
 
 - **Needs a source of `redaction` boxes** (e.g. `ocr_tool` or the Add-Box tool)
   and **surrounding text** on their lines (`embedded_text_viewer` spans or
-  `ocr_tool` lines). With neither, there is nothing to measure against and it
-  no-ops.
+  `ocr_tool` lines), tied to them by `embedded_text_viewer`
+  (`utbConnectRedactionsToLines`, whose `redactions:connected` starts a pass):
+  without that plugin no bar is tied to a line — even on a page OCR read — and
+  it no-ops.
 - Removing it: delete the `web/plugins/redaction_refiner/` folder,
   `tests/plugins/redaction_refiner/` and this docs folder, and drop its row
   from the table in [`../README.md`](../README.md). The
