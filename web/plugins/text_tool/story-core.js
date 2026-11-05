@@ -379,6 +379,20 @@
     return normalize(s);
   }
 
+  // Bold, Italic, Underline and Strikethrough flip as Affinity flips them:
+  // on, unless all of the text already has it (`summary`: its charSummary —
+  // a mixed key is not all of it). → the patch
+  function togglePatch(summary, key) {
+    const lined = key === 'underline' || key === 'strike';
+    const v = summary.attrs[key];
+    const all = !summary.mixed.includes(key) && (lined ? v != null && v !== 'none' : !!v);
+    return { [key]: lined ? (all ? 'none' : 'single') : !all };
+  }
+
+  // A size step of a run's own size (Ctrl+Shift+> / <, the panel's − / +):
+  // `by` points, never below 1 pt. → the patch, for mapChar
+  const stepSize = (attrs, by) => ({ sizePt: Math.max(1, Math.round((charOf(attrs).sizePt + by) * 100) / 100) });
+
   // Paragraph attributes onto every paragraph a range touches.
   function applyPara(story, range, patch) {
     const s = clone(story);
@@ -954,7 +968,7 @@
     clean, sameAttrs, charOf, paraOf, frameOf,
     fromText, toText, paraText, paraLength, clone, normalize,
     cmp, ordered, collapsed, startPos, endPos, whole, clampPos, isWhole,
-    runAttrsAt, charSummary, paraSummary, applyChar, mapChar, applyPara,
+    runAttrsAt, charSummary, paraSummary, applyChar, mapChar, togglePatch, stepSize, applyPara,
     deleteRange, insertText, replaceRange, slice, wordAt, listMarkers, changeCase, caseMapped,
     scaledMetrics, leadingPx, leadingPerRun, naturalLeading, firstBaselinePx,
     lineWords, TAB_GAP, lineTabGaps, lineTabs, WORD_FIT, lineSpace, PEN_STEP, wordSpacingFor,

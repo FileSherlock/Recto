@@ -66,9 +66,12 @@ window.utbDeleteBox = function (id, { silent = false } = {}) {
   const box = id ? utbState.getBox(id) : null;
   if (!box) return;
 
+  // Artistic / Frame text being edited: the edit is committed first, a step
+  // before the delete's (Undo brings the text back as it was typed) — or,
+  // when the undo stack itself takes the box out, ended without a step
   if (utbState.editingId === box.id) {
-    window.commitStoryEdit?.();
-    if (typeof cancelInlineEdit === 'function') cancelInlineEdit();
+    if (box.textMode) window.commitStoryEdit?.({ record: !silent });
+    else if (typeof cancelInlineEdit === 'function') cancelInlineEdit();
   }
   if (utbState.microTypoId === box.id && typeof exitMicroTypo === 'function') exitMicroTypo();
 

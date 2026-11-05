@@ -39,10 +39,10 @@ popover (`tool-column-more`), and keeps working there.
 |---|---|---|---|
 | Toggle Embedded Text | `toggle-embedded-text` | `embedded_text_viewer/toolbar_button.html` | `text_tool/toolbar.js` (guarded `?.`) — toggles body class `hide-embedded-text`. embedded_text_viewer contributes no bar; this toggle is its only UI |
 | Toggle WebGL Mask | `toggle-webgl` | `webgl_mask/toolbar_button.html` | `webgl_mask/webgl-mask.js` — opens `#webgl-options-bar` |
-| Artistic Text Tool (click to type; drag sets the size; corners scale) | `tt-art-text-btn` | `text_tool/toolbar_button.html` | `text_tool/artistic-tool.js` — stays armed; a click on a line of the page takes its face, size, baseline and space, and a tab stop where it goes on after a tab (a list label's: type the label, Tab, the text); a press on a story box edits it (`drag-resize.js`) |
-| Frame Text Tool (drag a frame; arrows while dragging: a grid of frames) | `tt-frame-text-btn` | `text_tool/toolbar_button.html` | `text_tool/frame-tool.js` — stays armed; a press on a story box edits it (`drag-resize.js`) |
+| Artistic Text Tool (click to type; drag sets the size; corners scale) | `tt-art-text-btn` | `text_tool/toolbar_button.html` | `text_tool/artistic-tool.js` — stays armed; a click on a line of the page takes its face, size, baseline and space, and a tab stop where it goes on after a tab (a list label's: type the label, Tab, the text); a press on a story box edits it (`drag-resize.js`); a press on the ruler's marker or a nudge's slider is theirs, not the page's |
+| Frame Text Tool (drag a frame; arrows while dragging: a grid of frames) | `tt-frame-text-btn` | `text_tool/toolbar_button.html` | `text_tool/frame-tool.js` — stays armed; a press on a story box edits it (`drag-resize.js`); a press on the ruler's marker or a nudge's slider is theirs, not the page's |
 | Add Redaction Box (click on page) | `tool-add-box` | `text_tool/toolbar_button.html` | arm the tool: `core/app.js`; placement: `handleManualAddBox` (`text_tool/text-tool.js`) |
-| Undo / Redo (Ctrl+Z, Ctrl+Shift+Z) | `tt-undo`, `tt-redo` | `text_tool/toolbar_button.html` | `text_tool/undo.js` — the tooltip names the step |
+| Undo / Redo (Ctrl+Z, Ctrl+Shift+Z) | `tt-undo`, `tt-redo` | `text_tool/toolbar_button.html` | `text_tool/undo.js` — the tooltip names the step; a text being edited is left first (its edit is the step Undo takes back) |
 | Text panel — font, spacing, kerning, paragraph, frame, typography and display | `tt-studio-btn` | `text_tool/toolbar_button.html` | `text_tool/text-studio.js` — shows / hides the docked `#tt-studio` |
 | Customise tools… | `tool-column-customise` | `core/index.template.html` | `core/app.js` |
 | More tools | `tool-column-more` | `core/index.template.html` | `core/app.js` — shown only while some tool is hidden |
@@ -80,9 +80,12 @@ side to it from another side panel — closed with `tt-studio-close`, its edge `
 to make it wider (on a phone, taller; a double click: the default size). `tt-studio-scope`
 says what it acts on — the selected text, all of a box's text, a line read from the page, or new
 text; `utb-delete-box` beside it deletes the selected box (also Delete / Backspace outside a
-field). Controls are bound by their `data-k` (`char:` / `para:` / `frame:` + a StoryCore
-attribute). A setting the selection or the drawing cannot have is greyed with a lock (`.tt-lock`,
-the reason on hover); a tab locked as a whole says why at its top (`.tt-pane-lock`). Described in
+field). While a text is edited the keyboard stays with it: the panel's buttons never take the
+focus, its menus, checkboxes and colours give it back after a change, its fields at Enter
+(`storyFocus`, `text_tool/story-edit.js`); Escape here leaves the text. Controls are bound by
+their `data-k` (`char:` / `para:` / `frame:` + a StoryCore attribute). A setting the selection or
+the drawing cannot have is greyed with a lock (`.tt-lock`, the reason on hover); a tab locked as
+a whole says why at its top (`.tt-pane-lock`). Described in
 [The Text panel](frontend/text-tool.md) and [Artistic and Frame Text](frontend/artistic-and-frame-text.md).
 
 | Tab / section | Controls (id) |
@@ -95,6 +98,15 @@ the reason on hover); a tab locked as a whole says why at its top (`.tt-pane-loc
 | Frame (Text Frame) | `tt-fr-*`: fill, stroke, insets (`tt-fr-link`), Hide Overflow, height follows the text; columns, gutter, balance; column rules; vertical position (`tt-fr-valign`, max paragraph space, initial advance, minimum); `tt-convert-frame`, `tt-convert-art` |
 | Typography | `tt-ot-*`: hide irrelevant features `tt-ot-hide`; ligatures; alternates; figures; capitals (`tt-ch-caps`); stylistic sets `tt-ot-ss` |
 | Display (`tt-view`, the panel's foot) | **Space widths** `toggle-space-labels` (`setShowSpaceWidthLabels`); a plugin's Settings section marked `data-text-panel` lands here |
+
+## Over the page (text_tool)
+
+Drawn into each page's `.page-container`; an armed Artistic or Frame tool leaves presses on them to them.
+
+| Label / tooltip | Element | Wired in |
+|---|---|---|
+| Ruler above the page — its marker (drag: the selected box's left edge, snapping to ⅛ inch; Alt: free) | `svg.ruler-layer` → `.ruler-marker` (one per page, no id) | `text_tool/ruler.js` — built on `page:rendered`; a drag is one undo step (`move:<id>`, collapsing with drags of the box) |
+| Nudge popover — the pressed character's x nudge slider | `.utb-nudge-popover` | `text_tool/micro-typo.js` — opened by pressing a character while **Nudge characters** (`fabric-nudge-mode`) is on |
 
 ## Panels
 

@@ -33,6 +33,14 @@ The panel shows and sets the formatting of what is selected — any box — and 
 | **A box with one face** — an OCR line, embedded text, a redaction box's label | Its own fields (`utbPlainChar`, below): font family, size, style, **B I U S** (single lines), colour and opacity, pair kerning, tracking, space width, nudge; a redaction box also its match terms. Everything else is **locked** — greyed, a lock, the reason on hover; the Paragraph, Frame and Typography tabs say so once, at their top |
 | **Nothing** | The font family and size **new text** takes (`TextPanel.newText()`; fonts.js puts the document's face there, a change made here is the user's own default), and the match terms a new redaction box takes |
 
+While Artistic or Frame text is edited the **keyboard stays with the text**: a button pressed in
+the panel or the tool column — **B**, a tab, **−/+**, a tool — never takes it (`story-edit.js`
+keeps the focus in the text), and a menu, a checkbox or a colour gives it back once its change
+is made (`storyFocus`); a field typed in, such as the size, gives it back at **Enter**. So
+choosing **B** at a caret and typing goes on in bold, and the font menu's type-ahead never
+re-fonts the selection. **Escape** leaves the text from the panel as it does from the text (the
+box stays selected; the next Escape is the page's).
+
 A setting the target or the drawing cannot have is locked (`lockOf` in `text-studio.js`):
 a box with one face has no paragraph, frame, OpenType or decoration-colour settings; the Frame
 tab belongs to Frame text (its **Convert to Text Frame** stays usable); and while a **pixel
@@ -307,7 +315,7 @@ story boxes; `storyConvert(box, 'frame' | 'artistic')` converts between them. Se
 
 ### Deleting a box
 
-`window.utbDeleteBox(id)` is the one removal path for every box type — the Text panel's Delete button and the Delete / Backspace keys both use it. Any live story-edit (`commitStoryEdit`), inline-edit (`cancelInlineEdit`), or micro-typo (`exitMicroTypo`) session on the box is torn down first, so no id in `utbState` outlives the box it points at. The keys are ignored while the caret is in a field, where they mean "erase a character". `utbDeleteBox(id, { silent: true })` is the undo stack taking a box out again — not a step of its own.
+`window.utbDeleteBox(id)` is the one removal path for every box type — the Text panel's Delete button and the Delete / Backspace keys both use it. A live session on the box is ended first, so no id in `utbState` outlives the box it points at: an inline edit (`cancelInlineEdit`) or micro-typo mode (`exitMicroTypo`) is torn down, and Artistic or Frame text being edited is committed (`commitStoryEdit`) — its edit is a step of its own before the delete's, so Undo brings the text back as it was typed. The keys are ignored while the caret is in a field, where they mean "erase a character". `utbDeleteBox(id, { silent: true })` is the undo stack taking a box out again — not a step of its own (a session still open on the box ends without one).
 
 ## Label seams — `labelColor`, `labelAlign`
 
@@ -325,10 +333,10 @@ One stack (`window.utbUndo`) for what the user does to boxes: add, delete, move,
 
 - `utbUndo.capture(boxes)` → token, then `utbUndo.commit(token, label, key)`: records the fields that changed between the two calls (nothing is pushed when nothing changed). A box's derived data — candidate widths, verdicts, the refiner's findings, the pixel raster — is not part of a step; it is derived again after a restore (a redaction whose typography changed has its widths measured again).
 - `utbUndo.recordAdd(boxes, label)` / `utbUndo.recordDelete(box, index, label)`: an add or a delete, put back at the same index.
-- **Collapsing.** Steps with the same `key` collapse while they follow each other: every drag of one box (`move:<id>`), every tick of one slider (`size:<id>`, `space:<id>`, `color:<id>`), every nudge of one character (`nudge:<id>:<i>`) is one step, as Word collapses repeated typing. Any other action in between starts a new step; a collapsed step that ends where it began is dropped.
-- `undo()` / `redo()` / `canUndo()` / `canRedo()` / `peek()` / `clear()` / `onChange(fn)`.
+- **Collapsing.** Steps with the same `key` collapse while they follow each other: every drag of one box (`move:<id>`, its ruler marker's too — `ruler.js`), every tick of one slider (`size:<id>`, `space:<id>`, `color:<id>`), every nudge of one character (`nudge:<id>:<i>`) is one step, as Word collapses repeated typing. Any other action in between starts a new step; a collapsed step that ends where it began is dropped. A collapsed step holds every box any of its actions touched, each as it was before the first and as it is after the last — a drag of one piece of a line sideways, then of the whole line down, is undone and redone whole.
+- `undo()` / `redo()` / `canUndo()` / `canRedo()` / `peek()` / `clear()` / `onChange(fn)`. An edit still open — Artistic or Frame text (`commitStoryEdit`), an inline edit (`commitInlineEdit`) — is committed before `undo()` or `redo()` moves the stack: the Undo button pressed while typing takes the typing back as one step, and no edit goes on in a box the stack removed or changed under it. (Never from inside an entry's own undo: a step committed there would cut the stack.)
 
-The buttons are `#tt-undo` / `#tt-redo` (the fragment `toolbar_button.html`); the keys are Ctrl/⌘+Z and Ctrl/⌘+Shift+Z or Ctrl/⌘+Y — ignored while a field has the caret or an inline edit is open, where they are the field's own.
+The buttons are `#tt-undo` / `#tt-redo` (the fragment `toolbar_button.html`); the keys are Ctrl/⌘+Z and Ctrl/⌘+Shift+Z or Ctrl/⌘+Y — ignored while a field typed in (a text or number field) has the caret or an inline edit is open, where they are the field's own. A menu, a checkbox or a colour that has the keyboard — as one does right after a change in the Text panel — leaves them to the stack.
 
 ---
 

@@ -23,8 +23,10 @@ own paragraph attributes.
 | Artistic Text Tool | **Artistic Text Tool** `#tt-art-text-btn` | A **click** starts Artistic text with its baseline at the point, in the font and size new text takes (the Text panel's, with nothing selected) — or, on or beside a line of the page's text, in **that line's face, bold / italic and size on its baseline, with the space it was set with** (Word widens a justified line's spaces: the paragraph's desired Word Spacing, below) — of a row cut by redaction bars, the piece the click is in; a click within half an em of where that line starts **starts at its first glyph**, so the new text lines up with the page's, word for word. Where the line goes on after a tab — a list label's or a bullet's ("2.", then "Evidence…" at the list's stop) — the paragraph gets **a left tab stop at the page's x of the text after it**: type the label, a **Tab**, and the rest starts where the page's does. An empty one is half an em wide (a drag's: the drag's width), so it can be seen and pressed. A **drag** sets the size: the font's typographic ascent is the drag's height, the baseline its lower edge. Artistic text breaks only at its returns; its box is its text's extent. Its **corner handles scale** it — every size in the story by the same factor, the opposite corner fixed. |
 
 Both Affinity tools stay armed, as Affinity's do, until clicked again or another placing tool
-is chosen. **Escape** leaves the text being edited (the box stays selected), then deselects,
-and with nothing selected puts the tool down.
+is chosen. Armed, they take only presses on the page: what sits over it — the ruler's marker, a
+nudge's slider, a control a plugin puts there — is used as it is without a tool. **Escape**
+leaves the text being edited (the box stays selected), then deselects, and with nothing
+selected puts the tool down.
 
 A frame **reflows** when its eight handles resize it. Text that does not fit shows Affinity's
 red **overflow marker** at the frame's bottom right.
@@ -73,22 +75,27 @@ Recto's orange for text the user added.)
 
 Double-click a story box, or press on it with either text tool. The browser places the caret,
 extends the selection (Shift, double-click a word, triple-click), moves with the arrow keys and
-runs input methods; every change goes through the story model.
+runs input methods; every change goes through the story model. A composition still open when the
+text is left — a press elsewhere, Undo — is committed into the story first, as the input method
+shows it.
 
 | Keys | |
 |---|---|
 | Enter | New paragraph (it takes the current paragraph's attributes) |
 | Shift+Enter | Line break inside the paragraph |
 | Tab | A tab (to the next tab stop) |
-| Ctrl+B / Ctrl+I / Ctrl+U | Bold / Italic / Underline — on unless all of the selection already has it |
-| Ctrl+Shift+> / Ctrl+Shift+< | Every character one point larger / smaller |
+| Ctrl+B / Ctrl+I / Ctrl+U | Bold / Italic / Underline — on unless all of the selection already has it (a selection that is partly bold turns all bold) |
+| Ctrl+Shift+> / Ctrl+Shift+< | Every character one point larger / smaller than its own size (24 and 12 pt become 25 and 13) |
 | Ctrl+Shift+- | Discretionary (soft) hyphen |
-| Ctrl+Z / Ctrl+Y | Undo / redo inside the session; leaving it records the session as one step on the box undo stack |
+| Ctrl+Z / Ctrl+Y | Undo / redo inside the session; leaving it records the session as one step on the box undo stack. The tool column's **Undo** / **Redo** and the Text panel's **Delete** leave the text first: Undo takes the whole session back, Delete records it, then the delete |
 | Ctrl+C / Ctrl+X / Ctrl+V | Plain text; a pasted line feed starts a paragraph |
 | Escape | Leave the text (the box stays selected) |
 
 With a **caret** (no selection) a character setting applies to the text typed next, as in
-Affinity. While a box is only **selected**, every setting applies to all of its text.
+Affinity. While a box is only **selected**, every setting applies to all of its text. The
+keyboard stays with the text being edited: a button of the Text panel or the tool column never
+takes it, a menu, checkbox or colour gives it back once its change is made, a field typed in at
+Enter — and Escape from the panel leaves the text, as Escape in it does.
 
 ---
 
@@ -210,10 +217,11 @@ alternates, ordinals, fractions, superior and inferior figures, all caps, small 
 - **The model** — `story-core.js` (`StoryCore`, no DOM, tested under node): attributes stored as
   overrides of Affinity's defaults, positions `{ p, o }` (paragraph, UTF-16 offset), edits
   (`insertText`, `deleteRange`, `replaceRange`, `applyChar`, `mapChar`, `applyPara`,
-  `changeCase`), list markers, and the mapping of attributes to CSS (`runCSS`, `paraCSS`), of
-  face metrics to Affinity's numbers (`scaledMetrics`, `leadingPx`, `firstBaselinePx`,
-  `capsPlan`) and of a page line's measured characters to the space it was set with and where
-  it goes on after a tab (`lineWords`, `lineTabGaps`, `lineTabs`, `lineSpace`, `wordSpacingFor`).
+  `changeCase`; `togglePatch` and `stepSize`, what B I U S and the size steps set), list
+  markers, and the mapping of attributes to CSS (`runCSS`, `paraCSS`), of face metrics to
+  Affinity's numbers (`scaledMetrics`, `leadingPx`, `firstBaselinePx`, `capsPlan`) and of a page
+  line's measured characters to the space it was set with and where it goes on after a tab
+  (`lineWords`, `lineTabGaps`, `lineTabs`, `lineSpace`, `wordSpacingFor`).
 - **The face metrics** — `Shaping.faceMetrics` reads the tables Affinity sets text with
   (`hhea`, `post`, `OS/2`), the outlines of H, x, l and q, and the font's OpenType feature
   list, through the same HarfBuzz build that measures widths.

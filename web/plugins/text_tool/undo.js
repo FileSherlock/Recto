@@ -13,7 +13,8 @@
 //
 // The stack is text_tool's, the buttons are text_tool's (#tt-undo, #tt-redo),
 // the keys are the platform's: Ctrl/⌘+Z undoes, Ctrl/⌘+Shift+Z and Ctrl/⌘+Y
-// redo — never while a field has the caret, where they are the field's own.
+// redo — never while a field typed in has the caret, where they are the
+// field's own (a menu or a checkbox with the keyboard leaves them to the page).
 (function initUndo() {
   const LIMIT = 200;
   const entries = [];      // done: entries[0 … index); undone (redo): entries[index …)
@@ -46,7 +47,11 @@
     entries.length = index;                        // a new action drops the redo branch
     const top = entries[index - 1];
     if (entry.key && top && top.key === entry.key && top.after) {
-      top.after = entry.after;                     // the same action again: one step
+      // the same action again: one step — every box either touched, each as
+      // it was before the first and as it is after the last (a drag sideways
+      // moves one piece of a line, the next one down the whole line)
+      for (const [id, snap] of Object.entries(entry.before)) if (!(id in top.before)) top.before[id] = snap;
+      Object.assign(top.after, entry.after);
       if (same(top.before, top.after)) { entries.pop(); index--; }   // …that ended where it began
       notify();
       return;
@@ -95,6 +100,14 @@
     utbState.boxes.splice(Math.min(at, utbState.boxes.length), 0, box);
     if (typeof renderBox === 'function') renderBox(box);
   }
+  // A text being edited is left before the stack moves: its edit becomes the
+  // step an Undo takes back, and no edit outlives its box or goes on in a
+  // story the stack changed under it. (Never from inside an entry's undo —
+  // the step committed there would cut the stack.)
+  function endEdits() {
+    window.commitStoryEdit?.();
+    window.commitInlineEdit?.();
+  }
 
   const api = {
     // the fields of these boxes now — commit() records what changed since
@@ -133,6 +146,7 @@
         redo() { takeOut(box); tell(); } });
     },
     undo() {
+      endEdits();
       if (index === 0) return false;
       const e = entries[--index];
       try { e.undo(); } catch (err) { console.warn('undo failed', err); }
@@ -140,6 +154,7 @@
       return true;
     },
     redo() {
+      endEdits();
       if (index >= entries.length) return false;
       const e = entries[index++];
       try { e.redo(); } catch (err) { console.warn('redo failed', err); }
@@ -156,7 +171,10 @@
 
   // ── keys and buttons ────────────────────────────────────────
 
-  const inField = t => t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName));
+  // a field typed in, whose own the keys are — not a menu, a checkbox or a
+  // colour, which keep the keyboard right after a change in the Text panel
+  const TYPED = /^(text|search|number|email|url|tel|password)$/;
+  const inField = t => t && (t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && TYPED.test(t.type)));
   document.addEventListener('keydown', e => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
     const k = e.key.toLowerCase();

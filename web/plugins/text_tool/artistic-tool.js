@@ -43,7 +43,7 @@
   btn?.addEventListener('click', () => arm(!armed()));
   for (const id of OTHER_TOOLS) document.getElementById(id)?.addEventListener('click', () => btn?.classList.remove('active'));
   document.addEventListener('keydown', e => {
-    if (e.key !== 'Escape' || !armed() || utbState.editingId) return;
+    if (e.key !== 'Escape' || e.defaultPrevented || !armed() || utbState.editingId) return;
     const t = e.target;
     if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
     if (utbState.selectedId) {
@@ -60,9 +60,12 @@
   // the page's own lines: a press on one starts text there (typing over the
   // page's line), not a select-and-drag of the line
   const READ_LAYER = new Set(['ocr', 'embedded']);
+  // what sits over the page but is not the page: the ruler's marker, a
+  // nudge's slider, a control a plugin puts there — pressed, it is used
+  const PAGE_UI = '.ruler-layer, .utb-nudge-popover, button, input, select, textarea, label, a[href]';
 
   els.viewer.addEventListener('mousedown', e => {
-    if (!armed() || e.button !== 0) return;
+    if (!armed() || e.button !== 0 || e.target.closest(PAGE_UI)) return;
     // Artistic / Frame text: the caret goes there, a redaction box is
     // selected (drag-resize.js)
     const hit = e.target.closest('.utb-group');

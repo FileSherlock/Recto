@@ -7,7 +7,7 @@
 // paragraph, Shift+Enter = line break, deleting, pasting plain text, Tab),
 // the story is drawn again and the caret put back. The model is the one truth;
 // the DOM is only ever its picture. An input method's composition is left to
-// the browser and taken over when it ends.
+// the browser and taken over when it ends — or when the session does, first.
 //
 // While a story is edited, utbState.editingId names its box (every key guard
 // of text_tool already honours it) and the character and paragraph settings —
@@ -20,7 +20,7 @@
 // step on the box undo stack (utbUndo).
 (function () {
   const SC = globalThis.StoryCore;
-  let session = null;   // { box, flow, sel, pending, undo, redo, step, composing, compRange, lastKind, lastAt }
+  let session = null;   // { box, flow, sel, pending, undo, redo, step, composing, compRange, compText, lastKind, lastAt }
 
   const flowOf = box => document.querySelector(`.utb-group[data-id="${box.id}"] .tt-flow`);
   const groupOf = box => document.querySelector(`.utb-group[data-id="${box.id}"]`);
@@ -253,15 +253,11 @@
   }
 
   // Bold / Italic / Underline / Strikethrough flip as Affinity flips them:
-  // on, unless all of the selection already has it.
+  // on, unless all of the selection already has it (at a caret: what is
+  // typed next).
   function toggle(key) {
     if (!session) return;
-    const r = SC.ordered(session.sel);
-    const eff = { ...SC.charSummary(session.box.story, r).attrs, ...(session.pending || {}) };
-    const patch = key === 'underline' ? { underline: eff.underline === 'none' ? 'single' : 'none' }
-      : key === 'strike' ? { strike: eff.strike === 'none' ? 'single' : 'none' }
-      : { [key]: !eff[key] };
-    applyCharToSession(patch);
+    applyCharToSession(SC.togglePatch(storyCharState(session.box), key));
   }
 
   function applyCharToSession(patch) {
@@ -291,12 +287,12 @@
       e.preventDefault();
       replace(readSelection() || session.sel, String.fromCharCode(0xAD), 'type');
     } else if (mod && e.shiftKey && (e.key === '>' || e.key === '<' || e.code === 'Period' || e.code === 'Comma')) {
-      // Affinity: Ctrl+Shift+> / < make the text larger / smaller
+      // Affinity: Ctrl+Shift+> / < make the text larger / smaller — every
+      // run of the selection by a point of its own size
       e.preventDefault();
       session.sel = readSelection() || session.sel;
-      const up = e.key === '>' || e.code === 'Period';
-      const size = SC.charSummary(session.box.story, session.sel).attrs.sizePt;
-      applyCharToSession({ sizePt: Math.max(1, Math.round((size + (up ? 1 : -1)) * 100) / 100) });
+      const by = e.key === '>' || e.code === 'Period' ? 1 : -1;
+      storyMapChar(session.box, a => SC.stepSize(a, by));
     }
     e.stopPropagation();   // typing is the editor's, not the app's hotkeys
   }
@@ -321,7 +317,9 @@
     if (!session) return;
     session.composing = true;
     session.compRange = SC.ordered(readSelection() || session.sel);
+    session.compText = '';
   }
+  function onCompositionUpdate(e) { if (session) session.compText = e.data || ''; }
   function onCompositionEnd(e) {
     if (!session) return;
     session.composing = false;
@@ -343,7 +341,7 @@
     if (typeof commitInlineEdit === 'function') commitInlineEdit();
 
     session = { box, flow: null, sel: null, pending: null, undo: [], redo: [], step: window.utbUndo?.capture([box]),
-      composing: false, compRange: null, lastKind: null, lastAt: 0 };
+      composing: false, compRange: null, compText: '', lastKind: null, lastAt: 0 };
     utbState.editingId = box.id;
     utbState.selectedId = box.id;
     window.selectBoxInSVG?.(box.id);
@@ -368,9 +366,21 @@
     notify();
   }
 
-  function commitStoryEdit() {
+  // Leave the text: the session becomes one step on the box undo stack —
+  // unless `record` is false (the stack itself is taking the box away). A box
+  // that has left the page meanwhile is neither drawn again nor recorded.
+  function commitStoryEdit({ record = true } = {}) {
     const s = session;
     if (!s) return;
+    const alive = utbState.getBox(s.box.id) === s.box;
+    // An input method's composition still open: the browser commits it as
+    // the text stops being editable — while the session still listens, so
+    // the composed text is the story's (onCompositionEnd). One it leaves open
+    // is taken as it shows.
+    if (alive) {
+      s.flow?.removeAttribute('contenteditable');
+      if (session === s && s.composing) onCompositionEnd({ data: s.compText });
+    }
     session = null;
     setHighlight(null);
     if (s.flow) {
@@ -379,9 +389,11 @@
     }
     groupOf(s.box)?.classList.remove('editing');
     if (utbState.editingId === s.box.id) utbState.editingId = null;
-    window.storySync?.(s.box);
-    window.renderBox?.(s.box);
-    window.utbUndo?.commit(s.step, 'edit text');
+    if (alive) {
+      window.storySync?.(s.box);
+      window.renderBox?.(s.box);
+      if (record) window.utbUndo?.commit(s.step, 'edit text');
+    }
     try { if (s.flow?.contains(getSelection().anchorNode)) getSelection().removeAllRanges(); } catch { /* nothing selected */ }
     notify();
   }
@@ -393,6 +405,7 @@
     ['cut', e => onCopy(e, true)],
     ['paste', onPaste],
     ['compositionstart', onCompositionStart],
+    ['compositionupdate', onCompositionUpdate],
     ['compositionend', onCompositionEnd],
     ['focus', onFocus],
     ['blur', onBlur],
@@ -414,14 +427,41 @@
 
   // A press outside the edited box — on the page, on another box — ends the
   // session; the ribbon, the tool column and the side panels (the Text panel,
-  // a plugin's) do not.
+  // a plugin's) do not. A button pressed there (B, a tab, a tool) does not
+  // take the keyboard either: typing goes on in the text. (A menu or a field
+  // needs it: the Text panel gives it back once its change is made.)
+  const KEEPS_SESSION = '#unified-options-bar-container, #tool-column, [data-side-panel], .floating-panel, #ribbon-overflow';
+  const FIELD = 'select, textarea, input:not([type=checkbox]):not([type=radio])';
   document.addEventListener('mousedown', e => {
     if (!session) return;
     const t = e.target;
     if (groupOf(session.box)?.contains(t)) return;
-    if (t.closest?.('#unified-options-bar-container, #tool-column, [data-side-panel], .floating-panel, #ribbon-overflow')) return;
+    if (t.closest?.(KEEPS_SESSION)) {
+      if (t.closest('button, summary, label, input') && !t.closest(FIELD)) e.preventDefault();
+      return;
+    }
     commitStoryEdit();
   }, true);
+
+  // Escape leaves the text wherever the keyboard is: in it (onKeyDown), or on
+  // a control that formats it — a menu of the Text panel, a field, a tool.
+  document.addEventListener('keydown', e => {
+    if (!session || e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return;
+    if (session.flow?.contains(e.target)) return;
+    e.preventDefault();          // the tools' Escape (deselect, put down) waits for the next one
+    commitStoryEdit();
+    // …which the control does not keep: the next Escape is the page's
+    if (e.target !== document.body) e.target.blur?.();
+  }, true);
+
+  // Give the keyboard back to the text being edited, at its selection.
+  function storyFocus() {
+    if (!session) return;
+    const flow = session.flow = flowOf(session.box);
+    if (!flow) return;
+    flow.focus({ preventScroll: true });
+    showSelection();
+  }
 
   // ── what the panels read and write ────────────────────────────────────────
 
@@ -550,6 +590,7 @@
   window.storyAfterRender = box => { if (session?.box === box) showSelection(); };
   window.enterStoryEdit = enterStoryEdit;
   window.commitStoryEdit = commitStoryEdit;
+  window.storyFocus = storyFocus;
   window.storyTarget = storyTarget;
   window.storyCharState = storyCharState;
   window.storyParaState = storyParaState;
