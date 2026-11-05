@@ -203,10 +203,12 @@ function ocrClearPage(pageNum) {
 
 // One page's read result -> UnifiedTextBoxes (OCRLineBoxes.pageBoxes decides
 // which: a box per line segment, a □ marker per unread band, a redaction box
-// per detected bar). Returns per-page tallies.
-function ocrAddBoxes(pageNum, img, res, pass) {
-  const sx = (state.pageWidth || img.naturalWidth) / img.naturalWidth;
-  const sy = (state.pageHeight || img.naturalHeight) / img.naturalHeight;
+// per detected bar). Returns per-page tallies. `size`: the page's own pixel
+// space (Doc.pageSize) — a page of another size than the one on screen
+// (Letter beside Legal) took the shown page's, and its boxes landed scaled.
+function ocrAddBoxes(pageNum, img, res, pass, size = null) {
+  const sx = (size?.width || state.pageWidth || img.naturalWidth) / img.naturalWidth;
+  const sy = (size?.height || state.pageHeight || img.naturalHeight) / img.naturalHeight;
   const { boxes, tally } = OCRLineBoxes.pageBoxes(pageNum, res, pass, { sx, sy });
   for (const spec of boxes) {
     const box = utbState.addBox(new UnifiedTextBox(spec.data));
@@ -421,13 +423,23 @@ window.ocrExportCache = async function () {
   return true;
 };
 
-// Rebuild boxes from a cache payload — same tail as a live full read.
-function ocrApplyCached(cached) {
+// Rebuild boxes from a cache payload — same tail as a live full read. Each
+// page in its own pixel space: a page whose raster is the size of the shown
+// page's takes the shown page's (no request: a uniform document asks
+// nothing), any other asks Doc.pageSize (4 ms a page). false when another
+// document took over meanwhile.
+async function ocrApplyCached(cached) {
+  const hash = state.docHash;
+  const ref = cached.pages.find(pg => pg.page === state.currentPage);
+  const sizes = await Promise.all(cached.pages.map(pg =>
+    ref && pg.w === ref.w && pg.h === ref.h && state.pageWidth ? { width: state.pageWidth, height: state.pageHeight }
+      : Doc.pageSize(pg.page).catch(() => null)));
+  if (hash !== state.docHash) return false;
   const totals = { lines: 0, clean: 0, unread: 0, boxes: 0 };
   const fonts = new Set();
-  for (const pg of cached.pages) {
+  for (const [i, pg] of cached.pages.entries()) {
     ocrClearPage(pg.page);
-    const t = ocrAddBoxes(pg.page, { naturalWidth: pg.w, naturalHeight: pg.h }, pg.res, pg.pass);
+    const t = ocrAddBoxes(pg.page, { naturalWidth: pg.w, naturalHeight: pg.h }, pg.res, pg.pass, sizes[i]);
     totals.lines += t.lines; totals.clean += t.clean;
     totals.unread += t.unread; totals.boxes += t.boxes;
     for (const L of pg.res.lines) if (L.font) fonts.add(L.font);
@@ -473,7 +485,7 @@ function ocrKeepRedactionBoxes(page, pageNum, res) {
 // run's { fresh } marker for Read-all-pages (cross-page baseline hints live
 // in the worker, per run; inline they live on this object).
 async function ocrReadOnePage(pageNum, label, carry) {
-  const img = await ocrLoadPageImage(pageNum);
+  const [img, size] = await Promise.all([ocrLoadPageImage(pageNum), Doc.pageSize(pageNum).catch(() => null)]);
   if (!img) return null;
   ocrToolState.engine ??= new PageEngine();
   const rgba = ocrToolState.engine.pageRGBA(img);
@@ -510,7 +522,7 @@ async function ocrReadOnePage(pageNum, label, carry) {
   // the ink of each glyph, from the raster read here (the worker has only the grays)
   OCRLineBoxes.inkColours(out.res, page, rgba);
   if (dropped) console.info(`OCR: page ${pageNum}: ${dropped} dark region(s) are not redactions —`, ocrDropped.get(`${state.docHash}|${pageNum}`).map(d => d.why).join(', '));
-  return { img, res: out.res, pass: out.pass, dropped };
+  return { img, size, res: out.res, pass: out.pass, dropped };
 }
 
 function ocrSetButtons(running) {
@@ -551,7 +563,7 @@ async function ocrRun(allPages) {
       if (runHash !== state.docHash || ocrToolState.cancel) break;
       if (!out) continue;
       ocrClearPage(p);
-      const t = ocrAddBoxes(p, out.img, out.res, out.pass);
+      const t = ocrAddBoxes(p, out.img, out.res, out.pass, out.size);
       totals.lines += t.lines; totals.clean += t.clean;
       totals.unread += t.unread; totals.boxes += t.boxes; totals.dropped += out.dropped || 0;
       lastPass = out.pass;
@@ -669,7 +681,7 @@ async function ocrAutoRead() {
       ocrToolState.autoDone = true;
       return;
     }
-    if (cached) { ocrApplyCached(cached); applied = true; }
+    if (cached) { applied = (await ocrApplyCached(cached)) !== false; if (!live()) return; }
   }
   if (!applied) {
     await ocrRun(true);

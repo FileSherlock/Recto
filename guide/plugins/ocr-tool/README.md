@@ -190,8 +190,12 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
   lossless page rasters, the very images the viewer displays,
   so OCR coordinates line up with the page by construction. The URL is asked
   for each time a page is read, never stored: the service keeps a small LRU
-  and revokes evicted URLs. Coordinates scale into the 816×1056 viewBox space
-  (scale = 1.0 for the standard 96-dpi document family).
+  and revokes evicted URLs. Coordinates scale from the raster into the page's
+  own pixel space (`Doc.pageSize(n)`: 816 × 1056 for a Letter scan, 816 × 1344
+  for a Legal one), asked for each page a read makes; a replay takes the shown
+  page's for every page whose raster is the shown page's size and asks for the
+  rest (a uniform document asks nothing). Every page used to take the shown
+  page's, and a Legal page read beside a Letter one had its boxes squeezed.
 - Passes escalate exactly like the char_training app: byte-exact first (plain
   → palette-quantized → same-size mixed-font union pools), per-pixel
   tolerances only after that, and the status line always names the weakest
