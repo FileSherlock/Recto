@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..', '..', '..', 'web', 'plugins', 'redaction_refiner');   // the plugin's folder
+// Skipped when the plugin is not installed (its folder dragged out), like every plugin's suite.
+if (!fs.existsSync(path.join(root, 'redaction-refiner.js'))) { console.log('# skip: redaction_refiner is not installed'); process.exit(0); }
 const PX_PER_PT = 96 / 72;
 
 // Times-Roman AFM advance widths, 1/1000 em.

@@ -50,9 +50,12 @@ test('the scripts load in the recorded order', () => {
   // compared any more.
   const golden = normalise(fs.readFileSync(path.join(HERE, 'golden', 'index.html'), 'utf8'));
   const built = normalise(build({ write: false }).html);
-  // the recorded scripts, all of them, in their order; a plugin added since brings
-  // scripts the recording never had (adding one changes nothing here)
-  const recorded = scripts(golden), known = new Set(recorded);
+  // the recorded scripts in their order — those of every installed plugin: a plugin
+  // added since brings scripts the recording never had, one dragged out takes its own
+  // (neither changes anything here)
+  const installed = new Set(build({ write: false }).plugins.map(p => p.name));
+  const recorded = scripts(golden).filter(src => { const m = src.match(/^plugins\/([^/]+)\//); return !m || installed.has(m[1]); });
+  const known = new Set(recorded);
   assert.deepEqual(scripts(built).filter(src => known.has(src)), recorded, 'script order');
 });
 
