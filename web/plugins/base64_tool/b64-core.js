@@ -37,7 +37,13 @@
 //   incomplete  every character certified, and the body itself is cut short
 //   unproven    every character certified, nothing says whether that is all of it
 //   damaged     some characters were not certified
+// A start or an end is proven only where nothing that could hold the body's
+// characters (a line of base64, a band nobody read) stands between it and the
+// body: a MIME header above a body whose first line went unread proves nothing.
 // A form's hidden field and a mail header's value are listed apart, as no files.
+//
+// Every pattern here runs in time linear in its line: a text attachment is read
+// again for the bodies inside it, so its lines are whatever the file holds.
 //
 // No DOM: base64-tool.js gathers the boxes and draws the panel; the node tests
 // load this very file (globalThis.B64Core).
@@ -65,28 +71,47 @@
   const isStrong = t => t.length >= 40 && B64.test(t) && /[a-z]/.test(t) && /[A-Z]/.test(t) && /[0-9+/]/.test(t) && classChanges(t) >= 0.2;
 
   // ── what opens a body on its own line, and what closes one ──────────────
-  const ARMOR_BEGIN = /^-{3,}\s*BEGIN\s+([^-]*?)\s*-{3,}\s*/;
+  // (the name runs to the first '-', its spaces trimmed after: one quantifier
+  // per run of spaces, so a line of `-----BEGIN` and spaces fails in one pass)
+  const ARMOR_BEGIN = /^-{3,}\s*BEGIN\s([^-]*)-{3,}\s*/;
   const ARMOR_END = /^\s*-{3,}\s*END\b/;
   const TAGS = /^(?:(?:<[A-Za-z_][^<>]*>|<!\[CDATA\[)\s*)+/;
   // the end of a tag the printer wrapped, the body right after it: `…XMLSchema-instance">PD94…`.
-  // Something outside the alphabet in it: `Zc/2">Name` is the end of a body, not the start of one
-  const TAG_RAN_ON = /^[^<>\s]*[^A-Za-z0-9+/=<>\s"'][^<>\s]*["']?\s*>/;
+  // Something outside the alphabet in it (OUTSIDE, tested after the match): `Zc/2">Name` is the end of a body, not the start of one
+  const TAG_RAN_ON = /^[^<>\s]*\s*>/;
+  const OUTSIDE = /[^A-Za-z0-9+/=<>\s"']/;
   const DATA_URI = /^.*?(?:\bdata:([\w.+/-]*))?;\s*base64\s*,/i;
-  const ATTR = /([A-Za-z_][\w:.-]*)\s*=\s*(["'])/g;
+  // a vCard property that holds a file (`PHOTO;ENCODING=b;TYPE=JPEG:/9j/4AAQ…`): its body starts after the colon
+  const VCARD = /^(PHOTO|LOGO|SOUND|KEY);([^:]*):/i;
   const STAMP = /^(?:EFTA\d{8}|HOUSE_OVERSIGHT_\d{4,})$/;     // a Bates stamp: printed on the page, not in the file
+  // what else a page carries at its top or bottom: its number ('2', 'Page 2 of 3',
+  // '2/3', '- 2 -'), a production's stamp ('ABC-0001234'), or both on one line
+  const PAGE_ITEM = String.raw`(?:[Pp]age\s*)?\d{1,4}(?:\s*(?:of|OF|\/)\s*\d{1,4})?|[-–—]\s*\d{1,4}\s*[-–—]|[A-Z]{2,}(?:[-_ ][A-Z]{2,})*[-_ ]?\d{4,}`;
+  const FURNITURE = new RegExp(`^(?:${PAGE_ITEM})(?:\\s+(?:${PAGE_ITEM}))*$`);
+  // characters that reorder or hide the text after them: a name with an RLO in
+  // it reads backwards (`invoice<RLO>fdp.exe` shows as `invoiceexe.pdf`)
+  const BIDI = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069\u2028\u2029]/g;
 
   // a value in quotes: one that runs off the end of the line, its closing quote
-  // further on, or a closed one long enough to be a body by itself
+  // further on, or a closed one long enough to be a body by itself. Found from
+  // its '=' and quote, the name read backwards from there: a pattern that
+  // starts a name at every letter rescans a long word once per letter.
   function attrHead(s) {
     if (!s.includes('=')) return null;
-    let m, best = null;
-    ATTR.lastIndex = 0;
-    while ((m = ATTR.exec(s))) {
-      const from = m.index + m[0].length, to = s.indexOf(m[2], from);
-      if (to < 0) { best = { name: m[1], from }; break; }
+    const EQ = /=\s*(["'])/g;
+    let m, best = null, floor = 0;
+    while ((m = EQ.exec(s))) {
+      let e = m.index;
+      while (e > floor && /\s/.test(s[e - 1])) e--;
+      let a = e;
+      while (a > floor && /[\w:.-]/.test(s[a - 1])) a--;
+      while (a < e && !/[A-Za-z_]/.test(s[a])) a++;           // a name starts at a letter or '_'
+      if (a === e) continue;
+      const name = s.slice(a, e), from = m.index + m[0].length, to = s.indexOf(m[1], from);
+      if (to < 0) { best = { name, from }; break; }
       const v = s.slice(from, to);
-      if (v.length >= 40 && B64.test(v) && (!best || v.length > best.n)) best = { name: m[1], from, n: v.length };
-      ATTR.lastIndex = to + 1;
+      if (v.length >= 40 && B64.test(v) && (!best || v.length > best.n)) best = { name, from, n: v.length };
+      floor = EQ.lastIndex = to + 1;
     }
     return best;
   }
@@ -95,7 +120,7 @@
   function formField(s) {
     if (!/<\s*INPUT\b/i.test(s) && !/\bTYPE\s*=\s*["']?hidden/i.test(s)) return null;
     const m = /\bNAME\s*=\s*["']([^"']*)["']/i.exec(s);
-    return m ? m[1].replace(/[\s_]+/g, '') || 'unnamed field' : 'unnamed field';
+    return m ? m[1].replace(/[\s_]+/g, '').replace(BIDI, '') || 'unnamed field' : 'unnamed field';
   }
 
   const isBodyChar = c => (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || (c >= 47 && c <= 57) || c === 43 || c === 61 || c === 32 || c === 9;
@@ -106,7 +131,7 @@
   //   { prose: true }                not base64
   //   { t, head, tail, soft, off, weak }
   // t: the base64 characters (may be '' on a line that is only a marker)
-  // head: { kind: armor | xml | attr | data-uri, name, form?, type? } opens a body on this line
+  // head: { kind: armor | xml | attr | data-uri | vcard, name, form?, type? } opens a body on this line
   // tail: armor | xml | close-tag | quote | cdata | paren: closes one (the caller
   //       decides: a quote means nothing outside an opened attribute)
   // soft: the printer's '-' at the end of a wrapped line: not base64, and not a word's hyphen either
@@ -121,8 +146,9 @@
     if (!s) return { blank: true };
     if (STAMP.test(s)) return { blank: true, stamp: true };
     let head = null, at = 0, m;
-    if ((m = ARMOR_BEGIN.exec(s))) { head = { kind: 'armor', name: m[1] }; at = m[0].length; }
+    if ((m = ARMOR_BEGIN.exec(s))) { head = { kind: 'armor', name: m[1].trim() }; at = m[0].length; }
     else if (/;\s*base64\s*,/i.test(s) && (m = DATA_URI.exec(s))) { head = { kind: 'data-uri', name: m[1] || 'data', type: m[1] || undefined }; at = m[0].length; }
+    else if ((m = VCARD.exec(s)) && /(?:^|;)\s*ENCODING=b/i.test(m[2])) { head = { kind: 'vcard', name: m[1].toUpperCase() }; at = m[0].length; }
     else {
       const a = /["']/.test(s) ? attrHead(s) : null;
       if (a) { const form = formField(s); head = { kind: 'attr', name: a.name, ...(form ? { form } : {}) }; at = a.from; }
@@ -130,7 +156,7 @@
         const last = m[0].trim().split('<').pop();
         head = { kind: 'xml', name: last.replace(/^!\[CDATA\[$/, 'CDATA').split(/[\s>]/)[0] };
         at = m[0].length;
-      } else if ((m = TAG_RAN_ON.exec(s)) && m[0].length < s.length) { head = { kind: 'xml', name: 'wrapped tag' }; at = m[0].length; }
+      } else if ((m = TAG_RAN_ON.exec(s)) && m[0].length < s.length && OUTSIDE.test(m[0])) { head = { kind: 'xml', name: 'wrapped tag' }; at = m[0].length; }
     }
     const rest = at ? s.slice(at) : s;
     let i = 0;
@@ -249,11 +275,12 @@
   // ── finding ─────────────────────────────────────────────────────────────
 
   // Would this base64 line open a NEW file? Its first bytes must carry a
-  // sniffable header: text and unknown bytes say no.
+  // sniffable header: text, unknown bytes and what may stand mid-file say no.
   function startsNewFile(chars) {
     if (chars.length < 8) return false;
     try {
-      return !['txt', 'bin', 'jpgpart', 'xml', 'json', 'html', 'eml'].includes(sniff(decode(chars.slice(0, 24))).ext);
+      const k = sniff(decode(chars.slice(0, 24)));
+      return !k.midway && !['txt', 'bin', 'jpgpart', 'xml', 'json', 'html', 'eml'].includes(k.ext);
     } catch { return false; }
   }
 
@@ -279,21 +306,46 @@
   // [{ chars, pages: [first, last], lines: [first, last], name, damage: [[char, n, why], …],
   //    suspects: [[char, candidates, why], …], width, padded, softWrapped?, opened, closed, declared }].
   //
-  // Two passes. RUNS: consecutive base64 pieces (blank lines and page breaks
-  // neutral), started by a strong clean line, ended by prose or padding.
-  // LOGICAL LINES: a printer wraps a line wider than its page, so one 76-char
-  // line of the e-mail can arrive as 75 + 1 or 73 + 3; pieces are summed back to
-  // the body's width W (the commonest such sum). A logical line that comes out
-  // short in the middle of a body lost characters: they are put back as FILL at
-  // its end and recorded as damage, so every later byte keeps its place. A lost
-  // band (unread) is one logical line of FILL. A body wrapped with the printer's
-  // '-' has no width: the printer also breaks after a '/', anywhere, so a short
-  // line there is not a short line (and a band lost inside it is a guess at the
-  // commonest line's length, recorded as such). How the body is known to start
-  // and end is kept in `opened` and `closed`; either is null where nothing shows it.
+  // Two passes. RUNS: consecutive base64 pieces (blank lines, page breaks and a
+  // page's furniture neutral), started by a strong clean line, ended by prose or
+  // padding. LOGICAL LINES: a printer wraps a line wider than its page, so one
+  // 76-char line of the e-mail can arrive as 75 + 1 or 73 + 3; pieces are summed
+  // back to the body's width W (the commonest such sum). A logical line that
+  // comes out short in the middle of a body lost characters: they are put back
+  // as FILL at its end and recorded as damage, so every later byte keeps its
+  // place. A lost band (unread) is one logical line of FILL. A body with no width
+  // — wrapped with the printer's '-' (the printer also breaks after a '/',
+  // anywhere, so a short line there is not a short line), or re-flowed — takes a
+  // band lost inside it as a guess at the commonest line's length, recorded as such.
+  //
+  // A body's FIRST lines need not be strong: a file that starts with zeros or a
+  // header of few characters (a compound document, a TAR, a font's tables) opens
+  // with lines of 'AAAA…'. The lines right above the first strong line that are
+  // of the body's width and hold base64 alone are taken back into it.
+  //
+  // How the body is known to start and end is kept in `opened` and `closed`;
+  // either is null where nothing shows it, and nothing shows it across what may
+  // hold the body's characters: a band nobody read, a line of base64 left out,
+  // a page's number standing where its last line would be (`unopened`,
+  // `unclosed` say which).
+  //
+  // A PAGE'S FURNITURE — a number, another production's stamp — printed at the
+  // top or bottom of a page, between two pages of a body in reading order, is no
+  // part of it. Its shape is the test: nothing else puts a page number between
+  // two lines of a body. Prose of that shape is passed over; a piece of that
+  // shape ('2', '2/3') is dropped where a new line of the body would start
+  // (where the line before it is short, it is the rest of that line), and as the
+  // body's last line proves no end. Other running heads (a browser's date and
+  // URL) still end a run.
   function findBlocks(lines) {
     const read = lines.map(L => (L.unread ? { unread: true, q: {} } : readLine(L)));
     const wide = wideGlyphs(read, lines);
+    // a page's furniture: short (no line of a body is), and of that shape; inside
+    // a body nothing else prints a page number between two of its lines
+    const furniture = k => {
+      const t = (lines[k]?.text || '').replace(QUOTE, '').trim();
+      return !!t && t.length <= 60 && FURNITURE.test(t);
+    };
     const runs = [];
     let run = null, pending = null;                     // pending: a marker alone on the line above
     const flush = (why, text) => {
@@ -315,7 +367,7 @@
     const misreadPad = (L, i) => {
       if (!(L.fails || doubtOf(L))) return false;
       for (let k = i + 1; k < read.length; k++) {
-        if (read[k].unread || read[k].q.blank) continue;
+        if (read[k].unread || read[k].q.blank || furniture(k)) continue;
         const t = read[k].q.t;
         return !!t && isStrong(t) && !startsNewFile(t);
       }
@@ -323,7 +375,11 @@
     };
     for (let i = 0; i < lines.length; i++) {
       const L = lines[i], r = read[i];
-      if (r.unread) { if (run) run.pieces.push({ unread: true, i }); continue; }
+      if (r.unread) {
+        if (!run && pending) { open(i, pending); pending = null; }   // under a marker alone on its line: the body's first line, unread
+        if (run) run.pieces.push({ unread: true, i });
+        continue;
+      }
       const q = r.q;
       if (q.blank) continue;
       // padding the printer wrapped onto a line of its own closes the body it belongs to
@@ -331,7 +387,10 @@
         run.pieces.push({ t: L.text.replace(QUOTE, '').trim(), q: { t: '', off: 0 }, r: { lostAt: [], failing: 0 }, i });
         run.padded = true; flush('padding'); pending = null; continue;
       }
-      if (q.prose) { flush('prose', L.text); pending = null; continue; }
+      if (q.prose) {
+        if (furniture(i)) continue;                     // a page's number or stamp, between two pages of the body
+        flush('prose', L.text); pending = null; continue;
+      }
       const { t, tail } = q;
       if (q.head) {                                     // a marker opens a body here: whatever ran before it has ended
         flush('prose', L.text);
@@ -360,7 +419,7 @@
     flush('end of document');
 
     const out = [];
-    let floor = 0;
+    let floor = 0, prevEnd = -1;
     // a line of quoted-printable ends in '=' as well: one such line, with another
     // beside it, is a mail's soft break and not a padded body of one line
     const softBreak = i => (lines[i]?.text ?? '').trim().endsWith('=');
@@ -368,11 +427,25 @@
       for (let k = i + step; k >= 0 && k < lines.length; k += step) if ((lines[k].text ?? '').trim()) return softBreak(k);
       return false;
     };
+    // what, between lines `from` and `to`, could hold characters of the body: a
+    // band nobody read, base64 that no marker closes (a page's number aside)
+    const between = (from, to) => {
+      for (let k = Math.max(0, from); k < to; k++) {
+        if (read[k].unread) return 'a band nobody read';
+        if (read[k].q.t && !read[k].q.tail && !furniture(k)) return 'a line of base64 left out of the body';
+      }
+      return null;
+    };
     for (const r of runs) {
-      while (r.pieces.length && r.pieces.at(-1).unread) r.pieces.pop();   // lost bands after the body are not the body's
+      const after = prevEnd;                            // the lines of the run before this one are its own
+      prevEnd = r.pieces.length ? r.pieces.at(-1).i : r.first;
+      let unclosed = null;                              // what keeps the end from being proven
+      // lost bands after the body are not the body's — nor can anything after them show where it ends
+      while (r.pieces.length && r.pieces.at(-1).unread) { r.pieces.pop(); unclosed = 'a band nobody read stands before its end'; }
       if (!r.pieces.length) continue;
       if (r.pieces.length === 1 && r.padded && (besideOne(r.pieces[0].i, -1) || besideOne(r.pieces[0].i, 1))) continue;
-      const P = r.pieces.filter(p => !p.unread);
+      for (const p of r.pieces) if (!p.unread && p.t.length < 20 && furniture(p.i)) p.furn = true;
+      const P = r.pieces.filter(p => !p.unread && !p.furn);
       const sums = new Map();
       for (let k = 0; k < P.length; k++) {
         if (P[k].r.failing || P[k].t.length < 20 || P[k].q.head || P[k].q.tail) continue;   // a line shared with a marker holds what is left of a line
@@ -383,8 +456,32 @@
       for (const [n, c] of sums) { all += c; if (c > best || (c === best && n > W)) { W = n; best = c; } }
       // a body sent as ONE unbroken line is re-flowed to the page by the printer,
       // no width to hold it to: it is taken as it reads
-      const widest = W;                                 // what a lost line of a soft-wrapped body is taken to hold
+      const widest = W;                                 // what a lost line of a body with no width is taken to hold
       if (best < 0.6 * all || r.soft) W = 0;
+      // the body's first lines, where the run started below them: whole logical
+      // lines only (a line of W, or a wrapped one's pieces summing to W), and a
+      // line with a lost cluster as one by itself, its characters put back
+      if (W && !r.head) {
+        const above = [];
+        let line = [], sum = 0;                         // the logical line being gathered, from its foot up
+        for (let k = r.first - 1; k > after; k--) {
+          const a = read[k], q = a.q;
+          if (a.unread) break;
+          if (q.blank || (q.prose && furniture(k))) continue;
+          if (q.prose || !q.t || q.head || q.tail || q.soft || q.weak || q.t.includes('=')) break;
+          if (a.failing) {
+            if (line.length || !a.lostAt.length || q.t.length + a.lostAt.length > W) break;
+            above.push({ t: q.t, q, r: a, i: k });
+            continue;
+          }
+          line.push({ t: q.t, q, r: a, i: k, pageMark: q.t.length < 20 && furniture(k) }); sum += q.t.length;
+          // a piece of a page number's shape at the foot: the line's overflow if that makes it whole, else the page's
+          if (sum !== W && line[0].pageMark && sum - line[0].t.length === W) sum -= line.shift().t.length;
+          if (sum === W) { above.push(...line); line = []; sum = 0; }
+          else if (sum > W || q.t.length >= 20) break;  // a wrapped line's long piece completes it, or nothing does
+        }
+        if (above.length) { above.reverse(); r.pieces.unshift(...above); r.first = above[0].i; }
+      }
       const form = r.head?.form ?? null;
       const b = { chars: '', damage: [], suspects: [], width: W, pages: null, lines: [r.first, r.first], name: null, count: 0, padded: !!r.padded, end: r.end,
         ...(r.soft ? { softWrapped: true } : {}) };
@@ -394,14 +491,21 @@
         if (acc > 0 && miss > 0) { b.damage.push([b.chars.length, miss, why]); b.chars += FILL.repeat(miss); }
         acc = 0;
       };
-      for (const p of r.pieces) {
-        const L = lines[p.i];
+      for (let n = 0; n < r.pieces.length; n++) {
+        const p = r.pieces[n], L = lines[p.i];
         if (p.unread) {
           shortEnd('characters lost before a band nobody read');
           // a form field is not a file: nothing depends on the bytes keeping their place
           if (form) { b.damage.push([b.chars.length, 0, 'unread band']); continue; }
-          if (r.soft && !W) { b.damage.push([b.chars.length, widest, 'unread band, its length a guess: what follows may be out of place']); b.chars += FILL.repeat(widest); continue; }
+          if (!W) { b.damage.push([b.chars.length, widest, 'unread band, its length a guess: what follows may be out of place']); b.chars += FILL.repeat(widest); continue; }
           b.damage.push([b.chars.length, W, 'unread band']); b.chars += FILL.repeat(W); continue;
+        }
+        // a page's number or stamp where a new line of the body would start is the page's;
+        // where the line before it is short, it is the rest of that line
+        if (p.furn && (!W || acc === 0)) {
+          if (n === r.pieces.length - 1) unclosed ??= 'its last line may be a page\'s number or stamp';
+          if (!W && !r.soft) b.damage.push([b.chars.length, 0, 'a page\'s number or stamp, or characters of the body: no width to tell']);
+          continue;
         }
         let t = p.t;
         const want = W ? (W - acc >= t.length ? W - acc : t.length) : t.length;
@@ -442,16 +546,25 @@
         // what stands above a marker is no part's header: a `name=` there belongs to some other element
         if (!b.declared.near) for (const k of ['name', 'filename', 'type', 'charset', 'encoding']) delete b.declared[k];
         b.declared.marker = r.head.kind;
-        if (r.head.kind === 'xml' || r.head.kind === 'attr') b.declared.element = r.head.name;
+        if (r.head.kind === 'xml' || r.head.kind === 'attr' || r.head.kind === 'vcard') b.declared.element = r.head.name;
         if (r.head.kind === 'armor') b.declared.armor = r.head.name;
         if (r.head.type && !b.declared.type) b.declared.type = r.head.type.toLowerCase();
       }
       // ASP.NET's own state, wherever its marker went: a serialized page, not a file
       const state = form ?? (/^\/?wE[PWdT]/.test(b.chars) && !b.declared.encoding && !b.declared.type && !b.declared.name ? 'ASP.NET state' : null);
       if (state) b.declared.form = state;
-      b.opened = r.head ? `marker: ${r.head.kind}` : b.declared.encoding === 'base64' && b.declared.near ? 'mime header' : b.declared.vcard ? 'vcard property' : null;
-      b.closed = r.padded ? 'padding' : r.tail && r.tail !== 'xml' ? `marker: ${r.tail}` : r.closer ?? (W && acc > 0 ? 'short last line' : null);
+      // the MIME header shows where the body starts only with nothing between them that could be the body's
+      b.opened = null;
+      if (r.head) b.opened = `marker: ${r.head.kind}`;
+      else if (b.declared.encoding === 'base64' && b.declared.near) {
+        const stop = between(b.declared.encodingAt + 1, r.first);
+        if (stop) b.unopened = `${stop} stands between its MIME header and its first line`;
+        else b.opened = 'mime header';
+      }
+      b.closed = r.padded ? 'padding' : unclosed ? null : r.tail && r.tail !== 'xml' ? `marker: ${r.tail}` : r.closer ?? (W && acc > 0 ? 'short last line' : null);
+      if (unclosed && !r.padded) b.unclosed = unclosed;
       delete b.declared.near;
+      delete b.declared.encodingAt;
       b.name = b.declared.name ?? null;
       floor = b.lines[1] + 1;
       out.push(b);
@@ -480,22 +593,23 @@
       if (!d.charset) { const m = /charset\s*=\s*"?([\w.-]+)/i.exec(joined); if (m) d.charset = m[1].toLowerCase(); }
       if (!d.filename) { const m = /\bfilename\*?\s*=\s*(?:"([^"]+)"?|([^\s";]+))/i.exec(joined); if (m) d.filename = (m[1] ?? m[2]).trim(); }
       if (!d.name) { const m = /(?:^|[\s;])name\*?\s*=\s*(?:"([^"]+)"?|([^\s";]+))/i.exec(joined); if (m) d.name = (m[1] ?? m[2]).trim(); }
-      if (!d.vcard) { const m = /^(PHOTO|LOGO|SOUND|KEY)[;:].*ENCODING=b/i.exec(t); if (m) d.vcard = m[1].toUpperCase(); }
       if (/^--\S{6,}$/.test(t) && (d.type || d.encoding)) break;   // the part's boundary: its headers are below it
     }
     const name = cleanName(d.filename || d.name);
     // the header stands right above the body, nothing but headers between: it declares THIS body
+    // (whether it also shows where the body STARTS is findBlocks' to say: a line of the body itself is headerish too)
     let near = encodingAt >= 0;
     for (let i = encodingAt + 1; near && i < start; i++) {
       const t = textAt(i);
       if (t && !HEADERISH.test(t)) near = false;
     }
-    return { ...d, name: name || undefined, near };
+    return { ...d, name: name || undefined, near, encodingAt };
   }
 
-  // A declared name made safe to save under: RFC 2231's charset'' prefix and
-  // %-escapes undone, RFC 2047's =?utf-8?…?= words decoded, no path, no
-  // characters a file system refuses.
+  // A declared name made safe to save under and to show: RFC 2231's charset''
+  // prefix and %-escapes undone, RFC 2047's =?utf-8?…?= words decoded, no path,
+  // no characters a file system refuses, no control that reorders the name on
+  // screen (each becomes '_', as the browser saves it).
   function cleanName(raw) {
     if (!raw) return null;
     let n = raw.trim().replace(/"+$/, '');
@@ -508,7 +622,7 @@
         return new TextDecoder(/^utf-?8$/i.test(cs) ? 'utf-8' : 'latin1').decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
       } catch { return m; }
     });
-    n = n.split(/[\\/]/).pop().replace(/[:*?"<>|\x00-\x1f]/g, '_').replace(/^\.+/, '').trim();
+    n = n.split(/[\\/]/).pop().replace(/[:*?"<>|\x00-\x1f\x7f-\x9f]/g, '_').replace(BIDI, '_').replace(/^\.+/, '').trim();
     return n && n.length <= 200 ? n : null;
   }
 
@@ -588,12 +702,44 @@
     return n > 0 && frameLen(n) > 0;
   }
 
-  // Magic bytes → { mime, ext, label, icon (a Material Symbols name), view }.
+  // A magic number of two or three bytes is a word of text as often as a file
+  // ('BM', 'PK', 'ID3' and 'BZh' open lines of prose), and a NUL-led one turns up
+  // in any binary: the header after it must read as the format's too.
+  const u16le = (b, i) => b[i] | b[i + 1] << 8;
+  const u32le = (b, i) => (b[i] | b[i + 1] << 8 | b[i + 2] << 16 | b[i + 3] << 24) >>> 0;
+  // BMP: a DIB header of a size some version of the format has, the pixels after both headers
+  function bmpHeader(b) {
+    if (b.length < 26 || b[0] !== 0x42 || b[1] !== 0x4D) return false;
+    const dib = u32le(b, 14);
+    return [12, 40, 52, 56, 64, 108, 124].includes(dib) && u32le(b, 10) >= 14 + dib;
+  }
+  // an icon (00 00 01 00, then a count): its first entry's planes, depth, size and offset
+  function iconDir(b) {
+    if (b.length < 22 || b[0] || b[1] || b[2] !== 1 || b[3]) return false;
+    const n = u16le(b, 4);
+    return n >= 1 && u16le(b, 10) <= 1 && [0, 1, 4, 8, 16, 24, 32].includes(u16le(b, 12)) && u32le(b, 14) > 0 && u32le(b, 18) >= 6 + 16 * n;
+  }
+  // ID3v2: a major version 2–4, a revision, and a size in four 7-bit bytes
+  const id3 = b => b.length >= 10 && b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33 && b[3] >= 2 && b[3] <= 4 && b[4] < 0xFF
+    && b[6] < 0x80 && b[7] < 0x80 && b[8] < 0x80 && b[9] < 0x80;
+  // TAR: 'ustar' at 257, and the header's checksum: its 512 bytes summed, the checksum's own eight as spaces
+  function tarHeader(b) {
+    if (b.length < 512 || latin1(b, 257, 5) !== 'ustar') return false;
+    let sum = 0, signed = 0;
+    for (let i = 0; i < 512; i++) { const v = i >= 148 && i < 156 ? 32 : b[i]; sum += v; signed += v > 127 ? v - 256 : v; }
+    const field = latin1(b, 148, 8).replace(/\0/g, ' ').trim();
+    return /^[0-7]{1,8}$/.test(field) && (parseInt(field, 8) === sum || parseInt(field, 8) === signed);
+  }
+
+  // Magic bytes → { mime, ext, label, icon (a Material Symbols name), view, midway? }.
+  // midway: the signature stands inside such a file as often as at its start (an
+  // HTML <div>, a mail's header line, an MP3 frame), so it shows no start.
   function sniff(bytes) {
     const at = (i, ...vals) => vals.every((v, k) => bytes[i + k] === v);
     const str = (i, len) => latin1(bytes, i, len);
     const has = (needle, limit) => str(0, limit).includes(needle);
     const t = (mime, ext, label, icon, view = 'inline') => ({ mime, ext, label, icon, view });
+    const midway = k => ({ ...k, midway: true });
 
     // documents
     if (str(0, 4) === '%PDF') return t('application/pdf', 'pdf', 'PDF', 'picture_as_pdf');
@@ -604,8 +750,8 @@
     if (at(0, 0x89, 0x50, 0x4E, 0x47)) return t('image/png', 'png', 'PNG image', 'image');
     if (at(0, 0xFF, 0xD8, 0xFF)) return t('image/jpeg', 'jpg', 'JPEG image', 'image');
     if (at(0, 0x47, 0x49, 0x46, 0x38)) return t('image/gif', 'gif', 'GIF image', 'image');
-    if (at(0, 0x42, 0x4D) && bytes.length > 26) return t('image/bmp', 'bmp', 'BMP image', 'image');
-    if (at(0, 0x00, 0x00, 0x01, 0x00)) return t('image/x-icon', 'ico', 'Icon', 'image');
+    if (bmpHeader(bytes)) return t('image/bmp', 'bmp', 'BMP image', 'image');
+    if (iconDir(bytes)) return t('image/x-icon', 'ico', 'Icon', 'image');
     if (at(0, 0x49, 0x49, 0x2A, 0x00) || at(0, 0x4D, 0x4D, 0x00, 0x2A))
       return t('image/tiff', 'tif', 'TIFF image', 'image', 'none');   // browsers don't render TIFF
 
@@ -630,19 +776,21 @@
     }
 
     // audio
-    if (str(0, 3) === 'ID3' || mpegFrames(bytes))
-      return t('audio/mpeg', 'mp3', 'MP3 audio', 'audio_file');
-    if (str(0, 4) === 'OggS') return t('audio/ogg', 'ogg', 'Ogg audio', 'audio_file');
+    if (id3(bytes)) return t('audio/mpeg', 'mp3', 'MP3 audio', 'audio_file');
+    if (mpegFrames(bytes)) return midway(t('audio/mpeg', 'mp3', 'MP3 audio', 'audio_file'));
+    // every page of an Ogg stream starts 'OggS'; only the first says it begins the stream
+    if (str(0, 4) === 'OggS') { const k = t('audio/ogg', 'ogg', 'Ogg audio', 'audio_file'); return bytes[5] & 2 ? k : midway(k); }
     if (str(0, 4) === 'fLaC') return t('audio/flac', 'flac', 'FLAC audio', 'audio_file');
-    if (str(0, 4) === '#!AM') return t('audio/amr', 'amr', 'AMR audio', 'audio_file', 'none');
+    if (str(0, 5) === '#!AMR') return t('audio/amr', 'amr', 'AMR audio', 'audio_file', 'none');
 
     // video (EBML: WebM or Matroska)
     if (at(0, 0x1A, 0x45, 0xDF, 0xA3))
       return has('webm', 64) ? t('video/webm', 'webm', 'WebM video', 'video_file')
         : t('video/x-matroska', 'mkv', 'Matroska video', 'video_file', 'none');
 
-    // archives — OOXML and EPUB are ZIPs whose member paths show early on
-    if (str(0, 2) === 'PK') {
+    // archives — OOXML and EPUB are ZIPs whose member paths show early on; a ZIP
+    // opens with a member's local header, or (empty) with its end record
+    if (at(0, 0x50, 0x4B, 0x03, 0x04) || at(0, 0x50, 0x4B, 0x05, 0x06)) {
       const head = str(0, 4096);
       if (head.includes('word/')) return t('application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'docx', 'Word document', 'description', 'none');
       if (head.includes('xl/')) return t('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx', 'Excel spreadsheet', 'table_chart', 'none');
@@ -651,10 +799,13 @@
       return t('application/zip', 'zip', 'ZIP archive', 'folder_zip', 'none');
     }
     if (at(0, 0x37, 0x7A, 0xBC, 0xAF)) return t('application/x-7z-compressed', '7z', '7-Zip archive', 'folder_zip', 'none');
-    if (str(0, 4) === 'Rar!') return t('application/vnd.rar', 'rar', 'RAR archive', 'folder_zip', 'none');
-    if (at(0, 0x1F, 0x8B)) return t('application/gzip', 'gz', 'Gzip archive', 'folder_zip', 'none');
-    if (str(0, 3) === 'BZh') return t('application/x-bzip2', 'bz2', 'Bzip2 archive', 'folder_zip', 'none');
-    if (str(257, 5) === 'ustar') return t('application/x-tar', 'tar', 'TAR archive', 'folder_zip', 'none');
+    if (str(0, 6) === 'Rar!\x1A\x07') return t('application/vnd.rar', 'rar', 'RAR archive', 'folder_zip', 'none');
+    // gzip: deflate (8), no reserved flag set
+    if (at(0, 0x1F, 0x8B, 0x08) && !(bytes[3] & 0xE0)) return t('application/gzip', 'gz', 'Gzip archive', 'folder_zip', 'none');
+    // bzip2: a block size 1–9, then a block's magic (π) or an empty stream's end (√π)
+    if (str(0, 3) === 'BZh' && bytes[3] >= 0x31 && bytes[3] <= 0x39 && (at(4, 0x31, 0x41, 0x59, 0x26, 0x53, 0x59) || at(4, 0x17, 0x72, 0x45, 0x38, 0x50, 0x90)))
+      return t('application/x-bzip2', 'bz2', 'Bzip2 archive', 'folder_zip', 'none');
+    if (tarHeader(bytes)) return t('application/x-tar', 'tar', 'TAR archive', 'folder_zip', 'none');
 
     // DER: a CMS message by its OID, anything else only if its length is the whole file
     const der = derInfo(bytes);
@@ -672,16 +823,20 @@
         return has('<svg', 2048) ? t('image/svg+xml', 'svg', 'SVG image', 'code', 'text')
           : t('application/xml', 'xml', 'XML file', 'code', 'text');
       if (head.startsWith('<svg')) return t('image/svg+xml', 'svg', 'SVG image', 'code', 'text');
-      if (/^(<!doctype html|<html|<head|<body|<div|<p[\s>]|<table|<meta|<style|<!--)/.test(head) || /<html[\s>]/.test(head))
-        return t('text/html', 'html', 'HTML file', 'code', 'text');
+      // an HTML file opens with its doctype or <html>; a <div> first, or <html> further in, is as likely its middle
+      if (/^(<!doctype html|<html)/.test(head)) return t('text/html', 'html', 'HTML file', 'code', 'text');
+      if (/^(<head|<body|<div|<p[\s>]|<table|<meta|<style|<!--)/.test(head) || /<html[\s>]/.test(head))
+        return midway(t('text/html', 'html', 'HTML file', 'code', 'text'));
       if (head.startsWith('begin:vcalendar')) return t('text/calendar', 'ics', 'Calendar invitation', 'event', 'text');
-      if (head.startsWith('begin:vcard')) return t('text/vcard', 'vcf', 'vCard', 'contact_page', 'text');
+      // a file of several cards begins every one of them so
+      if (head.startsWith('begin:vcard')) return midway(t('text/vcard', 'vcf', 'vCard', 'contact_page', 'text'));
       if ((head.startsWith('{') || head.startsWith('[')) && bytes.length <= 4 << 20) {
         try { JSON.parse(new TextDecoder().decode(bytes)); return t('application/json', 'json', 'JSON file', 'data_object', 'text'); }
         catch { /* not JSON — plain text */ }
       }
+      // any header line of a mail reads like its first one
       if (/^(from|received|return-path|mime-version|date|subject|delivered-to|x-[\w-]+):/.test(head))
-        return t('message/rfc822', 'eml', 'Email message', 'mail', 'text');
+        return midway(t('message/rfc822', 'eml', 'Email message', 'mail', 'text'));
       return t('text/plain', 'txt', 'Text file', 'article');
     }
     // the middle of a JPEG: entropy-coded scan data, where every 0xFF is stuffed
@@ -830,28 +985,33 @@
   // the whole file. b: from findBlocks; kind: sniff; c: check; bytes: the file's
   // size; wrap: a container's { size }; surplus: bytes past that size.
   // → { status, start, end, why }
+  // A start is proven by the body's own opening (findBlocks' `opened`), an
+  // attachment header, or a magic number that only a file's first bytes carry.
   function verdict({ b, kind, c, damaged = false, bytes, wrap = null, surplus = 0, formatEnd: atEnd = false }) {
-    const start = b.opened ?? (wrap ? 'attachment header' : !NOT_A_START.has(kind.ext) ? 'magic number' : null);
+    const start = b.opened ?? (wrap ? 'attachment header' : !NOT_A_START.has(kind.ext) && !kind.midway ? 'magic number' : null);
     const end = wrap && !surplus && bytes === wrap.size ? 'declared size' : atEnd ? 'format end' : wrap ? null : b.closed ?? null;
     const out = (status, why) => ({ status, start, end, why });
     if (damaged) return out('damaged', typeof damaged === 'string' ? damaged : 'some characters were not read');
     if (c?.ok === false) return out('incomplete', c.note || 'the format refuses it');
     if (wrap && bytes < wrap.size) return out('incomplete', `${bytes} of ${wrap.size} declared bytes`);
     if (kind.ext === 'jpgpart') return out('incomplete', 'starts mid-attachment: scan data with no JPEG header');
+    // padding ends a body of whole groups of four: characters short of that went missing (or crept in) before it
+    if (b.padded && b.chars.length % 4 !== 0) return out('incomplete', `padded, but ${b.chars.length % 4} character${b.chars.length % 4 > 1 ? 's' : ''} past whole groups of four: characters were lost or added inside it`);
     if (c?.ok === true) return out('exact', c.note);
     if (!b.padded && b.chars.length % 4 !== 0) return out('incomplete', 'the last base64 group is not whole: cut short');
     if (start && end) return out('exact', `opens by ${start}, ends by ${end}`);
-    return out('unproven', `no check covers it; ${start ? `opens by ${start}` : 'nothing shows where it starts'}, ${end ? `ends by ${end}` : 'nothing shows where it ends'}`);
+    return out('unproven', `no check covers it; ${start ? `opens by ${start}` : b.unopened ?? 'nothing shows where it starts'}, ${end ? `ends by ${end}` : b.unclosed ?? 'nothing shows where it ends'}`);
   }
 
   // ── from lines to what the panel lists ──────────────────────────────────
 
   const CAN_HOLD_MORE = new Set(['txt', 'html', 'xml', 'svg', 'eml', 'ics', 'vcf']);
 
+  // (a damage of no characters still counts: a band whose length nobody can guess)
   function whyDamaged(b) {
     const parts = [];
     const shown = new Set();
-    for (const [, n, why] of b.damage) { const k = why.split(':')[0]; if (n && !shown.has(k)) { shown.add(k); parts.push(k); } }
+    for (const [, , why] of b.damage) { const k = why.split(':')[0]; if (!shown.has(k)) { shown.add(k); parts.push(k); } }
     if (b.suspects.length) parts.push(`${b.suspects.length} glyph${b.suspects.length > 1 ? 's' : ''} wider than read`);
     return parts.length ? `not certified: ${parts.join('; ')}` : 'not certified';
   }
@@ -869,13 +1029,14 @@
     const form = b.declared.form ?? (kind.ext === 'viewstate' ? 'ASP.NET state' : null);
     if (form) { out.others.push({ what: 'form data', field: form, kind, bytes: bytes.length, pages }); return; }
     // a short base64 value that no MIME part or marker opens is a HEADER's value —
-    // a DKIM signature, an Exchange diagnostics blob — not a file
-    if (!b.opened && !b.declared.name && !wrap && bytes.length < 1024 && kind.ext === 'bin') {
+    // a DKIM signature, an Exchange diagnostics blob — not a file (a part's
+    // header that cannot show where its body starts still makes it a part's)
+    if (!b.opened && !b.unopened && !b.declared.name && !wrap && bytes.length < 1024 && kind.ext === 'bin') {
       out.others.push({ what: 'header value', kind, bytes: bytes.length, pages }); return;
     }
     const data = wrap ? bytes.subarray(off, Math.min(bytes.length, off + wrap.size)) : bytes;
     const surplus = wrap ? Math.max(0, bytes.length - off - wrap.size) : 0;
-    const damaged = b.damage.some(d => d[1]) || b.suspects.length ? whyDamaged(b) : x.parentDamaged ? 'the file it is inside is damaged' : false;
+    const damaged = b.damage.length || b.suspects.length ? whyDamaged(b) : x.parentDamaged ? 'the file it is inside is damaged' : false;
     const v = verdict({ b, kind, c: check(data, kind), damaged, bytes: data.length, wrap, surplus, formatEnd: formatEnd(kind.ext, data) });
     const element = x.parent && b.declared.element ? b.declared.element.replace(/[^\w.-]+/g, '-') : null;
     const name = (wrap?.name && cleanName(wrap.name)) || b.declared.name || (element ? `${element}.${kind.ext}` : null);

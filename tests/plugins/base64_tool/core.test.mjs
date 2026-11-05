@@ -137,18 +137,23 @@ test('types are sniffed from the bytes, and each type is viewed as it may be', {
   const b = (...v) => Uint8Array.from(v.flatMap(x => (typeof x === 'string' ? [...x].map(c => c.charCodeAt(0)) : [x])));
   const ftyp = brand => b(0, 0, 0, 0x18, 'ftyp', brand, ...noise(20));
   const zip = member => b('PK', 3, 4, ...noise(26), member, ...noise(20));
-  const tar = Uint8Array.from([...noise(257).map(v => v & 0x7f | 0x20), ...[...'ustar'].map(c => c.charCodeAt(0)), ...noise(30)]);
+  // the headers behind a short magic number: a BMP's DIB header, an icon's first entry, an ID3 size, a TAR's checksum
+  const bmp = b('BM', 102, 0, 0, 0, 0, 0, 0, 0, 54, 0, 0, 0, 40, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 1, 0, 24, 0, ...noise(72));
+  const ico = b(0, 0, 1, 0, 1, 0, 16, 16, 0, 0, 1, 0, 32, 0, 0x68, 4, 0, 0, 22, 0, 0, 0, ...noise(40));
+  const tar = Buffer.alloc(512 + 30);
+  tar.write('notes.txt'); tar.write('0000644', 100); tar.write('ustar', 257); tar.write('00', 263); tar.fill(0x20, 148, 156);
+  tar.write(`${tar.subarray(0, 512).reduce((s, x) => s + x, 0).toString(8).padStart(6, '0')}`, 148); tar[154] = 0;
   const cases = [
     [b('%PDF-1.7\n'), 'pdf', 'inline'], [b('{\\rtf1\\ansi'), 'rtf', 'text'], [b(0xD0, 0xCF, 0x11, 0xE0, 0xA1), 'doc', 'none'],
-    [PNG, 'png', 'inline'], [b(0xFF, 0xD8, 0xFF, 0xE0), 'jpg', 'inline'], [b('GIF89a'), 'gif', 'inline'], [b('BM', ...noise(40)), 'bmp', 'inline'],
-    [b(0, 0, 1, 0, 1, 0), 'ico', 'inline'], [b('II', 0x2A, 0), 'tif', 'none'], [b('MM', 0, 0x2A), 'tif', 'none'],
+    [PNG, 'png', 'inline'], [b(0xFF, 0xD8, 0xFF, 0xE0), 'jpg', 'inline'], [b('GIF89a'), 'gif', 'inline'], [bmp, 'bmp', 'inline'],
+    [ico, 'ico', 'inline'], [b('II', 0x2A, 0), 'tif', 'none'], [b('MM', 0, 0x2A), 'tif', 'none'],
     [b('RIFF', 0, 0, 0, 0, 'WEBP'), 'webp', 'inline'], [b('RIFF', 0, 0, 0, 0, 'WAVE'), 'wav', 'inline'], [b('RIFF', 0, 0, 0, 0, 'AVI '), 'avi', 'none'],
     [ftyp('M4A '), 'm4a', 'inline'], [ftyp('qt  '), 'mov', 'inline'], [ftyp('heic'), 'heic', 'none'], [ftyp('avif'), 'avif', 'inline'], [ftyp('isom'), 'mp4', 'inline'],
-    [b('ID3', 4, 0), 'mp3', 'inline'], [b('OggS', 0), 'ogg', 'inline'], [b('fLaC'), 'flac', 'inline'],
+    [b('ID3', 4, 0, 0, 0, 0, 0, 0x7F), 'mp3', 'inline'], [b('OggS', 0, 2), 'ogg', 'inline'], [b('fLaC'), 'flac', 'inline'],
     [b(0x1A, 0x45, 0xDF, 0xA3, ...noise(8), 'webm'), 'webm', 'inline'], [b(0x1A, 0x45, 0xDF, 0xA3, ...noise(8), 'matroska'), 'mkv', 'none'],
     [zip('word/document.xml'), 'docx', 'none'], [zip('xl/workbook.xml'), 'xlsx', 'none'], [zip('ppt/slides/'), 'pptx', 'none'],
     [b('PK', 3, 4, ...noise(26), 'mimetypeapplication/epub+zip'), 'epub', 'none'], [zip('photos/1.jpg'), 'zip', 'none'],
-    [b(0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C), '7z', 'none'], [b('Rar!', 0x1A, 7), 'rar', 'none'], [b(0x1F, 0x8B, 8), 'gz', 'none'], [b('BZh91AY'), 'bz2', 'none'], [tar, 'tar', 'none'],
+    [b(0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C), '7z', 'none'], [b('Rar!', 0x1A, 7, 0), 'rar', 'none'], [b(0x1F, 0x8B, 8), 'gz', 'none'], [b('BZh91AY&SY'), 'bz2', 'none'], [tar, 'tar', 'none'],
     [b('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>'), 'svg', 'text'], [b('<svg onload="alert(1)"/>'), 'svg', 'text'],
     [b('<?xml version="1.0"?><root/>'), 'xml', 'text'], [b('<!DOCTYPE html><script>alert(1)</script>'), 'html', 'text'],
     [b('{"a": [1, 2]}'), 'json', 'text'], [b('{ not json'), 'txt', 'inline'], [b('From: a@b.c\nSubject: hi\n\nbody'), 'eml', 'text'],
@@ -450,4 +455,201 @@ test('linesFromBoxes: the OCR layer only, a line\'s segments joined, its certifi
   assert.deepEqual([lines[3].unread, lines[3].page], [true, 1]);
   assert.equal(lines[4].edited, true);
   assert.equal(lines[5].edited, true);
+});
+
+// ── what a verdict rests on (the review of 2026-11-05): a start proven across
+// nothing that could be the body's, an end likewise, whole groups under
+// padding, a short magic number backed by its format's header, patterns linear
+// in their line, a name shown as it is saved, a page's furniture kept out of
+// the body. Each case was a wrong verdict, a wrong type or a frozen tab before.
+const U = { page: 1, unread: true, text: '' };
+const mime = (name, type = 'application/octet-stream') => [plain(`Content-Type: ${type}; name="${name}"`), plain('Content-Transfer-Encoding: base64'), plain('')];
+const BOUNDARY = plain('--boundary-string--');
+const same = (a, b) => Buffer.from(a).equals(Buffer.from(b));
+
+test('a body\'s first lines need not be strong: a compound document\'s header, zeros, a TAR\'s, a font\'s tables are taken back, whole and exact', { skip }, () => {
+  const r = seeded(21);
+  const cfb = Buffer.alloc(512);
+  Buffer.from([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]).copy(cfb);
+  cfb.writeUInt16LE(0x3E, 24); cfb.writeUInt16LE(3, 26); cfb.writeUInt16LE(0xFFFE, 28); cfb.writeUInt16LE(9, 30); cfb.writeUInt16LE(6, 32); cfb.writeUInt32LE(1, 44);
+  for (let o = 76; o < 512; o += 4) cfb.writeUInt32LE(0xFFFFFFFF, o);
+  const tar = Buffer.alloc(512); tar.write('notes/report.txt'); tar.write('0000644', 100); tar.write('ustar', 257);
+  const ttf = Buffer.alloc(300); ttf.writeUInt32BE(0x00010000, 0); ttf.writeUInt16BE(12, 4);
+  // each lost its first 513, 114, 513 and 285 bytes and was called exact
+  for (const [name, data] of [['minutes.doc', Buffer.concat([cfb, randomBytes(512 * 30, r)])], ['capture.bin', Buffer.concat([Buffer.alloc(100), randomBytes(4000, r)])],
+    ['files.tar', Buffer.concat([tar, randomBytes(5120, r)])], ['font.ttf', Buffer.concat([ttf, randomBytes(4000, r)])]]) {
+    const body = wrapAt(data.toString('base64'), 76);
+    const [f, more] = C.examine([...mime(name), ...body.map(l => plain(l)), BOUNDARY]).files;
+    assert.ok(f && !more, name);
+    assert.ok(same(f.data, data), `${name}: every byte, the first ones too`);
+    assert.deepEqual([f.status, f.start], ['exact', 'mime header'], name);
+    // printed by a printer that wraps every line as 75 + 1: the same
+    const [g] = C.examine([...mime(name), ...body.flatMap(l => (l.length === 76 ? [l.slice(0, 75), l.slice(75)] : [l])).map(l => plain(l)), BOUNDARY]).files;
+    assert.deepEqual([g.status, same(g.data, data)], ['exact', true], `${name}, wrapped`);
+  }
+});
+
+test('a MIME header proves no start across what may be the body\'s: a first line with a lost cluster is damage in place; a band or a line left out leaves the start unproven', { skip }, () => {
+  const r = seeded(22), data = randomBytes(3000, r), body = wrapAt(data.toString('base64'), 76).map(l => plain(l));
+  assert.equal(C.examine([...mime('blob.bin'), ...body, BOUNDARY]).files[0].status, 'exact', 'all of it read');
+  const cut = { page: 1, text: body[0].text.slice(0, 30) + '□' + body[0].text.slice(31), fails: 1 };
+  const [c] = C.examine([...mime('blob.bin'), cut, ...body.slice(1), BOUNDARY]).files;
+  assert.deepEqual([c.status, c.data.length], ['damaged', data.length]);
+  assert.ok(same(c.data.subarray(0, 21), data.subarray(0, 21)) && same(c.data.subarray(24), data.subarray(24)), 'only the group the cluster stood in is lost');
+  const [u] = C.examine([...mime('blob.bin'), U, U, ...body.slice(2), BOUNDARY]).files;
+  assert.deepEqual([u.status, u.start], ['unproven', null]);
+  assert.match(u.why, /a band nobody read stands between its MIME header and its first line/);
+  // a line of base64 the body cannot take back (not of its width) stands between them: the same
+  const [s] = C.examine([...mime('blob.bin'), plain('A'.repeat(64)), ...body, BOUNDARY]).files;
+  assert.deepEqual([s.status, s.start], ['unproven', null]);
+  assert.match(s.why, /a line of base64 left out of the body stands between/);
+  // short, unnamed, its first line unread: still its part's file, not a header's value
+  const small = wrapAt(randomBytes(600, r).toString('base64'), 76).map(l => plain(l));
+  const { files, others } = C.examine([plain('Content-Type: application/octet-stream'), plain('Content-Transfer-Encoding: base64'), plain(''), U, ...small.slice(1), BOUNDARY]);
+  assert.deepEqual([files.length, others.length, files[0]?.status], [1, 0, 'unproven']);
+});
+
+test('nothing after a band nobody read shows where a body ends: its last line lost before the boundary, or before the closing tag', { skip }, () => {
+  const r = seeded(23), data = randomBytes(3001, r), body = wrapAt(data.toString('base64'), 76).map(l => plain(l));
+  assert.equal(C.examine([...mime('blob.bin'), ...body, BOUNDARY]).files[0].status, 'exact', 'all of it read');
+  const [a] = C.examine([...mime('blob.bin'), ...body.slice(0, -1), U, BOUNDARY]).files;
+  assert.deepEqual([a.status, a.end], ['unproven', null]);
+  assert.match(a.why, /a band nobody read stands before its end/);
+  const [x] = C.examine([plain('<my:form>'), plain('<my:file>'), ...body.slice(0, -1), U, plain('</my:file>')]).files;
+  assert.deepEqual([x.status, x.start, x.end], ['unproven', 'marker: xml', null]);
+});
+
+test('a band nobody read under a marker alone on its line is the body\'s first line: damage, every later byte in place', { skip }, () => {
+  const r = seeded(24), data = randomBytes(2000, r), body = wrapAt(data.toString('base64'), 76).map(l => plain(l));
+  const [f] = C.examine([plain('<my:form>'), plain('<my:file>'), U, ...body.slice(1), plain('</my:file>')]).files;
+  assert.deepEqual([f.status, f.data.length], ['damaged', data.length]);
+  assert.ok(same(f.data.subarray(57), data.subarray(57)));
+  assert.match(f.why, /unread band/);
+});
+
+test('a band nobody read in a body with no width (re-flowed by the printer) is damage, its length a guess', { skip }, () => {
+  const r = seeded(25), data = randomBytes(3000, r), s = data.toString('base64'), flowed = [];
+  for (let i = 0, k = 0; i < s.length; k++) { const n = 60 + (k * 7) % 30; flowed.push(s.slice(i, i + n)); i += n; }
+  const [whole] = C.examine([...mime('b.bin'), ...flowed.map(l => plain(l)), BOUNDARY]).files;
+  assert.deepEqual([whole.status, same(whole.data, data)], ['exact', true]);
+  const [f] = C.examine([...mime('b.bin'), ...flowed.slice(0, 10).map(l => plain(l)), U, ...flowed.slice(11).map(l => plain(l)), BOUNDARY]).files;
+  assert.equal(f.status, 'damaged');
+  assert.match(f.why, /unread band/);
+});
+
+test('a vCard\'s photo starts on its property line (3.0) or under it (2.1): whole, opened by the property', { skip }, () => {
+  const r = seeded(26);
+  const jpg = Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]), randomBytes(3000, r).map(x => (x === 0xFF ? 0 : x)), Buffer.from([0xFF, 0xD9])]);
+  const s = jpg.toString('base64'), prop = 'PHOTO;ENCODING=b;TYPE=JPEG:', first = 75 - prop.length;
+  const [a] = C.examine([plain('BEGIN:VCARD'), plain('VERSION:3.0'), plain('FN:Someone'), plain(prop + s.slice(0, first)),
+    ...wrapAt(s.slice(first), 74).map(l => plain(` ${l}`)), plain('END:VCARD')]).files;
+  assert.deepEqual([a.status, a.start, a.kind.ext, same(a.data, jpg)], ['exact', 'marker: vcard', 'jpg', true]);
+  const [b] = C.examine([plain('BEGIN:VCARD'), plain('VERSION:2.1'), plain('PHOTO;TYPE=JPEG;ENCODING=BASE64:'), ...wrapAt(s, 76).map(l => plain(` ${l}`)), plain(''), plain('END:VCARD')]).files;
+  assert.deepEqual([b.status, b.start, same(b.data, jpg)], ['exact', 'marker: vcard', true]);
+});
+
+test('a signature that stands mid-file as well proves no start: an HTML file that lost its first line is not exact', { skip }, () => {
+  const html = Buffer.from('<!doctype html><html><head><title>t</title></head>\n<body>\n'
+    + Array.from({ length: 80 }, (_, i) => `<div class="row">Row ${i} of the table, with some words in it.</div>`).join('\n') + '\n</body></html>\n');
+  const lines = wrapAt(html.toString('base64'), 76).map(l => plain(l));
+  const around = mid => C.examine([plain('Some prose, then the body.'), ...mid, plain('Some prose, after it.')]).files[0];
+  assert.deepEqual([around(lines).status, around(lines).start], ['exact', 'magic number']);
+  const cut = around(lines.slice(1));
+  assert.deepEqual([cut.kind.ext, cut.start, cut.status], ['html', null, 'unproven']);
+  const k = s => C.sniff(typeof s === 'string' ? Buffer.from(s) : s);
+  assert.deepEqual(['<!DOCTYPE html><p>', '<html><body>', '<div>a</div>', '<p class=x>a</p>', 'Received: from a by b', 'BEGIN:VCARD\r\nFN:A\r\nEND:VCARD', 'BEGIN:VCALENDAR\r\nEND:VCALENDAR']
+    .map(t => !!k(t).midway), [false, false, true, true, true, true, false]);
+  const frame = Buffer.concat([Buffer.from([0xFF, 0xFB, 0x90, 0x00]), Buffer.alloc(413)]);
+  assert.deepEqual([k(Buffer.concat([frame, frame])).ext, !!k(Buffer.concat([frame, frame])).midway], ['mp3', true], 'an MP3 frame: one of thousands');
+  assert.deepEqual([!!k(Buffer.from('ID3\x04\x00\x00\x00\x00\x00\x10')).midway, !!k(Buffer.from('OggS\x00\x02')).midway, !!k(Buffer.from('OggS\x00\x00')).midway], [false, false, true]);
+});
+
+test('a padded body is whole groups of four: one that is not lost or gained characters inside it, and is never exact', { skip }, () => {
+  const v = chars => C.verdict({ b: { chars, padded: true, opened: 'mime header', closed: 'padding' }, kind: { ext: 'txt' }, c: { ok: null }, bytes: 75 });
+  assert.equal(v(`${'QUJD'.repeat(25)}QQ==`).status, 'exact');
+  for (const end of ['Q==', 'QUJ==', 'QU=']) {
+    const out = v(`${'QUJD'.repeat(25)}${end}`);
+    assert.equal(out.status, 'incomplete', end);
+    assert.match(out.why, /padded, but \d characters? past whole groups of four/, end);
+  }
+  // a PDF whose last line lost a character: its %%EOF and its padding both read, and it is not exact
+  const pdf = Buffer.concat([Buffer.from('%PDF-1.4\n'), randomBytes(3000, seeded(27)), Buffer.from('\n%%EOF\n')]);
+  const lines = wrapAt(pdf.toString('base64').replace(/=+$/, ''), 76);
+  lines[lines.length - 1] = `${lines.at(-1).slice(0, -1)}=`;
+  const [f] = C.examine([...mime('report.pdf', 'application/pdf'), ...lines.map(l => plain(l)), BOUNDARY]).files;
+  assert.equal(f.status, 'incomplete');
+});
+
+test('two- and three-byte magic numbers need their format\'s header behind them: text that starts "PK", "BM", "ID3" or "BZh" is text', { skip }, () => {
+  for (const head of ['PKI enrolment notes', 'BMW service history', 'ID3 tags explained', 'BZh looks like bzip', 'PK', 'Rar! that was loud', '#!AM radio']) {
+    const data = Buffer.from(`${head} — ${'an ordinary line of text in an ordinary attachment.\n'.repeat(60)}`);
+    assert.deepEqual([C.sniff(data).ext, C.sniff(data).view], ['txt', 'inline'], head);
+    const [f] = C.examine([...mime('notes.txt', 'text/plain'), ...wrapAt(data.toString('base64'), 76).map(l => plain(l)), BOUNDARY]).files;
+    assert.deepEqual([f.kind.ext, f.status, same(f.data, data)], ['txt', 'exact', true], head);
+  }
+  // binary that opens with them and no more: no DIB header, a central directory's record, no gzip method, an icon with no entry
+  for (const bytes of [[0x42, 0x4D], [0x50, 0x4B, 0x01, 0x02], [0x1F, 0x8B, 0x07], [0, 0, 1, 0, 0, 0]])
+    assert.equal(C.sniff(Uint8Array.from([...bytes, ...noise(60, bytes.length)])).ext, 'bin', bytes.join(' '));
+});
+
+test('every pattern a line meets runs in time linear in it: a text attachment\'s lines are whatever the file holds', { skip }, () => {
+  // each of these took seconds (and twice the length, four or eight times as long)
+  const lines = { armor: `-----BEGIN ${' '.repeat(3000)}x`, ranOn: '!'.repeat(40000), attr: `"=${'a'.repeat(40000)}`, attrs: 'a="'.repeat(13000),
+    tags: `${'<a>'.repeat(13000)}<b`, dataUri: `${'x;'.repeat(20000)} ; base64 ,`, field: `<INPUT TYPE="hidden" NAME="${'a'.repeat(40000)}`, vcard: `PHOTO;${';'.repeat(40000)}` };
+  for (const [what, s] of Object.entries(lines)) {
+    const t0 = performance.now();
+    C.pieceOf(s);
+    const ms = performance.now() - t0;
+    assert.ok(ms < 100, `${what}: ${ms.toFixed(0)} ms for ${s.length} characters`);
+  }
+  // end to end, as the auto-scan meets it on every open: a text attachment read again for the bodies inside it
+  const text = Buffer.from(`Notes from the meeting, see below.\n-----BEGIN ${' '.repeat(2000)}x\nThanks.\n`);
+  const t0 = performance.now();
+  const [f] = C.examine([...mime('notes.txt', 'text/plain'), ...wrapAt(text.toString('base64'), 76).map(l => plain(l)), BOUNDARY]).files;
+  const ms = performance.now() - t0;
+  assert.deepEqual([f.kind.ext, f.status], ['txt', 'exact']);
+  assert.ok(ms < 250, `${ms.toFixed(0)} ms`);
+});
+
+test('a declared name shows as it is saved: a control that reorders it on screen becomes "_"', { skip }, () => {
+  const RLO = String.fromCharCode(0x202E), LRI = String.fromCharCode(0x2066);
+  assert.equal(C.cleanName(`invoice${RLO}fdp.exe`), 'invoice_fdp.exe');    // shown as "invoiceexe.pdf" before
+  assert.equal(C.cleanName(`a${LRI}b.txt`), 'a_b.txt');
+  assert.equal(C.cleanName('Grüße aus Zürich.pdf'), 'Grüße aus Zürich.pdf');
+  const encoded = `=?utf-8?B?${Buffer.from(`invoice${RLO}fdp.exe`).toString('base64')}?=`;
+  const [f] = C.examine([plain(`Content-Type: application/octet-stream; name="${encoded}"`), plain('Content-Transfer-Encoding: base64'), plain(''),
+    ...wrapAt(randomBytes(1500, seeded(28)).toString('base64'), 76).map(l => plain(l)), BOUNDARY]).files;
+  assert.equal(f.name, 'invoice_fdp.exe');
+  // a form field's name, among the values that are no files
+  const form = C.examine([plain(`<INPUT TYPE="hidden" NAME="__VIEW${RLO}STATE" VALUE="/-`),
+    ...wrapAt(randomB64(300, seeded(29)), 76).map((l, i, all) => plain(i === all.length - 1 ? `${l}">` : `${l}-`))]);
+  assert.deepEqual(form.others.map(o => o.field), ['VIEWSTATE']);
+});
+
+test('a page\'s number or stamp between two pages of a body is not the body\'s; a piece of that shape that completes a wrapped line is', { skip }, () => {
+  const r = seeded(30), data = Buffer.concat([Buffer.from('%PDF-1.4\n'), randomBytes(5000, r), Buffer.from('\n%%EOF\n')]);
+  const body = wrapAt(data.toString('base64'), 76);
+  // pages of 40 lines, the mark at the foot of the first or the head of the second
+  const paged = (mark, foot) => body.flatMap((text, i) => {
+    const page = 1 + Math.floor(i / 40), line = { page, text };
+    return foot && i === 39 ? [line, { page, text: mark }] : !foot && i === 40 ? [{ page, text: mark }, line] : [line];
+  });
+  for (const mark of ['2', '12', 'Page 2', 'Page 2 of 3', '2/3', '- 2 -', 'ABC-0001234', 'ABC0001234', 'DOJ-OGR-00012345', 'Page 2 of 3 EFTA00012345'])
+    for (const foot of [true, false]) {
+      const files = C.examine([...mime('report.pdf', 'application/pdf'), ...paged(mark, foot), BOUNDARY]).files, at = `${mark} at the ${foot ? 'foot' : 'head'}`;
+      assert.equal(files.length, 1, at);
+      assert.deepEqual([files[0].status, same(files[0].data, data)], ['exact', true], at);
+    }
+  // between the MIME header and the body's first line, it hides nothing
+  const [h] = C.examine([...mime('blob.pdf'), { page: 2, text: '2' }, ...body.map(text => ({ page: 2, text })), BOUNDARY]).files;
+  assert.deepEqual([h.status, h.start], ['exact', 'mime header']);
+  // printed 75 + 1: an overflow of one digit is its line's, whatever it looks like
+  const wrapped = body.flatMap(l => (l.length === 76 ? [l.slice(0, 75), l.slice(75)] : [l]));
+  assert.ok(wrapped.some(l => /^\d$/.test(l)), 'some line ends in a digit');
+  const [w] = C.examine([...mime('report.pdf', 'application/pdf'), ...wrapped.map(l => plain(l)), BOUNDARY]).files;
+  assert.deepEqual([w.status, same(w.data, data)], ['exact', true]);
+  // a page's number under the last line of a body that fills it: the bytes whole, the end unproven
+  const full = randomBytes(57 * 20, r), [t] = C.examine([...mime('blob.bin'), ...wrapAt(full.toString('base64'), 76).map(l => plain(l)), plain('3'), BOUNDARY]).files;
+  assert.deepEqual([t.status, t.end, same(t.data, full)], ['unproven', null, true]);
+  assert.match(t.why, /its last line may be a page's number or stamp/);
 });
