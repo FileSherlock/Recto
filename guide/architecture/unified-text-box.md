@@ -104,7 +104,7 @@ Clicking any box activates the formatting toolbar. `syncToolbarToBox(box)` pushe
 
 Each box has an independent `defaultSpaceWidth` boolean and `spaceWidth` float.
 
-- `defaultSpaceWidth = true` — the box uses the font's native space advance (`nativeSpaceWidth`, measured once per face, size and kerning with `Shaping.widths({ strings: [' '], … })` and cached).
+- `defaultSpaceWidth = true` — the box uses the font's native space advance (`nativeSpaceWidth`, measured once per face, size and kerning with `Shaping.widths({ strings: [' '], … })` and cached; `nativeSpaceKey` says what it was measured for, and a box whose font, style, size or kerning has changed since measures it again before a manual space width is drawn from it).
 - `defaultSpaceWidth = false` — the slider is active; `spaceWidth` overrides the space width and `computeXPositions` shifts all characters after each space accordingly.
 
 ### Inline Text Editing

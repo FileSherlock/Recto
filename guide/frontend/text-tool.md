@@ -261,7 +261,10 @@ const data = await Shaping.widths({
 ```
 
 The result is written to `box.spaceWidth` and `box.nativeSpaceWidth`, and cached per face, size,
-kerning and scale. Ticking **Font's** again sets `box.spaceWidth` to `null` (native font
+kerning and scale; `box.nativeSpaceKey` names the face, size and kerning it was measured for, so
+a box whose font or size changes afterwards draws its manual space width from a fresh measurement
+(`utbNativeSpace` in `svg-renderer.js` re-measures and draws the box again). Ticking **Font's**
+again sets `box.spaceWidth` to `null` (native font
 spacing). The helper is exposed as `window.getNaturalSpaceWidth(box)` for plugins that need
 the same number.
 
@@ -391,7 +394,8 @@ keeps no font list and no plugin is named:
 `detected` (measured from the page's pixels) outranks `declared` (the PDF's
 font names) and `layer` (the embedded text layer's most used face, which
 `embedded_text_viewer` submits when its spans arrive), whichever arrives
-first; the user's own menu choice (no source) always wins. Every
+first; the user's own menu choice (no source) always wins, and holds: a face detected after
+it does not replace it. Every
 `document:loaded` opens the ranking again. The layer's own
 boxes map their font names through the catalogue with one exception: the
 base-14 names `Times-Roman`, `Helvetica`, `Courier` become Times New Roman,

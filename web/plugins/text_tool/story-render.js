@@ -230,7 +230,8 @@
       const text = SC.paraText(para);
       let dropEnd = 0, drop = null;
       if (pa.dropLines >= 2 && text.length) {
-        dropEnd = Math.min(Math.max(1, pa.dropChars | 0), text.length);
+        const starts = SC.charStarts(text), n = Math.max(1, pa.dropChars | 0);   // whole characters
+        dropEnd = n < starts.length ? starts[n] : text.length;
         drop = el('span', 'tt-drop');
         // its size: the cap height spans from the first line's cap to the
         // baseline `dropLines` lines down
@@ -441,6 +442,12 @@
     if (typeof window.utbPixelRender !== 'function') return;
     const give_up = () => { forgetPieces(box, before); };
     if (utbState.editingId === box.id) return give_up();
+    // A renderer that says it draws nothing now (utbPixelRenderOn → null)
+    // declines every piece: measuring each character for it cost 700 ms per
+    // render of an 8k-character story, and a drag renders twice per move.
+    // One that does not answer is asked piece by piece.
+    try { if (typeof window.utbPixelRenderOn === 'function' && !window.utbPixelRenderOn()) return give_up(); }
+    catch { /* the plugin's; ask it piece by piece */ }
     const map = flowMap(g, box);
     if (!map) return give_up();
     const { flow, docX, docY } = map;
@@ -463,18 +470,19 @@
         const drop = lf.closest('.tt-drop');
         const sizePt = drop ? +drop.dataset.px / ctx.pxPerPt : a.sizePt;
         let cur = null;
-        for (let i = 0; i < node.length; i++) {
-          const ch = node.data[i];
+        const starts = SC.charStarts(node.data);   // whole characters: a piece never cuts one
+        for (let k = 0; k < starts.length; k++) {
+          const i = starts[k], j = starts[k + 1] ?? node.length, ch = node.data.slice(i, j);
           if (ch === '\n' || ch === '\t' || ch === SOFT_HYPHEN || (justified && ch === ' ')) { cur = null; last = null; continue; }
           const r = document.createRange();
-          r.setStart(node, i); r.setEnd(node, i + 1);
+          r.setStart(node, i); r.setEnd(node, j);
           const q = r.getClientRects()[0];
           if (!q) continue;
           const sameLine = p => p && Math.abs(q.top + q.height / 2 - (p.top + p.height / 2)) < Math.min(q.height, p.height) / 2;
-          if (cur && sameLine(cur)) { cur.i1 = i + 1; continue; }
+          if (cur && sameLine(cur)) { cur.i1 = j; continue; }
           if (docX(q.left) > clipRight) { cur = null; continue; }
           // a new piece: chained to the one before it while they share a line
-          cur = { node, lf, i0: i, i1: i + 1, top: q.top, height: q.height, left: q.left, a, stored, sizePt, pa,
+          cur = { node, lf, i0: i, i1: j, top: q.top, height: q.height, left: q.left, a, stored, sizePt, pa,
             chain: !!(last && sameLine(last) && !drop && !last.drop), drop: !!drop };
           pieces.push(cur);
           last = cur;
@@ -584,11 +592,12 @@
       for (const lf of pe.querySelectorAll('.tt-leaf')) {
         const node = lf.firstChild;
         if (!node || node.nodeType !== 3) continue;
-        for (let i = 0; i < node.length; i++) {
-          const ch = node.data[i];
+        const starts = SC.charStarts(node.data);   // whole characters: an emoji is one
+        for (let n = 0; n < starts.length; n++) {
+          const i = starts[n], ch = node.data.slice(i, starts[n + 1] ?? node.length);
           if (ch === '\n') { prev = null; continue; }
           const r = document.createRange();
-          r.setStart(node, i); r.setEnd(node, i + 1);
+          r.setStart(node, i); r.setEnd(node, i + ch.length);
           const q = r.getClientRects()[0];
           if (!q) continue;
           const lineStart = !prev || Math.abs(q.top + q.height / 2 - (prev.top + prev.height / 2)) >= Math.min(q.height, prev.height) / 2;

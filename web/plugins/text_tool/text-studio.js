@@ -130,6 +130,12 @@
     if (sizePt > 0) newText.sizePt = Math.round(sizePt * 100) / 100;
     if (!target()) sync();
   }
+  // The user's own choice: through the font catalogue (fonts.js ranks the
+  // claims), so a face a plugin detects afterwards does not undo it.
+  function chooseNewText(fontFamily, sizePt) {
+    if (typeof window.FontCatalog?.select === 'function') window.FontCatalog.select(fontFamily, sizePt);
+    else setNewText(fontFamily, sizePt);
+  }
 
   function states(t) {
     if (!t) return { char: { attrs: SC.charOf(newText), mixed: [] }, para: { attrs: SC.paraOf({}), mixed: [] }, frame: { attrs: SC.frameOf({}), mixed: [] } };
@@ -664,7 +670,7 @@
     const t = target();
     if (!t) {
       // nothing selected: the font and size new text takes
-      if (scopeKey === 'char' && ('fontFamily' in patch || 'sizePt' in patch)) setNewText(patch.fontFamily, patch.sizePt);
+      if (scopeKey === 'char' && ('fontFamily' in patch || 'sizePt' in patch)) chooseNewText(patch.fontFamily, patch.sizePt);
       return;
     }
     if (!t.story) {
@@ -778,7 +784,7 @@
   // Size steps: Affinity steps each run's own size by a point
   function stepSize(by) {
     const t = target();
-    if (!t) { setNewText(null, SC.stepSize(newText, by).sizePt); return; }
+    if (!t) { chooseNewText(null, SC.stepSize(newText, by).sizePt); return; }
     if (t.story) { window.storyMapChar?.(t.box, a => SC.stepSize(a, by)); return; }
     window.utbPlainChar?.apply(t.box, SC.stepSize({ sizePt: t.box.sizePt }, by), `size:${t.box.id}`);
   }

@@ -492,13 +492,31 @@
     }
     // title case: every word capitalised but the small ones inside a sentence
     const s = lower.join('');
+    // a match's index counts UTF-16 units, `lower` code points: an emoji
+    // before a word is two of one and one of the other
+    const at = [];
+    lower.forEach((c, i) => { for (let k = 0; k < c.length; k++) at.push(i); });
     const words = [...s.matchAll(/[\p{L}\p{N}'’]+/gu)];
     const out = lower.slice();
     words.forEach((w, i) => {
       const firstOrLast = i === 0 || i === words.length - 1 || /[.!?:]\s*$/.test(s.slice(0, w.index));
-      if (firstOrLast || !TITLE_SMALL.has(w[0])) out[w.index] = one(out[w.index], true);
+      if (firstOrLast || !TITLE_SMALL.has(w[0])) out[at[w.index]] = one(out[at[w.index]], true);
     });
     return out.join('');
+  }
+
+  // Where the characters of a text start (UTF-16 offsets, the first 0): whole
+  // graphemes where the runtime segments them (an emoji, a letter and its
+  // accents — what the editor's caret steps over), else code points. A drop
+  // cap, a nudge or a character's box never cuts one in two.
+  let graphemes = null;
+  function charStarts(text) {
+    const out = [];
+    if (graphemes === null)
+      graphemes = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : false;
+    if (graphemes) for (const seg of graphemes.segment(text)) out.push(seg.index);
+    else for (let i = 0; i < text.length; i += text.codePointAt(i) > 0xFFFF ? 2 : 1) out.push(i);
+    return out;
   }
   function changeCase(story, range, mode) {
     const s = clone(story);
@@ -900,7 +918,9 @@
       css['paint-order'] = 'stroke fill';
     }
     if (a.highlight) { css['background-color'] = a.highlight; css['box-decoration-break'] = 'clone'; }
-    if (a.noBreak) css['white-space'] = 'nowrap';
+    // not broken across lines, its spaces kept as typed ('nowrap' would
+    // collapse a run of them into one)
+    if (a.noBreak) css['white-space'] = 'pre';
     if (a.leadingOverride != null) css['line-height'] = px(a.leadingOverride * ctx.pxPerPt);
     return css;
   }
@@ -977,7 +997,7 @@
     fromText, toText, paraText, paraLength, clone, normalize,
     cmp, ordered, collapsed, startPos, endPos, whole, clampPos, isWhole,
     runAttrsAt, charSummary, paraSummary, applyChar, mapChar, togglePatch, stepSize, applyPara,
-    deleteRange, insertText, replaceRange, slice, wordAt, listMarkers, changeCase, caseMapped,
+    deleteRange, insertText, replaceRange, slice, wordAt, listMarkers, changeCase, caseMapped, charStarts,
     scaledMetrics, leadingPx, leadingPerRun, naturalLeading, firstBaselinePx,
     lineWords, TAB_GAP, lineTabGaps, lineTabs, WORD_FIT, lineSpace, PEN_STEP, wordSpacingFor,
     capsPlan, featureSettings, runCSS, strikeCSS, paraCSS, styleText,

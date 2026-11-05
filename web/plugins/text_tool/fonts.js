@@ -76,13 +76,14 @@
   // names) and 'layer' (the text layer's most used face), which are what a
   // producer wrote, not what the page shows; a weaker claim arriving after a
   // stronger one is ignored, so the reader's face is not undone by the
-  // layer's spans landing later. Unranked calls (the user's own choice) win.
+  // layer's spans landing later. Unranked calls (the user's own choice) win,
+  // and hold: no claim after one changes what the user chose.
   const RANK = { layer: 1, declared: 1, detected: 2 };
   let chosen = 0;
   function select(family, sizePt, source) {
     const rank = source ? (RANK[source] || 1) : 3;
     if (rank < chosen) return false;
-    if (source) chosen = rank;
+    chosen = rank;
     const sel = document.getElementById('fabric-font-family');
     if (sel && family && !Array.from(sel.options).some(o => o.value === family)) {
       const opt = document.createElement('option');

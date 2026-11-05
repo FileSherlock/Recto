@@ -63,7 +63,9 @@ text through attributes Affinity already has:
   [The Text panel](text-tool.md#space-width-nudge).
 - **Space widths** (`toggle-space-labels`, in the panel's Display section) badges every run of
   spaces inside a line with its width.
-- **Nudge characters** (`fabric-nudge-mode`) puts a hit area on every character; a character's x
+- **Nudge characters** (`fabric-nudge-mode`) puts a hit area on every character (a whole
+  character: an emoji or a letter with its accents is one — `StoryCore.charStarts`, which drop
+  caps count by too); a character's x
   nudge is the **manual kerning** of the pair it closes (Kerning ▸ Manual on the character before
   it), so it moves that character and the rest of its line. The story's first character moves the
   whole text; the first character of another line has nothing to kern against and has no hit area.
@@ -132,7 +134,7 @@ em, as Affinity's panel shows them.
 | Shear | `shear` | Slants each glyph about its baseline (±85°) |
 | Horizontal / Vertical Scale | `scaleX`, `scaleY` | Each word scaled about its baseline; horizontal scale takes its scaled width |
 | Super/Subscript | `position` | Affinity's synthesis for every font: **58.3 %** of the size, the baseline **33.3 %** of the size up / down |
-| No break | `noBreak` | The run is not broken across lines |
+| No break | `noBreak` | The run is not broken across lines; its spaces stay as typed |
 | Underline, Strikethrough: No / Single / Double, colour | `underline`, `underlineColor`, `strike`, `strikeColor` | Position and thickness from the font as Affinity reads them: the underline from `post` (fallback 0.1 em below, 0.05 em thick), the strikeout from `OS/2`. A colour of None is the text's |
 | Outline Stroke, colour | `strokeWidth`, `strokeColor` | Drawn behind the fill |
 | Language | `lang` | Hyphenation and language-specific glyphs (`locl`) |

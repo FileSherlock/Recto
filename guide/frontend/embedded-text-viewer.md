@@ -42,6 +42,7 @@ Every piece of text is stored as a `UnifiedTextBox` instance inside the global `
   defaultSpaceWidth: bool,    // true = use native font spacing
   spaceWidth: float|null,     // manual override (applies when defaultSpaceWidth is false)
   nativeSpaceWidth: float|null, // cached HarfBuzz natural space advance
+  nativeSpaceKey: string|null,  // the font, style, size and kerning it was measured for
 
   // Per-character positioning (from PDF extraction or a plugin's measurement)
   baseCharPositions: [{c, x, w}]|null,

@@ -385,6 +385,18 @@ test('Change Case rewrites the text and keeps every run and offset', { skip }, (
   assert.equal(SC.toText(SC.changeCase(SC.fromText('straße'), null, 'upper')), 'STRAßE');   // the length holds
 });
 
+test('an emoji is one character: Title Case after it, where characters start, No break keeps spaces', { skip }, () => {
+  assert.equal(SC.caseMapped('😀 hello world', 'title'), '😀 Hello World');
+  assert.equal(SC.caseMapped('𝐀 b 😀😀 the end', 'title'), '𝐀 B 😀😀 the End');
+  assert.deepEqual(SC.charStarts('a😀b'), [0, 1, 3]);
+  assert.deepEqual(SC.charStarts('😀'), [0]);
+  assert.deepEqual(SC.charStarts(''), []);
+  // a letter and its combining accent are one character (graphemes)
+  assert.deepEqual(SC.charStarts('éx'), [0, 2]);
+  // No break keeps a run of spaces as typed ('nowrap' collapses them)
+  assert.equal(SC.runCSS(SC.charOf({ noBreak: true }), SC.paraOf({}), SC.scaledMetrics({}, 16), { pxPerPt: 4 / 3 })['white-space'], 'pre');
+});
+
 test('shaping.js: the face metrics of Times New Roman and Calibri', { skip }, async () => {
   const hb = await import('../web/vendor/harfbuzz/index.mjs');
   await import('../web/plugins/text_tool/shaping.js');

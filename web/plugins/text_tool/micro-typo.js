@@ -201,7 +201,8 @@
 
   function showStoryPopover(box, p, o, anchorEl) {
     const SC = globalThis.StoryCore;
-    const ch = SC.paraText(box.story.paragraphs[p])[o] || '?';
+    const text = SC.paraText(box.story.paragraphs[p]);
+    const ch = text.slice(o, SC.charStarts(text).find(s => s > o) ?? text.length) || '?';   // the whole character
     const x0 = box.x;                      // the first character moves the text from here
     openPopover(anchorEl, ch, storyNudgeOf(box, p, o), delta => applyStoryNudge(box, p, o, delta, x0));
   }
@@ -214,7 +215,9 @@
     } else {
       const a = SC.charOf(SC.runAttrsAt(box.story.paragraphs[p], o));
       const kern = Math.abs(delta) < 0.01 ? 0 : delta / (a.sizePt * GEO.docPxPerPt()) * 1000;
-      box.story = SC.applyChar(box.story, { start: { p, o: o - 1 }, end: { p, o } }, { manualKern: kern });
+      // the kern after the character before: all of it (an emoji is two units)
+      const before = SC.charStarts(SC.paraText(box.story.paragraphs[p])).filter(s => s < o).pop() ?? o - 1;
+      box.story = SC.applyChar(box.story, { start: { p, o: before }, end: { p, o } }, { manualKern: kern });
       window.storySync?.(box);
     }
     renderBox(box);

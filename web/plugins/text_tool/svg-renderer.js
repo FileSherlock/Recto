@@ -112,6 +112,18 @@ function computeBaseline(box) {
 
 // ── Box rendering ─────────────────────────────────────────────
 
+// Each text layer's groups by box id. renderBox makes every group, so the map
+// is complete and a box finds its group at once: a querySelector over the
+// layer made hydrating a page of 20,000 words quadratic (4.5 s of 5.2). A
+// group removed since (a box deleted) no longer has the layer for parent.
+const _layerGroups = new WeakMap();   // svg → Map(String(box id) → <g>)
+
+function _groupsOf(svg) {
+  let groups = _layerGroups.get(svg);
+  if (!groups) _layerGroups.set(svg, groups = new Map());
+  return groups;
+}
+
 /**
  * Create or update the SVG group and text element for a single box.
  * Call this whenever box data changes (position, text, font, charAdvances…).
@@ -123,13 +135,16 @@ function renderBox(box) {
   const svg = getOrCreateSVGLayer(pageContainer, box.page);
 
   // Find or create the <g> group for this box
-  let g = svg.querySelector(`[data-id="${box.id}"]`);
+  const groups = _groupsOf(svg);
+  let g = groups.get(String(box.id));
+  if (g && g.parentNode !== svg) g = null;
   if (!g) {
     g = document.createElementNS(SVG_NS, 'g');
     g.dataset.id = box.id;
     g.dataset.type = box.type;
     g.classList.add('utb-group');
     svg.appendChild(g);
+    groups.set(String(box.id), g);
   }
   g.dataset.type = box.type;
 
@@ -248,11 +263,10 @@ function _updateText(g, box) {
   // inside computeXPositions() above.
   if (xs.length === 1 && box.spaceWidth != null && !box.defaultSpaceWidth) {
     // word-spacing is additive: it adds to the default space advance.
-    // If nativeSpaceWidth is cached, compute the delta; otherwise use
-    // spaceWidth directly as an approximation.
-    const delta = box.nativeSpaceWidth != null
-      ? (box.spaceWidth - box.nativeSpaceWidth)
-      : box.spaceWidth;
+    // While the face's own space is known for the box as it is now, compute
+    // the delta; until it is measured, spaceWidth stands in.
+    const native = utbNativeSpace(box);
+    const delta = native != null ? (box.spaceWidth - native) : box.spaceWidth;
     text.setAttribute('word-spacing', `${delta}px`);
   } else {
     text.removeAttribute('word-spacing');
@@ -390,7 +404,8 @@ function utbBarGaps(box) {
   const spaceOf = b => {
     const ws = (b.baseCharPositions || []).filter(cp => cp.c === ' ' && cp.w > 0).map(cp => cp.w).sort((p, q) => p - q);
     if (ws.length) return ws[ws.length >> 1];
-    if (b.nativeSpaceWidth > 0) return b.nativeSpaceWidth;
+    const native = utbNativeSpace(b);
+    if (native > 0) return native;
     if (b.ocr?.spaceAdv > 0) return b.ocr.spaceAdv;
     return GEO.docPtToPx(b.sizePt || 12) * 0.25;
   };
@@ -470,7 +485,7 @@ function _updateSpaceLabels(g, box) {
         spX = textEl.getStartPositionOfChar(i).x;
         for (let k = i; k <= end; k++) {
           const measured = textEl.getSubStringLength(k, 1);
-          runW += hasSpaceOverride ? box.spaceWidth : (box.nativeSpaceWidth || measured || 0);
+          runW += hasSpaceOverride ? box.spaceWidth : (utbNativeSpace(box) || measured || 0);
         }
       } catch (e) {
         i = end + 1;
@@ -507,6 +522,28 @@ function _updateSpaceLabels(g, box) {
   }
 }
 
+/**
+ * The face's own space advance (px) as cached on the box — while it was
+ * measured for the box as it is now (font, style, size, kerning: toolbar.js
+ * nativeSpaceKey). A cache from before a change is stale: it is measured again
+ * and the box drawn again; null meanwhile, and when nothing is cached.
+ */
+const _nativeSpaceAsked = new WeakMap();   // box → the key a measurement was started for
+function utbNativeSpace(box) {
+  if (box.nativeSpaceWidth == null) return null;
+  const plain = window.utbPlainChar;
+  if (typeof plain?.nativeSpaceKey !== 'function') return box.nativeSpaceWidth;
+  const key = plain.nativeSpaceKey(box);
+  if (box.nativeSpaceKey === key) return box.nativeSpaceWidth;
+  if (_nativeSpaceAsked.get(box) !== key) {
+    _nativeSpaceAsked.set(box, key);
+    plain.measureNativeSpace(box)
+      .then(w => { if (w != null && box.nativeSpaceKey === key && utbState.getBox(box.id) === box) renderBox(box); })
+      .catch(() => { /* unmeasurable: stays null */ });
+  }
+  return null;
+}
+
 /** Resolve the font family string for SVG, accounting for renderFont override. */
 function _svgFontFamily(box) {
   if (box.renderFont) return `"etv_${box.renderFont}", ${box.fontFamily}`;
@@ -529,8 +566,11 @@ function renderTextLayer(pageContainer, pageNum) {
   // utbState.editingId / microTypoId still claim it is open. renderBox is safe
   // to run over a kept group: it only updates the text / bbox / handles.
   const keep = new Set([utbState.editingId, utbState.microTypoId].filter(Boolean));
+  const groups = _groupsOf(svg);
+  groups.clear();
   svg.querySelectorAll('.utb-group').forEach(g => {
     if (!keep.has(g.dataset.id)) g.remove();
+    else groups.set(g.dataset.id, g);
   });
 
   utbState.getPageBoxes(pageNum).forEach(box => renderBox(box));
@@ -549,7 +589,10 @@ function renderAllTextLayers() {
 
 /** Remove a single box's group from its SVG layer. */
 function removeBoxFromSVG(id) {
-  document.querySelectorAll(`.utb-group[data-id="${id}"]`).forEach(g => g.remove());
+  document.querySelectorAll(`.utb-group[data-id="${id}"]`).forEach(g => {
+    _layerGroups.get(g.parentNode)?.delete(String(id));
+    g.remove();
+  });
 }
 
 

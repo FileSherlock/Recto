@@ -86,7 +86,7 @@
       box.defaultSpaceWidth = true;
       box.spaceWidth = null;
     } else {
-      if (box.nativeSpaceWidth == null) box.nativeSpaceWidth = await fetchNaturalSpaceWidth(box);
+      if (box.nativeSpaceWidth == null || box.nativeSpaceKey !== nativeSpaceKey(box)) await measureNativeSpace(box);
       box.defaultSpaceWidth = false;
       box.spaceWidth = Math.max(0, +px);
     }
@@ -95,7 +95,8 @@
     remeasure(box);
   }
 
-  window.utbPlainChar = { attrs: plainAttrs, keys: Object.keys(PLAIN_WRITE), apply: applyPlain, setSpaceWidth };
+  window.utbPlainChar = { attrs: plainAttrs, keys: Object.keys(PLAIN_WRITE), apply: applyPlain, setSpaceWidth,
+    nativeSpaceKey, measureNativeSpace };
 
   // ── the face's own space ──────────────────────────────────────
 
@@ -106,11 +107,27 @@
    */
   const _naturalSpaceCache = new Map();
 
+  // What a face's space advance depends on: its cache key, and what a box's
+  // cached nativeSpaceWidth was measured for (box.nativeSpaceKey) — a box
+  // whose font, style, size or kerning changed since has to measure again.
+  function nativeSpaceKey(box) {
+    return `${box.fontFamily}|${box.bold ? 'b' : ''}${box.italic ? 'i' : ''}|${box.sizePt}|${box.kerning ? 1 : 0}|${GEO.docScale()}`;
+  }
+
+  // Measures the box's own space advance for what it is now and caches it on
+  // the box (px, or null when the face cannot be shaped).
+  async function measureNativeSpace(box) {
+    const key = nativeSpaceKey(box);
+    const w = await fetchNaturalSpaceWidth(box);
+    if (w != null && nativeSpaceKey(box) === key) { box.nativeSpaceWidth = w; box.nativeSpaceKey = key; }
+    return w;
+  }
+
   async function fetchNaturalSpaceWidth(box) {
     // HarfBuzz expects the size in POINTS — box.sizePt is already points.
     const size  = box.sizePt;
     const scale = GEO.docScale();  // px-per-pt × 100 for this document
-    const key = `${box.fontFamily}|${box.bold ? 'b' : ''}${box.italic ? 'i' : ''}|${size}|${box.kerning ? 1 : 0}|${scale}`;
+    const key = nativeSpaceKey(box);
     if (_naturalSpaceCache.has(key)) return _naturalSpaceCache.get(key);
     try {
       const data = await Shaping.widths({
