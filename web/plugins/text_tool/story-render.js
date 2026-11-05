@@ -942,10 +942,11 @@
   }
 
   document.fonts?.addEventListener?.('loadingdone', () => renderAllStories());
-  // the handles keep their size on screen
+  // the handles keep their size on screen — Frame and Artistic text alike
+  // (frameHandles draws both)
   window.PDFHooks?.on('zoom:changed', () => {
     const b = utbState.selectedId && utbState.getBox(utbState.selectedId);
-    if (b?.textMode === 'frame') window.renderBox?.(b);
+    if (b?.textMode) window.renderBox?.(b);
   });
 
   window.renderStoryBox = renderStoryBox;

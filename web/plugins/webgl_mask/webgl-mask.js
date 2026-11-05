@@ -94,8 +94,14 @@ async function buildPageMask(pageNum) {
 }
 
 async function initWebGLOverlay(canvas, pageNum) {
+  // This run's own entry. The page's overlay can be torn down while its mask
+  // is still being built (scrolled away), and a new run started when it comes
+  // back: a run that no longer finds its own entry stops, so two runs never
+  // set up the same canvas.
+  const run = { loading: true };
+  const mine = () => webglContexts.get(pageNum) === run;
   try {
-    webglContexts.set(pageNum, { loading: true });
+    webglContexts.set(pageNum, run);
 
     if (maskCacheHash !== state.docHash) {
       maskBlobCache.clear();
@@ -116,10 +122,11 @@ async function initWebGLOverlay(canvas, pageNum) {
       }
       blob = await buildPageMask(pageNum);
       if (state.docHash !== hash) {   // document changed mid-flight
-        webglContexts.delete(pageNum);
+        if (mine()) webglContexts.delete(pageNum);
         return;
       }
       maskBlobCache.set(pageNum, blob);
+      if (!mine()) return;            // torn down meanwhile: the mask is kept, a newer run (if any) draws it
     }
     if (!blob) {
       webglContexts.delete(pageNum);
@@ -134,7 +141,7 @@ async function initWebGLOverlay(canvas, pageNum) {
     img.onerror = () => URL.revokeObjectURL(maskURL);
     img.onload = () => {
       URL.revokeObjectURL(maskURL);
-      if (!webglContexts.has(pageNum)) return; // Was destroyed before load
+      if (!mine()) return; // torn down (or taken over by a newer run) before load
 
       const pageImg = document.getElementById(`page${pageNum}`);
       if (!pageImg) {
@@ -143,7 +150,7 @@ async function initWebGLOverlay(canvas, pageNum) {
       }
 
       const proceed = () => {
-        if (!webglContexts.has(pageNum)) return;
+        if (!mine()) return;
 
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
@@ -265,7 +272,7 @@ async function initWebGLOverlay(canvas, pageNum) {
   } catch (e) {
     console.error("Could not load mask", e);
     canvas.remove();
-    webglContexts.delete(pageNum);
+    if (mine()) webglContexts.delete(pageNum);
   }
 }
 

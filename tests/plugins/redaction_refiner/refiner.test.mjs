@@ -150,6 +150,19 @@ test('classifyToken: words, proper nouns, names, fragments', () => {
   state.namesData = [];
 });
 
+test('a list changed to one of the same size is read anew (namesVersion)', () => {
+  state.namesData = [{ first: ['Sarah'], last: ['Kellen'] }];
+  state.customCandidates = [];
+  state.namesVersion = 1;
+  assert.equal(R.classifyToken('KELLEN', 'right').reason, 'name');
+  state.namesData = [{ first: ['Sarah'], last: ['Maxwell'] }];      // one entry swapped for another
+  state.namesVersion = 2;
+  assert.equal(R.classifyToken('MAXWELL', 'right').reason, 'name');
+  assert.notEqual(R.classifyToken('KELLEN', 'right').reason, 'name');
+  state.namesData = [];
+  state.namesVersion = 3;
+});
+
 // ── Real page: embedded layer only (the "a" of "and" dropped) ──
 for (const [rowIdx, label] of [[1, 'item 3'], [0, 'item 2']]) {
   test(`fixture ${label}: fragment "nd" recovers the dropped "a"; bar = SARAH KELLEN`, async () => {
@@ -181,6 +194,30 @@ for (const [rowIdx, label] of [[1, 'item 3'], [0, 'item 2']]) {
     assert.ok(rendered.includes(box.id), 'redrawn');
   });
 }
+
+// ── A bar the user holds during a pass is refined once let go ──
+test('a bar selected during a pass is left alone, and refined once it is let go', async () => {
+  reset();
+  const bar = fixture.bars[1];
+  const spans = fixture.spans.filter((s) => s.text.includes('including') || s.text.startsWith('nd '));
+  const y = [...new Set(spans.map((s) => s.y))].sort((a, b) => a - b)[1];
+  const row = spans.filter((s) => s.y === y).map((s) => fromFixture(s, 'L1'));
+  const box = redaction(bar.x, bar.x1, row[0].y, row[0].h);
+  box.lineId = 'L1';
+  utbState.boxes.push(...row, box);
+  const before = [box.x, box.w], recalcs = widthsRecalcs;
+
+  utbState.selectedId = box.id;
+  await R.refineAllRedactions();
+  assert.deepEqual([box.x, box.w], before, 'held: not moved under the user');
+  await new Promise((r) => setTimeout(r, 900));
+  assert.deepEqual([box.x, box.w], before, 'still held: still not moved');
+
+  utbState.selectedId = null;
+  await new Promise((r) => setTimeout(r, 900));
+  near(box.w, NAME_W, 0.5, 'let go: refined to SARAH KELLEN');
+  assert.ok(widthsRecalcs > recalcs, 'and the widths measured again');
+});
 
 // ── OCR lands later and reads "and" in full: same edge, no drift ──
 test('OCR layer wins once present and converges on the same edge', async () => {

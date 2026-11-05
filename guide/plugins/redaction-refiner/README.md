@@ -130,7 +130,8 @@ the right):
   redrawn **one space-width in** from where the neighbour begins. A token is a
   whole word when it is in the shipped English list (`words.txt`, possessives and
   hyphen compounds included), **or** a name from the candidate pool
-  (`state.namesData` / custom names, read through a guarded global), **or**
+  (`state.namesData` / custom names, read through a guarded global, and read
+  again whenever `state.namesVersion` moves — a list changed), **or**
   capitalised (`Wexner` — a proper noun the list cannot know).
 - **A word fragment** — not a word, but a dictionary word *completes* it. This is
   the `including ███ nd GHISLAINE MAXWELL` case: the redaction tool dropped the
@@ -217,7 +218,10 @@ itself needs neither the network sources nor Python. The licence notice is
   event, emitted by `embedded_text_viewer`'s `utbConnectRedactionsToLines` after
   it snaps redactions to lines. That single emission covers both the span-load
   path (per hydrated page) and the post-OCR path (`ocr_tool` calls the same
-  connect function when its run finishes).
+  connect function when its run finishes). A bar the user has selected, or is
+  editing, while a pass runs is left alone then and refined once it is let go
+  (looked at every 400 ms while such a bar waits), with the widths measured
+  again; another document drops the waiting bars.
 - **Emits `redaction:refined`** after judging a bar:
   `{ boxId, source, changed, remnants: [{ text, side }] }`. Generic — it names
   no consumer; `redaction_matching` listens and turns the remnants into that

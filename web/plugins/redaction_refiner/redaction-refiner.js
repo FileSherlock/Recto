@@ -319,7 +319,9 @@
     if (typeof state === 'undefined' || !state) return false;
     const data = Array.isArray(state.namesData) ? state.namesData : [];
     const customs = Array.isArray(state.customCandidates) ? state.customCandidates : [];
-    const key = `${data.length}|${customs.length}`;
+    // namesVersion moves on every change of a list (a name swapped for another
+    // leaves the counts as they were); the counts serve without it
+    const key = `${state.namesVersion ?? ''}|${data.length}|${customs.length}`;
     if (!_namePool || key !== _namePoolKey) {
       _namePool = new Set();
       const add = (s) => {
@@ -825,11 +827,13 @@
     const boxes = utbState.boxes.filter((b) => b.type === 'redaction')
       .sort((a, b) => a.page - b.page || a.y - b.y || a.x - b.x);
     let changed = false;
+    const held = new Set();
     for (let pass = 0; pass < MAX_REFINE_PASSES; pass++) {
       let moved = false;
       for (const box of boxes) {
-        // Don't fight a box the user is actively editing/selecting.
-        if (utbState.selectedId === box.id || utbState.editingId === box.id) continue;
+        // Don't fight a box the user is actively editing/selecting: it is
+        // refined once it is let go (refineWhenReleased).
+        if (utbState.selectedId === box.id || utbState.editingId === box.id) { held.add(box.id); continue; }
         try {
           if (await refineRedaction(box, opts)) moved = true;
         } catch (e) {
@@ -841,12 +845,46 @@
     }
     // Widths depend on box.w — recompute matches for the redrawn bars.
     if (changed && !opts.skipWidths && typeof calculateAllWidths === 'function') calculateAllWidths();
+    if (held.size) refineWhenReleased(held);
+  }
+
+  // Bars a pass left alone because the user had one selected or was editing
+  // it: each is refined, and the widths measured again, once it is no longer
+  // held — looked at every 400 ms while any bar waits, never otherwise (the
+  // text tool announces no selection change).
+  const waiting = new Set();
+  let waitTimer = null;
+  function refineWhenReleased(ids) {
+    for (const id of ids) waiting.add(id);
+    if (waitTimer || !waiting.size) return;
+    waitTimer = setInterval(async () => {
+      const free = [...waiting].filter((id) => utbState.selectedId !== id && utbState.editingId !== id);
+      if (!free.length) return;
+      for (const id of free) waiting.delete(id);
+      if (!waiting.size) { clearInterval(waitTimer); waitTimer = null; }
+      let changed = false;
+      for (const id of free) {
+        const box = utbState.getBox(id);
+        if (!box || box.type !== 'redaction') continue;   // deleted meanwhile
+        try {
+          if (await refineRedaction(box)) changed = true;
+        } catch (e) {
+          console.warn('[redaction_refiner] refine failed for', id, e);
+        }
+      }
+      if (changed && typeof calculateAllWidths === 'function') calculateAllWidths();
+    }, 400);
   }
 
   // Run whenever redactions have just been (re)connected to their text lines —
   // this fires on the span-load path (per hydrated page) and after an OCR pass.
   if (window.PDFHooks) {
     PDFHooks.on('redactions:connected', () => refineAllRedactions({ skipWidths: true }));
+    // another document: the bars still waiting were the old one's (ids repeat)
+    PDFHooks.on('document:opening', () => {
+      waiting.clear();
+      if (waitTimer) { clearInterval(waitTimer); waitTimer = null; }
+    });
   }
 
   // Guarded globals for manual re-runs / tooling.
