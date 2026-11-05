@@ -776,9 +776,9 @@
   // Size steps: Affinity steps each run's own size by a point
   function stepSize(by) {
     const t = target();
-    if (!t) { setNewText(null, Math.max(1, newText.sizePt + by)); return; }
-    if (t.story) { window.storyMapChar?.(t.box, a => ({ sizePt: Math.max(1, Math.round((a.sizePt + by) * 100) / 100) })); return; }
-    window.utbPlainChar?.apply(t.box, { sizePt: Math.max(1, Math.round((t.box.sizePt + by) * 100) / 100) }, `size:${t.box.id}`);
+    if (!t) { setNewText(null, SC.stepSize(newText, by).sizePt); return; }
+    if (t.story) { window.storyMapChar?.(t.box, a => SC.stepSize(a, by)); return; }
+    window.utbPlainChar?.apply(t.box, SC.stepSize({ sizePt: t.box.sizePt }, by), `size:${t.box.id}`);
   }
   $('tt-size-up')?.addEventListener('click', () => stepSize(1));
   $('tt-size-down')?.addEventListener('click', () => stepSize(-1));

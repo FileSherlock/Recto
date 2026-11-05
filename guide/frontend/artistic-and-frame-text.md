@@ -83,8 +83,8 @@ shows it.
 | Enter | New paragraph (it takes the current paragraph's attributes) |
 | Shift+Enter | Line break inside the paragraph |
 | Tab | A tab (to the next tab stop) |
-| Ctrl+B / Ctrl+I / Ctrl+U | Bold / Italic / Underline — on unless all of the selection already has it |
-| Ctrl+Shift+> / Ctrl+Shift+< | Every character one point larger / smaller |
+| Ctrl+B / Ctrl+I / Ctrl+U | Bold / Italic / Underline — on unless all of the selection already has it (a selection that is partly bold turns all bold) |
+| Ctrl+Shift+> / Ctrl+Shift+< | Every character one point larger / smaller than its own size (24 and 12 pt become 25 and 13) |
 | Ctrl+Shift+- | Discretionary (soft) hyphen |
 | Ctrl+Z / Ctrl+Y | Undo / redo inside the session; leaving it records the session as one step on the box undo stack. The tool column's **Undo** / **Redo** and the Text panel's **Delete** leave the text first: Undo takes the whole session back, Delete records it, then the delete |
 | Ctrl+C / Ctrl+X / Ctrl+V | Plain text; a pasted line feed starts a paragraph |
@@ -216,7 +216,7 @@ alternates, ordinals, fractions, superior and inferior figures, all caps, small 
 - **The model** — `story-core.js` (`StoryCore`, no DOM, tested under node): attributes stored as
   overrides of Affinity's defaults, positions `{ p, o }` (paragraph, UTF-16 offset), edits
   (`insertText`, `deleteRange`, `replaceRange`, `applyChar`, `mapChar`, `applyPara`,
-  `changeCase`), list markers, and the mapping of attributes to CSS (`runCSS`, `paraCSS`), of
+  `changeCase`; `togglePatch` and `stepSize`, what B I U S and the size steps set), list markers, and the mapping of attributes to CSS (`runCSS`, `paraCSS`), of
   face metrics to Affinity's numbers (`scaledMetrics`, `leadingPx`, `firstBaselinePx`,
   `capsPlan`) and of a page line's measured characters to the space it was set with and where
   it goes on after a tab (`lineWords`, `lineTabGaps`, `lineTabs`, `lineSpace`, `wordSpacingFor`).

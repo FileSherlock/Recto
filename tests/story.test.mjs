@@ -65,6 +65,27 @@ test('the attributes over a range, with the keys that are mixed in it', { skip }
   assert.equal(SC.charSummary(s, range(pos(0, 0), pos(0, 0))).attrs.bold, true);
 });
 
+test('B I U S turn on unless all of the text has them; a size step steps every run its own', { skip }, () => {
+  const s = SC.applyChar(SC.fromText('abcd'), range(pos(0, 0), pos(0, 2)), { bold: true, underline: 'double', sizePt: 24 });
+  const all = range(pos(0, 0), pos(0, 4)), ab = range(pos(0, 0), pos(0, 2)), cd = range(pos(0, 2), pos(0, 4));
+  // Ctrl+B on "**ab**cd": the first run is bold, but not all of it is — on
+  assert.deepEqual(SC.togglePatch(SC.charSummary(s, all), 'bold'), { bold: true });
+  assert.deepEqual(SC.togglePatch(SC.charSummary(s, ab), 'bold'), { bold: false });
+  assert.deepEqual(SC.togglePatch(SC.charSummary(s, cd), 'italic'), { italic: true });
+  // a line of any style is a line: double turns off; mixed turns a single one on
+  assert.deepEqual(SC.togglePatch(SC.charSummary(s, ab), 'underline'), { underline: 'none' });
+  assert.deepEqual(SC.togglePatch(SC.charSummary(s, all), 'underline'), { underline: 'single' });
+  assert.deepEqual(SC.togglePatch(SC.charSummary(s, all), 'strike'), { strike: 'single' });
+  // at a caret, the attributes of what is typed next
+  assert.deepEqual(SC.togglePatch(SC.charSummary(s, range(pos(0, 2), pos(0, 2))), 'bold'), { bold: false });
+  // Ctrl+Shift+> on 24 pt "ab" and 12 pt "cd": 25 and 13, not one size for all
+  const up = SC.mapChar(s, all, a => SC.stepSize(a, 1));
+  assert.deepEqual(up.paragraphs[0].runs.map(r => [r.text, SC.charOf(r.attrs).sizePt]), [['ab', 25], ['cd', 13]]);
+  assert.deepEqual(SC.stepSize({ sizePt: 1.5 }, -1), { sizePt: 1 });          // never below 1 pt
+  assert.deepEqual(SC.stepSize({ sizePt: 10.333 }, 1), { sizePt: 11.33 });
+  assert.deepEqual(SC.stepSize({}, -1), { sizePt: 11 });                      // the default size's step
+});
+
 test('deleting across paragraphs joins them under the first one\'s attributes', { skip }, () => {
   let s = SC.fromText('first\nsecond\nthird');
   s = SC.applyPara(s, range(pos(0, 0), pos(0, 0)), { align: 'center' });

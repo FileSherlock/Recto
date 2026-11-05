@@ -253,15 +253,11 @@
   }
 
   // Bold / Italic / Underline / Strikethrough flip as Affinity flips them:
-  // on, unless all of the selection already has it.
+  // on, unless all of the selection already has it (at a caret: what is
+  // typed next).
   function toggle(key) {
     if (!session) return;
-    const r = SC.ordered(session.sel);
-    const eff = { ...SC.charSummary(session.box.story, r).attrs, ...(session.pending || {}) };
-    const patch = key === 'underline' ? { underline: eff.underline === 'none' ? 'single' : 'none' }
-      : key === 'strike' ? { strike: eff.strike === 'none' ? 'single' : 'none' }
-      : { [key]: !eff[key] };
-    applyCharToSession(patch);
+    applyCharToSession(SC.togglePatch(storyCharState(session.box), key));
   }
 
   function applyCharToSession(patch) {
@@ -291,12 +287,12 @@
       e.preventDefault();
       replace(readSelection() || session.sel, String.fromCharCode(0xAD), 'type');
     } else if (mod && e.shiftKey && (e.key === '>' || e.key === '<' || e.code === 'Period' || e.code === 'Comma')) {
-      // Affinity: Ctrl+Shift+> / < make the text larger / smaller
+      // Affinity: Ctrl+Shift+> / < make the text larger / smaller — every
+      // run of the selection by a point of its own size
       e.preventDefault();
       session.sel = readSelection() || session.sel;
-      const up = e.key === '>' || e.code === 'Period';
-      const size = SC.charSummary(session.box.story, session.sel).attrs.sizePt;
-      applyCharToSession({ sizePt: Math.max(1, Math.round((size + (up ? 1 : -1)) * 100) / 100) });
+      const by = e.key === '>' || e.code === 'Period' ? 1 : -1;
+      storyMapChar(session.box, a => SC.stepSize(a, by));
     }
     e.stopPropagation();   // typing is the editor's, not the app's hotkeys
   }
