@@ -46,7 +46,11 @@
     entries.length = index;                        // a new action drops the redo branch
     const top = entries[index - 1];
     if (entry.key && top && top.key === entry.key && top.after) {
-      top.after = entry.after;                     // the same action again: one step
+      // the same action again: one step — every box either touched, each as
+      // it was before the first and as it is after the last (a drag sideways
+      // moves one piece of a line, the next one down the whole line)
+      for (const [id, snap] of Object.entries(entry.before)) if (!(id in top.before)) top.before[id] = snap;
+      Object.assign(top.after, entry.after);
       if (same(top.before, top.after)) { entries.pop(); index--; }   // …that ended where it began
       notify();
       return;
