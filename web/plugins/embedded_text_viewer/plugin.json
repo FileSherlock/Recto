@@ -1,9 +1,7 @@
 {
   "name": "embedded_text_viewer",
   "order": 10,
-  "styles": [
-    "styles.css"
-  ],
+  "styles": [],
   "toolbar_button": "toolbar_button.html",
   "options_bar": null,
   "ribbon_bar": null,
