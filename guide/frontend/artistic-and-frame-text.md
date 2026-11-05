@@ -24,8 +24,9 @@ own paragraph attributes.
 
 Both Affinity tools stay armed, as Affinity's do, until clicked again or another placing tool
 is chosen. Armed, they take only presses on the page: what sits over it — the ruler's marker, a
-nudge's slider, a control a plugin puts there — is used as it is without a tool. **Escape** leaves the text being edited (the box stays selected), then deselects,
-and with nothing selected puts the tool down.
+nudge's slider, a control a plugin puts there — is used as it is without a tool. **Escape**
+leaves the text being edited (the box stays selected), then deselects, and with nothing
+selected puts the tool down.
 
 A frame **reflows** when its eight handles resize it. Text that does not fit shows Affinity's
 red **overflow marker** at the frame's bottom right.
@@ -216,10 +217,11 @@ alternates, ordinals, fractions, superior and inferior figures, all caps, small 
 - **The model** — `story-core.js` (`StoryCore`, no DOM, tested under node): attributes stored as
   overrides of Affinity's defaults, positions `{ p, o }` (paragraph, UTF-16 offset), edits
   (`insertText`, `deleteRange`, `replaceRange`, `applyChar`, `mapChar`, `applyPara`,
-  `changeCase`; `togglePatch` and `stepSize`, what B I U S and the size steps set), list markers, and the mapping of attributes to CSS (`runCSS`, `paraCSS`), of
-  face metrics to Affinity's numbers (`scaledMetrics`, `leadingPx`, `firstBaselinePx`,
-  `capsPlan`) and of a page line's measured characters to the space it was set with and where
-  it goes on after a tab (`lineWords`, `lineTabGaps`, `lineTabs`, `lineSpace`, `wordSpacingFor`).
+  `changeCase`; `togglePatch` and `stepSize`, what B I U S and the size steps set), list
+  markers, and the mapping of attributes to CSS (`runCSS`, `paraCSS`), of face metrics to
+  Affinity's numbers (`scaledMetrics`, `leadingPx`, `firstBaselinePx`, `capsPlan`) and of a page
+  line's measured characters to the space it was set with and where it goes on after a tab
+  (`lineWords`, `lineTabGaps`, `lineTabs`, `lineSpace`, `wordSpacingFor`).
 - **The face metrics** — `Shaping.faceMetrics` reads the tables Affinity sets text with
   (`hhea`, `post`, `OS/2`), the outlines of H, x, l and q, and the font's OpenType feature
   list, through the same HarfBuzz build that measures widths.

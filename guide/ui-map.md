@@ -82,9 +82,10 @@ says what it acts on — the selected text, all of a box's text, a line read fro
 text; `utb-delete-box` beside it deletes the selected box (also Delete / Backspace outside a
 field). While a text is edited the keyboard stays with it: the panel's buttons never take the
 focus, its menus, checkboxes and colours give it back after a change, its fields at Enter
-(`storyFocus`, `text_tool/story-edit.js`); Escape here leaves the text. Controls are bound by their `data-k` (`char:` / `para:` / `frame:` + a StoryCore
-attribute). A setting the selection or the drawing cannot have is greyed with a lock (`.tt-lock`,
-the reason on hover); a tab locked as a whole says why at its top (`.tt-pane-lock`). Described in
+(`storyFocus`, `text_tool/story-edit.js`); Escape here leaves the text. Controls are bound by
+their `data-k` (`char:` / `para:` / `frame:` + a StoryCore attribute). A setting the selection or
+the drawing cannot have is greyed with a lock (`.tt-lock`, the reason on hover); a tab locked as
+a whole says why at its top (`.tt-pane-lock`). Described in
 [The Text panel](frontend/text-tool.md) and [Artistic and Frame Text](frontend/artistic-and-frame-text.md).
 
 | Tab / section | Controls (id) |
