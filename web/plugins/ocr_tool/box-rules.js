@@ -54,10 +54,14 @@
   const NARROW_PX = 40;        // under the engine's long-run rule: a stack-born box
   const NARROW_TALL = 1.6;     // such a box taller than this many lines is no bar
 
-  // the black fraction of a box's interior; 1 for a box too thin to have one
+  // the black fraction of a box's interior — its pixels less a one-pixel
+  // border; the engine's boxes are half-open, [x0, x1) × [y0, y1) — and 1 for
+  // a box too thin to have one. (Read as inclusive, the soft last column and
+  // row counted as interior: a 20-px bar with soft right and bottom edges
+  // scored 0.894 and was dropped, mirrored it scored 1.)
   function blackness(page, ob) {
-    const x0 = Math.max(0, ob.x0 + 1), x1 = Math.min(page.w - 1, ob.x1 - 1);
-    const y0 = Math.max(0, ob.y0 + 1), y1 = Math.min(page.h - 1, ob.y1 - 1);
+    const x0 = Math.max(0, ob.x0 + 1), x1 = Math.min(page.w - 1, ob.x1 - 2);
+    const y0 = Math.max(0, ob.y0 + 1), y1 = Math.min(page.h - 1, ob.y1 - 2);
     if (x1 < x0 || y1 < y0) return 1;
     let black = 0, n = 0;
     for (let y = y0; y <= y1; y++) {

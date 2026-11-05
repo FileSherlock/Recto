@@ -51,6 +51,10 @@ test('the startup document: a box per segment at the pens, the bars split the li
   const bars = boxes.filter(s => s.data.type === 'redaction');
   assert.equal(bars.length, 3);
   for (const s of bars) assert.deepEqual(s.ink, { x0: s.data.x, x1: s.data.x + s.data.w });
+  // a bar is exactly the reader's half-open box, [x0, x1) × [y0, y1)
+  const objs = data.pages[0].res.objects.filter(o => o.type === 'box');
+  for (const [i, s] of bars.entries())
+    assert.deepEqual([s.data.x, s.data.y, s.data.w, s.data.h], [objs[i].x0, objs[i].y0, objs[i].x1 - objs[i].x0, objs[i].y1 - objs[i].y0]);
 });
 
 test('every segment: one position per character, rising, the text its line\'s', { skip }, () => {

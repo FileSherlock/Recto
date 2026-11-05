@@ -337,11 +337,13 @@
 
     // detected redaction rectangles -> redaction boxes (the same kind the Add
     // Box tool creates; the matching suite picks them up when installed)
+    // (the engine's boxes are half-open, [x0, x1) × [y0, y1): x1 − x0 wide —
+    // a + 1 made every box and its ink a pixel too wide and tall)
     for (const ob of (res.objects || []).filter(o => o.type === 'box')) {
-      const x = ob.x0 * sx, w = (ob.x1 - ob.x0 + 1) * sx;
+      const x = ob.x0 * sx, w = (ob.x1 - ob.x0) * sx;
       boxes.push({ data: {
         type: 'redaction', page: pageNum, text: '',
-        x, y: ob.y0 * sy, w, h: (ob.y1 - ob.y0 + 1) * sy,
+        x, y: ob.y0 * sy, w, h: (ob.y1 - ob.y0) * sy,
       // the black ink's own extent (viewBox px), kept apart from x/w which a
       // refiner moves: the hidden text can start no earlier and end no later
       }, ink: { x0: x, x1: x + w } });

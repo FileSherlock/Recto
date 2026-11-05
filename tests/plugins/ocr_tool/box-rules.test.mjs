@@ -34,6 +34,12 @@ test('blackness: the interior one pixel in from every side', { skip }, () => {
   assert.equal(R.blackness(p, box(20, 20, 120, 22)), 1);                     // too thin to have an interior: the reader's word
   const holed = page(200, 200, [{ x0: 20, y0: 20, x1: 120, y1: 40 }, { x0: 60, y0: 25, x1: 80, y1: 35, v: 255 }]);
   assert.ok(R.blackness(holed, box(20, 20, 120, 40)) < 0.9);                 // a white hole: not a redaction
+  // the reader's boxes are half-open: a 20 × 12 bar whose last column and row are soft
+  // (the scan's resampled edge) is black inside, as it is mirrored (soft first column and row)
+  const soft = page(200, 200, [{ x0: 100, y0: 50, x1: 120, y1: 62 }, { x0: 119, y0: 50, x1: 120, y1: 62, v: 128 }, { x0: 100, y0: 61, x1: 120, y1: 62, v: 128 }]);
+  const mirrored = page(200, 200, [{ x0: 100, y0: 50, x1: 120, y1: 62 }, { x0: 100, y0: 50, x1: 101, y1: 62, v: 128 }, { x0: 100, y0: 50, x1: 120, y1: 51, v: 128 }]);
+  assert.equal(R.blackness(soft, box(100, 50, 120, 62)), 1);
+  assert.equal(R.blackness(mirrored, box(100, 50, 120, 62)), 1);
 });
 
 test('grid: distinct rows and their pitch, or nothing to trust', { skip }, () => {
