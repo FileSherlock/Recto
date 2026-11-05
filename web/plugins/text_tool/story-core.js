@@ -393,11 +393,16 @@
   // `by` points, never below 1 pt. → the patch, for mapChar
   const stepSize = (attrs, by) => ({ sizePt: Math.max(1, Math.round((charOf(attrs).sizePt + by) * 100) / 100) });
 
-  // Paragraph attributes onto every paragraph a range touches.
+  // Paragraph attributes onto every paragraph a range touches. A list's start
+  // number restarts the count at the first of them only — the rest go on
+  // counting from it (5, 6, 7), as a list started there does.
   function applyPara(story, range, patch) {
     const s = clone(story);
     const r = ordered(range || whole(s));
-    for (let p = r.start.p; p <= r.end.p; p++) s.paragraphs[p].attrs = { ...s.paragraphs[p].attrs, ...patch };
+    for (let p = r.start.p; p <= r.end.p; p++) {
+      const own = p > r.start.p && 'listStart' in patch ? { ...patch, listStart: 0 } : patch;
+      s.paragraphs[p].attrs = { ...s.paragraphs[p].attrs, ...own };
+    }
     return normalize(s);
   }
 
@@ -422,8 +427,10 @@
   }
 
   // Insert text at a position: '\n' starts a new paragraph (it takes the
-  // current one's attributes), U+2028 is a line break. `attrs` are the stored
-  // character attributes of the new text; null = the caret's. → { story, pos }
+  // current one's attributes — but a list's start number, which restarts the
+  // count, stays with the paragraph it was set on: the next item goes on
+  // counting), U+2028 is a line break. `attrs` are the stored character
+  // attributes of the new text; null = the caret's. → { story, pos }
   function insertText(story, pos, text, attrs = null) {
     const s = clone(story);
     const at = clampPos(s, pos);
@@ -434,8 +441,9 @@
     const tail = para.runs.splice(i);
     para.runs.push({ text: chunks[0], attrs: copy(a) });
     let p = at.p, o = at.o + chunks[0].length;
+    const { listStart, ...carried } = para.attrs;
     for (let k = 1; k < chunks.length; k++) {
-      s.paragraphs.splice(++p, 0, { attrs: copy(para.attrs), runs: [{ text: chunks[k], attrs: copy(a) }] });
+      s.paragraphs.splice(++p, 0, { attrs: copy(carried), runs: [{ text: chunks[k], attrs: copy(a) }] });
       o = chunks[k].length;
     }
     s.paragraphs[p].runs.push(...tail);

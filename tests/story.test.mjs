@@ -362,6 +362,19 @@ test('list types: zero-padded numbers', { skip }, () => {
   assert.deepEqual(SC.listMarkers(s), ['001.', '002.']);
 });
 
+test('a list started at 5 goes on 6, 7: Enter does not restart it, nor does a start set over several items', { skip }, () => {
+  const s = SC.applyPara(SC.fromText('first'), null, { list: 'decimal', listStart: 5 });
+  let r = SC.insertText(s, { p: 0, o: 5 }, '\n');
+  r = SC.insertText(r.story, r.pos, 'second');
+  r = SC.insertText(r.story, r.pos, '\nthird');
+  assert.deepEqual(SC.listMarkers(r.story), ['5.', '6.', '7.']);
+  assert.deepEqual(SC.listMarkers(SC.applyPara(SC.fromText('a\nb\nc'), null, { list: 'decimal', listStart: 5 })), ['5.', '6.', '7.']);
+  // a start set on a later item alone restarts there
+  const later = SC.applyPara(SC.applyPara(SC.fromText('a\nb\nc'), null, { list: 'decimal' }),
+    { start: { p: 2, o: 0 }, end: { p: 2, o: 0 } }, { listStart: 9 });
+  assert.deepEqual(SC.listMarkers(later), ['1.', '2.', '9.']);
+});
+
 test('Change Case rewrites the text and keeps every run and offset', { skip }, () => {
   let s = SC.applyChar(SC.fromText('the quick brown fox. it ran'), { start: { p: 0, o: 4 }, end: { p: 0, o: 9 } }, { bold: true });
   const up = SC.changeCase(s, null, 'upper');

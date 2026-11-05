@@ -772,6 +772,8 @@
     fo.setAttribute('x', box.x); fo.setAttribute('y', box.y);
     fo.setAttribute('width', W); fo.setAttribute('height', auto ? 8000 : H);
     root.style.cssText = `width:${W}px;height:${auto ? 'auto' : `${H}px`}`;
+    // the frame's own fill and outline (behind the text) cover the frame
+    if (shape?.isConnected) for (const [k, v] of [['x', box.x], ['y', box.y], ['width', W], ['height', H]]) shape.setAttribute(k, v);
     // a single column still has a gap: the column beyond it holds what overflows
     const colGap = cols > 1 ? gutter : 24;
     const flowCSS = (top, { show = false } = {}) => SC.styleText({
@@ -801,6 +803,7 @@
       box.h = h;
       root.style.height = `${h}px`;
       fo.setAttribute('height', h);
+      if (shape?.isConnected) shape.setAttribute('height', h);
       columnRules(g, box, frame, { insetL, insetT, H: h, insetB, cols, colW, gutter, ctx });
       g.classList.remove('tt-overflow');
       _overflowMarker(g, box, false);

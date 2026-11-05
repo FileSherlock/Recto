@@ -46,7 +46,9 @@
   const toolBtn = $('tt-studio-btn');
   const isOpen = () => !panel.classList.contains('hidden');
   function showTab(tab) {
-    if (!panel.querySelector(`.tt-tab-btn[data-tab="${tab}"]`)) tab = 'character';
+    // compared, not put into a selector: a stored value is anything (a quote
+    // in it once made querySelector throw and the panel never came up)
+    if (![...panel.querySelectorAll('.tt-tab-btn')].some(b => b.dataset.tab === tab)) tab = 'character';
     panel.querySelectorAll('.tt-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     panel.querySelectorAll('.tt-pane').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== tab));
     store.set('tab', tab);
