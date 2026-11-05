@@ -230,6 +230,13 @@ path comes back unchanged. The map doubles as a directory listing the page can c
 without a request: `window.RECTO_ASSETS['plugins/my_tool/data/x.json']` is `undefined` when
 the file does not exist.
 
+The page's content security policy (written by the build) holds a plugin to what the site
+promises — a document never leaves the browser: scripts, workers and `fetch` reach the site
+itself only (and `blob:` URLs); no inline `<script>`, no `onclick="…"` attribute (add the
+listener in your script), no `eval` or `new Function`. Inline `style` attributes and
+`<style>` elements are fine, and so are WebAssembly, `blob:` and `data:` images. What the
+policy refuses is logged as a console error — the smoke test fails on it.
+
 ### Two UI Patterns
 
 There are two distinct plugin UI patterns. Choose one based on what your tool needs:

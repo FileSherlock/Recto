@@ -44,7 +44,7 @@ and nowhere else. The build has no dependencies and takes well under a second.
 |------|--------|
 | 1 | Finds every folder under `web/plugins/` that holds a `plugin.json`, in `order` |
 | 2 | Inlines each plugin's HTML fragments, styles and scripts into `web/core/index.template.html` → `web/index.html` |
-| 3 | Appends `?v=<content hash>` to every local URL and writes the hash map the scripts use for the files they fetch themselves (`window.RECTO_ASSETS`, `assetURL()`) |
+| 3 | Appends `?v=<content hash>` to every local URL and writes the hash map the scripts use for the files they fetch themselves (`window.RECTO_ASSETS`, `assetURL()`), and the page's content security policy, which allows that map by its hash |
 | 4 | Writes `web/generated/plugins.json`, `fonts.json` (the catalogue plus which face files exist) and `default-document.json` (the startup document) |
 
 It stops with `build failed: …` and a non-zero exit status when a manifest is not valid
@@ -115,11 +115,16 @@ visit and compress well.
 
 ### 6. If you send a Content-Security-Policy
 
-Not required. If the host adds one, it has to allow what the page does: WebAssembly
+Not required: `index.html` carries its own, as a `<meta http-equiv>` the build writes (see
+the [API reference](../api-reference/api-reference.md#webindexhtml)) — the page runs the
+site's own files and nothing else. A policy the host adds as a header applies on top of it
+(a resource must pass both), so it has to allow what the page does: WebAssembly
 compilation (`'wasm-unsafe-eval'` in `script-src`), workers from the site itself and from a
 `blob:` URL (`worker-src 'self' blob:` — the hashing worker is created from a blob),
 `blob:` images (`img-src` — page rasters are blob URLs), the inline asset map in
-`index.html`, and the CDN origins the template names.
+`index.html` (its hash is in the page's own policy and changes with every build), and the
+Google Fonts origins the template names. Only a header can set `frame-ancestors`, which a
+`<meta>` policy ignores.
 
 ### Example: the rules in one place
 

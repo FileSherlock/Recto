@@ -334,7 +334,7 @@ worker, a data file — are not listed; they are fetched through
 - `styles`, `scripts_before_viewer` or `scripts_after_app` is not a list;
 - the manifest names a file that does not exist in the plugin's folder;
 - an HTML fragment contains a template tag (`{%` or `{{`) — fragments are inlined verbatim, nothing evaluates them;
-- the template lacks one of the `@plugins:*` markers or the `@assets` marker, or contains an unknown `@plugins:` marker.
+- the template lacks one of the `@plugins:*` markers, the `@assets` marker or the `@csp` marker, or contains an unknown `@plugins:` marker.
 
 A folder without a `plugin.json`, or one whose name starts with a dot, is not a plugin and is skipped.
 
@@ -354,6 +354,14 @@ scripts in the fixed order: `hooks.js` → `geometry.js` → `state.js` → `doc
 plugins' `scripts_before_viewer` → `pdf-viewer.js` → `ui-events.js` → `app.js` → plugins'
 `scripts_after_app`. Every local `src` / `href` gets `?v=<first 8 hex digits of the file's
 SHA-256>`, so any cache lifetime is safe: a changed file has a new URL.
+
+First in `<head>` (the `@csp` marker) is the page's content security policy, a
+`<meta http-equiv="Content-Security-Policy">` (`contentSecurityPolicy()` in the build):
+scripts, workers and fetches from the site itself only (`blob:` too, for page rasters, the
+hashing worker and a fetch of a page image), WebAssembly allowed (`'wasm-unsafe-eval'`), no
+inline script but the asset map — allowed by its SHA-256 — and no inline event handler,
+inline styles allowed, Google Fonts for the icon and UI fonts, no `<object>`, no form that
+sends anywhere. The browser refuses whatever else and logs it as a console error.
 
 ### `web/generated/plugins.json`
 

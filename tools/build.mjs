@@ -170,6 +170,23 @@ function assetMap(plugins) {
 
 const isLocal = url => !/^([a-z][a-z0-9+.-]*:|\/\/|\/|#)/i.test(url);
 
+// The policy for a page whose inline scripts are `inline` (their exact text).
+export function contentSecurityPolicy(inline = []) {
+  const hashes = inline.map(text => `'sha256-${createHash('sha256').update(text).digest('base64')}'`);
+  return [
+    "default-src 'self'",
+    ["script-src 'self' 'wasm-unsafe-eval'", ...hashes].join(' '),
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' blob: data:",
+    "connect-src 'self' blob: data:",
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'none'",
+  ].join('; ');
+}
+
 function render(template, plugins, assets) {
   const url = rel => `${rel}?v=${assets[rel] ?? hash8(path.join(WEB, rel))}`;
   const lines = (p, slot, make) => p[slot].map(f => make(url(`plugins/${p.name}/${f}`)));
@@ -199,7 +216,19 @@ function render(template, plugins, assets) {
   // end the script element.
   if (!html.includes('<!-- @assets -->')) throw new Error('index.template.html: marker @assets is missing');
   const assetJSON = JSON.stringify(assets).replace(/</g, '\\u003c');
-  html = html.replace('<!-- @assets -->', () => `<script>window.RECTO_ASSETS = ${assetJSON};</script>`);
+  const assetScript = `window.RECTO_ASSETS = ${assetJSON};`;
+  html = html.replace('<!-- @assets -->', () => `<script>${assetScript}</script>`);
+
+  // The page's content security policy, at the @csp marker (first in <head>):
+  // the page runs the site's own files and nothing else — no outside script, no
+  // inline script but the asset map above (allowed by its hash), no plugin, no
+  // form that sends anywhere. WebAssembly (MuPDF, HarfBuzz) needs
+  // 'wasm-unsafe-eval'; styles may be inline (fragments and SVG carry style
+  // attributes); Google Fonts serves the icon and UI fonts; blob: is what page
+  // rasters, the hashing worker and a fetch of a page image use.
+  if (!html.includes('<!-- @csp -->')) throw new Error('index.template.html: marker @csp is missing');
+  html = html.replace('<!-- @csp -->', () =>
+    `<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy([assetScript])}">`);
 
   // Content-hash every remaining local src/href (the template's own core files).
   html = html.replace(/\b(src|href)="([^"?#]+)"/g, (m, attr, value) => {

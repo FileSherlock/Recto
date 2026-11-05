@@ -23,7 +23,7 @@ shows the same message in the browser instead of the app.
 | `plugins/<name>/plugin.json: "<slot>" must be a list` | `styles`, `scripts_before_viewer` and `scripts_after_app` are arrays, even for one file |
 | `web/plugins/<name>/plugin.json: …` followed by a JSON parser message | The manifest is not valid JSON (a trailing comma, usually) |
 | `plugins/<name>/<file> still contains a … template tag` | An HTML fragment contains `{%` or `{{`. Fragments are plain HTML, inlined as they are — nothing expands template syntax |
-| `index.template.html: marker @plugins:<slot> is missing` / `unknown marker` / `marker @assets is missing` | `web/core/index.template.html` was edited and lost, or gained, an insertion marker |
+| `index.template.html: marker @plugins:<slot> is missing` / `unknown marker` / `marker @assets is missing` / `marker @csp is missing` | `web/core/index.template.html` was edited and lost, or gained, an insertion marker |
 
 A folder under `web/plugins/` **without** a `plugin.json` is not an error: it is simply not
 a plugin, and is skipped.
@@ -66,9 +66,11 @@ The viewer shows `Error: <message>` in place of the page, and the Console has
 - **`document worker: failed to load`.** The MuPDF worker (`core/pdf-worker.js`) is a
   *module* worker and imports `vendor/mupdf/mupdf.js` and `core/pdf-document.js` as ES
   modules. Browsers refuse a module whose `Content-Type` is not a JavaScript type — check
-  `.js` and `.mjs` in the Network tab. A Content-Security-Policy can block it too: the page
-  needs `worker-src 'self' blob:` (the hashing worker is created from a `blob:` URL) and
-  `'wasm-unsafe-eval'` in `script-src`.
+  `.js` and `.mjs` in the Network tab. A Content-Security-Policy the host adds can block it
+  too: the page needs `worker-src 'self' blob:` (the hashing worker is created from a
+  `blob:` URL) and `'wasm-unsafe-eval'` in `script-src`. The page's own policy (a `<meta>`
+  the build writes) allows both; a console error naming a Content Security Policy directive
+  says which policy refused what.
 - **A PDF that MuPDF cannot parse** shows MuPDF's own message. MuPDF's *warnings* about a
   damaged file are logged as `mupdf: …` console warnings and are not errors; the document
   usually opens anyway.

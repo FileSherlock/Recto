@@ -77,6 +77,24 @@ test('the page loads no script from another origin', () => {
   assert.deepEqual(outside, []);
 });
 
+test('the page\'s policy comes first and allows its one inline script by hash, nothing else inline', () => {
+  const { html } = build({ write: false });
+  const meta = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/);
+  assert.ok(meta, 'a Content-Security-Policy <meta>');
+  const before = html.slice(html.indexOf('<head>'), meta.index);
+  assert.ok(!/<(script|link|style)\b/i.test(before), 'nothing the policy governs comes before it');
+  const policy = Object.fromEntries(meta[1].split(';').map(d => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
+  const scriptSrc = policy['script-src'] || [];
+  assert.ok(!scriptSrc.includes("'unsafe-inline'") && !scriptSrc.includes("'unsafe-eval'"), scriptSrc.join(' '));
+  assert.deepEqual(policy['object-src'], ["'none'"]);
+  assert.deepEqual(policy['form-action'], ["'none'"]);
+  const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]);
+  assert.equal(inline.length, 1, 'one inline script: the asset map');
+  for (const text of inline)
+    assert.ok(scriptSrc.includes(`'sha256-${createHash('sha256').update(text).digest('base64')}'`), 'the policy allows it by its hash');
+  assert.deepEqual([...html.matchAll(/\son[a-z]+\s*=\s*["']/gi)].map(m => m[0].trim()), [], 'no inline event handler');
+});
+
 test('every local URL of the page carries the content hash of an existing file', () => {
   const { html } = build({ write: false });
   const local = [...html.matchAll(/\b(?:src|href)="((?:core|plugins)\/[^"]+)"/g)].map(m => m[1]);
