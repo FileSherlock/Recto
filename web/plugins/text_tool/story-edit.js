@@ -368,7 +368,10 @@
     notify();
   }
 
-  function commitStoryEdit() {
+  // Leave the text: the session becomes one step on the box undo stack —
+  // unless `record` is false (the stack itself is taking the box away). A box
+  // that has left the page meanwhile is neither drawn again nor recorded.
+  function commitStoryEdit({ record = true } = {}) {
     const s = session;
     if (!s) return;
     session = null;
@@ -379,9 +382,11 @@
     }
     groupOf(s.box)?.classList.remove('editing');
     if (utbState.editingId === s.box.id) utbState.editingId = null;
-    window.storySync?.(s.box);
-    window.renderBox?.(s.box);
-    window.utbUndo?.commit(s.step, 'edit text');
+    if (utbState.getBox(s.box.id) === s.box) {
+      window.storySync?.(s.box);
+      window.renderBox?.(s.box);
+      if (record) window.utbUndo?.commit(s.step, 'edit text');
+    }
     try { if (s.flow?.contains(getSelection().anchorNode)) getSelection().removeAllRanges(); } catch { /* nothing selected */ }
     notify();
   }

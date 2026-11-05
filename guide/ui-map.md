@@ -42,7 +42,7 @@ popover (`tool-column-more`), and keeps working there.
 | Artistic Text Tool (click to type; drag sets the size; corners scale) | `tt-art-text-btn` | `text_tool/toolbar_button.html` | `text_tool/artistic-tool.js` — stays armed; a click on a line of the page takes its face, size, baseline and space, and a tab stop where it goes on after a tab (a list label's: type the label, Tab, the text); a press on a story box edits it (`drag-resize.js`) |
 | Frame Text Tool (drag a frame; arrows while dragging: a grid of frames) | `tt-frame-text-btn` | `text_tool/toolbar_button.html` | `text_tool/frame-tool.js` — stays armed; a press on a story box edits it (`drag-resize.js`) |
 | Add Redaction Box (click on page) | `tool-add-box` | `text_tool/toolbar_button.html` | arm the tool: `core/app.js`; placement: `handleManualAddBox` (`text_tool/text-tool.js`) |
-| Undo / Redo (Ctrl+Z, Ctrl+Shift+Z) | `tt-undo`, `tt-redo` | `text_tool/toolbar_button.html` | `text_tool/undo.js` — the tooltip names the step |
+| Undo / Redo (Ctrl+Z, Ctrl+Shift+Z) | `tt-undo`, `tt-redo` | `text_tool/toolbar_button.html` | `text_tool/undo.js` — the tooltip names the step; a text being edited is left first (its edit is the step Undo takes back) |
 | Text panel — font, spacing, kerning, paragraph, frame, typography and display | `tt-studio-btn` | `text_tool/toolbar_button.html` | `text_tool/text-studio.js` — shows / hides the docked `#tt-studio` |
 | Customise tools… | `tool-column-customise` | `core/index.template.html` | `core/app.js` |
 | More tools | `tool-column-more` | `core/index.template.html` | `core/app.js` — shown only while some tool is hidden |

@@ -95,6 +95,14 @@
     utbState.boxes.splice(Math.min(at, utbState.boxes.length), 0, box);
     if (typeof renderBox === 'function') renderBox(box);
   }
+  // A text being edited is left before the stack moves: its edit becomes the
+  // step an Undo takes back, and no edit outlives its box or goes on in a
+  // story the stack changed under it. (Never from inside an entry's undo —
+  // the step committed there would cut the stack.)
+  function endEdits() {
+    window.commitStoryEdit?.();
+    window.commitInlineEdit?.();
+  }
 
   const api = {
     // the fields of these boxes now — commit() records what changed since
@@ -133,6 +141,7 @@
         redo() { takeOut(box); tell(); } });
     },
     undo() {
+      endEdits();
       if (index === 0) return false;
       const e = entries[--index];
       try { e.undo(); } catch (err) { console.warn('undo failed', err); }
@@ -140,6 +149,7 @@
       return true;
     },
     redo() {
+      endEdits();
       if (index >= entries.length) return false;
       const e = entries[index++];
       try { e.redo(); } catch (err) { console.warn('redo failed', err); }

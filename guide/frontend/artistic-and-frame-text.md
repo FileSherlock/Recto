@@ -83,7 +83,7 @@ runs input methods; every change goes through the story model.
 | Ctrl+B / Ctrl+I / Ctrl+U | Bold / Italic / Underline — on unless all of the selection already has it |
 | Ctrl+Shift+> / Ctrl+Shift+< | Every character one point larger / smaller |
 | Ctrl+Shift+- | Discretionary (soft) hyphen |
-| Ctrl+Z / Ctrl+Y | Undo / redo inside the session; leaving it records the session as one step on the box undo stack |
+| Ctrl+Z / Ctrl+Y | Undo / redo inside the session; leaving it records the session as one step on the box undo stack. The tool column's **Undo** / **Redo** and the Text panel's **Delete** leave the text first: Undo takes the whole session back, Delete records it, then the delete |
 | Ctrl+C / Ctrl+X / Ctrl+V | Plain text; a pasted line feed starts a paragraph |
 | Escape | Leave the text (the box stays selected) |
 

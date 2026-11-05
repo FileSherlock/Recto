@@ -305,7 +305,7 @@ story boxes; `storyConvert(box, 'frame' | 'artistic')` converts between them. Se
 
 ### Deleting a box
 
-`window.utbDeleteBox(id)` is the one removal path for every box type — the Text panel's Delete button and the Delete / Backspace keys both use it. A live inline-edit or micro-typo session on the box is torn down first, so no id in `utbState` outlives the box it points at. The keys are ignored while the caret is in a field, where they mean "erase a character". `utbDeleteBox(id, { silent: true })` is the undo stack taking a box out again — not a step of its own.
+`window.utbDeleteBox(id)` is the one removal path for every box type — the Text panel's Delete button and the Delete / Backspace keys both use it. A live session on the box is ended first, so no id in `utbState` outlives the box it points at: an inline edit or micro-typo mode is torn down, and Artistic or Frame text being edited is committed — its edit is a step of its own before the delete's, so Undo brings the text back as it was typed. The keys are ignored while the caret is in a field, where they mean "erase a character". `utbDeleteBox(id, { silent: true })` is the undo stack taking a box out again — not a step of its own (a session still open on the box ends without one).
 
 ## Label seams — `labelColor`, `labelAlign`
 
@@ -324,7 +324,7 @@ One stack (`window.utbUndo`) for what the user does to boxes: add, delete, move,
 - `utbUndo.capture(boxes)` → token, then `utbUndo.commit(token, label, key)`: records the fields that changed between the two calls (nothing is pushed when nothing changed). A box's derived data — candidate widths, verdicts, the refiner's findings, the pixel raster — is not part of a step; it is derived again after a restore (a redaction whose typography changed has its widths measured again).
 - `utbUndo.recordAdd(boxes, label)` / `utbUndo.recordDelete(box, index, label)`: an add or a delete, put back at the same index.
 - **Collapsing.** Steps with the same `key` collapse while they follow each other: every drag of one box (`move:<id>`), every tick of one slider (`size:<id>`, `space:<id>`, `color:<id>`), every nudge of one character (`nudge:<id>:<i>`) is one step, as Word collapses repeated typing. Any other action in between starts a new step; a collapsed step that ends where it began is dropped.
-- `undo()` / `redo()` / `canUndo()` / `canRedo()` / `peek()` / `clear()` / `onChange(fn)`.
+- `undo()` / `redo()` / `canUndo()` / `canRedo()` / `peek()` / `clear()` / `onChange(fn)`. An edit still open — Artistic or Frame text (`commitStoryEdit`), an inline edit (`commitInlineEdit`) — is committed before `undo()` or `redo()` moves the stack: the Undo button pressed while typing takes the typing back as one step, and no edit goes on in a box the stack removed or changed under it. (Never from inside an entry's own undo: a step committed there would cut the stack.)
 
 The buttons are `#tt-undo` / `#tt-redo` (the fragment `toolbar_button.html`); the keys are Ctrl/⌘+Z and Ctrl/⌘+Shift+Z or Ctrl/⌘+Y — ignored while a field has the caret or an inline edit is open, where they are the field's own.
 
