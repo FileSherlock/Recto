@@ -525,12 +525,28 @@
       "sizePx": 12.28125,
       "plain": false
     },
+    "dejavusansmonolin1024": {
+      "family": "DejaVu Sans Mono",
+      "bold": false,
+      "italic": false,
+      "file": "DejaVuSansMono.ttf",
+      "sizePx": 16,
+      "plain": false
+    },
     "times13": {
       "family": "Times New Roman",
       "bold": false,
       "italic": false,
       "file": "times.ttf",
       "sizePx": 13,
+      "plain": true
+    },
+    "times833": {
+      "family": "Times New Roman",
+      "bold": false,
+      "italic": false,
+      "file": "times.ttf",
+      "sizePx": 13.015625,
       "plain": true
     },
     "times16": {

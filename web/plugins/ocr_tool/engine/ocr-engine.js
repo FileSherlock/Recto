@@ -2016,6 +2016,48 @@
   // without it a bad baseline absorbs the whole band column by column.
   const PROF = HAS_ENV && !!process.env.BR_PROF ? { n: 0, ms: 0, by: {} } : null;
   let profTag = 'primary';
+  // The rows, relative to the baseline, where a set's flat-topped capitals
+  // (T E F Z 5 7) draw their top bars at y-phase `phy`: a raster row whose
+  // dark pixels (< 160, detectObjects' rule test) span half the glyph's ink
+  // width, among its first three ink rows. Memoized on the set.
+  function capRows(set, phy) {
+    const memo = (set._capRows ??= new Map());
+    if (memo.has(phy)) return memo.get(phy);
+    const rows = new Set();
+    for (const g of set.byPhy.get(phy) ?? []) {
+      if (!'TEFZ57'.includes(g.ch) || !g.inkR.length) continue;
+      let top = Infinity, cMin = Infinity, cMax = -1;
+      for (let k = 0; k < g.inkR.length; k++) {
+        if (g.inkR[k] < top) top = g.inkR[k];
+        if (g.inkC[k] < cMin) cMin = g.inkC[k];
+        if (g.inkC[k] > cMax) cMax = g.inkC[k];
+      }
+      const dark = new Map();
+      for (let k = 0; k < g.inkR.length; k++)
+        if (g.inkB[k] < 160 && g.inkR[k] < top + 3) dark.set(g.inkR[k], (dark.get(g.inkR[k]) ?? 0) + 1);
+      for (const [r, n] of dark) if (2 * n >= cMax - cMin + 1) rows.add(g.dy + r);
+    }
+    memo.set(phy, rows);
+    return rows;
+  }
+  // the page mask with these rules' cells (their rows ±2, as detectObjects
+  // paints them) cleared — a copy; box cells stay
+  function unmaskRules(mask, rules, page) {
+    const m2 = mask.slice();
+    for (const ob of rules)
+      for (let y = Math.max(0, ob.y0 - 2); y < Math.min(page.h, ob.y1 + 2); y++)
+        for (let x = Math.max(0, ob.x0 - 1); x <= Math.min(page.w - 1, ob.x1); x++)
+          if (m2[y * page.w + x] === 1 || m2[y * page.w + x] === 4) m2[y * page.w + x] = 0;
+    return m2;
+  }
+  // a rule every row of which is a cap-bar row of this line (see readPage)
+  const onCapLine = (ob, set, phy, yb) => {
+    const rows = capRows(set, phy);
+    if (!rows.size) return false;
+    for (let y = ob.y0; y < ob.y1; y++) if (!rows.has(y - yb)) return false;
+    return true;
+  };
+
   function probeBaseline(page, mask, set, phy, baseline, x0, x1, TOL, quant, bandTop, explained, bandBot, opts = null) {
     if (PROF) { const t = Date.now(); const r = probeBaseline0(page, mask, set, phy, baseline, x0, x1, TOL, quant, bandTop, explained, bandBot, opts); PROF.n++; PROF.ms += Date.now() - t; PROF.by[profTag] = (PROF.by[profTag] || 0) + (Date.now() - t); return r; }
     return probeBaseline0(page, mask, set, phy, baseline, x0, x1, TOL, quant, bandTop, explained, bandBot, opts);
@@ -2358,6 +2400,29 @@
       // ink is explained and the overlap rows are settled evidence.
       if (!pick) packedSweep(top + 1, bot - Math.max(...sets.map(s => s.maxDesc)) - 1, false);
       tagPick('packed');
+      // CAPITALS ON THE CAP LINE, at the probe (see the re-scan after the
+      // pick): a line that OPENS with a run of them ("7TTTTBAy…") has its
+      // first glyphs under that false rule's ±2-row mask, no probe can pin
+      // it, and the whole line was an unread band (EFTA01150379: 9 lines,
+      // 513 bytes of one attachment). Last chance for such a band: probe
+      // again with the rules in its top rows unmasked, and keep the pick only
+      // if every one of them then lies on the picked line's cap line.
+      if (!pick) {
+        const topRules = lineObjects.filter(ob => ob.type === 'rule' && !isBoxSlice(ob) && ob.y0 <= top + 2 && ob.y1 >= top);
+        if (topRules.length) {
+          const m2 = unmaskRules(mask, topRules, page);
+          const o2 = { ...scanOpts, rules: scanOpts.rules.filter(r => !topRules.includes(r)) };
+          let p2 = null;
+          for (const set of sets)
+            for (const phy of set.byPhy.keys())
+              for (let yb = bot; yb >= bot - set.maxDesc && yb > top; yb--) {
+                const score = probeBaseline(page, m2, set, phy, yb, Math.max(0, xp - 2), Math.min(page.w, x1 + 20), tol, quant, top, explained, clampBot, o2);
+                if (score > 0 && (!p2 || score > p2.score)) p2 = { set, phy, yb, score };
+              }
+          if (p2 && topRules.every(ob => onCapLine(ob, p2.set, p2.phy, p2.yb))) pick = p2;
+        }
+      }
+      tagPick('capline');
       if (pick && HAS_ENV && process.env.BR_PICK) console.error(`  pick y${pick.yb} ${pick.set.name} via ${pick.sweep} band ${top}-${bot}${work[wi].clamp ? ' (split upper)' : ''}`);
       if (pick) last = { set: pick.set, phy: pick.phy };
       const pushUnread = () => {
@@ -2433,8 +2498,31 @@
           }
         }
       }
-      const L = scanLine(page, mask, pick.set, pick.phy, pick.yb,
+      let L = scanLine(page, mask, pick.set, pick.phy, pick.yb,
         Math.max(0, x0 - 2), Math.min(page.w, x1 + 4), Infinity, Infinity, tol, quant, halos, top, explained, clampBot, scanOpts);
+      // CAPITALS SIDE BY SIDE ARE NOT A RULE. The flat tops of T, E, F, Z,
+      // 5 and 7 standing next to each other ("+7Tf7TFR" in a line of base64)
+      // join into one 40-px dark run on the CAP LINE, and detectObjects
+      // calls it a rule: its rows ±2 became don't-care, and the strike-
+      // through test below then voided the span — eight characters gone with
+      // no □ to say so (EFTA01150379: 232 of its base64 lines). A rule lying
+      // exactly on the rows where this set's capitals draw their tops is
+      // read again AS INK: the line is re-scanned with that rule unmasked,
+      // and the re-scan stands only if it explains at least as much — it is
+      // then certified on the bar's rows too, which the masked scan was not.
+      // A real rule there (a border the text touches) leaves its ink
+      // unexplained in the re-scan, which loses, and nothing changes.
+      const capRules = lineObjects.filter(ob => ob.type === 'rule' && !isBoxSlice(ob) && onCapLine(ob, pick.set, pick.phy, pick.yb));
+      if (capRules.length) {
+        const m2 = unmaskRules(mask, capRules, page);
+        const L2 = scanLine(page, m2, pick.set, pick.phy, pick.yb,
+          Math.max(0, x0 - 2), Math.min(page.w, x1 + 4), Infinity, Infinity, tol, quant, halos, top, explained, clampBot,
+          { ...scanOpts, rules: scanOpts.rules.filter(r => !capRules.includes(r)) });
+        if (L2.glyphs.length && L2.fails.length <= L.fails.length && L2.glyphs.length >= L.glyphs.length) {
+          L = L2;
+          for (const ob of capRules) lineObjects.splice(lineObjects.indexOf(ob), 1);
+        }
+      }
       // a "line" that read NOTHING has no certified baseline — it is an unread
       // band (a dot-only band above a real line probes into that line's glyphs
       // through the +20px window, picks a shifted-but-equivalent baseline, then

@@ -84,7 +84,9 @@ A miss in both tiers falls back to the live engine read.
 - `version` (`OCR_CACHE_VERSION`, currently 4 — the rules are kept beside the
   bars, and an entry carries its glyph's `ink`; 3: only black boxes are kept;
   2: per-page `spaceAdv`, per-line `phy`, per-entry `src`) guards the payload
-  shape; a file or a stored read with another version is ignored.
+  shape; a file or a stored read with another version is ignored. It does not
+  follow the engine or the glyph bundle: after a sync a document this browser
+  already read replays its old read until **All pages** is run on it again.
 - A fresh browser profile has no second tier, so tol0's `npm run recto-test`
   (which uploads its certified document in a fresh browser profile and waits
   for the auto cycle) always exercises the real engine.
@@ -107,10 +109,12 @@ here.** The workflow:
    every file a script fetches itself, with its content hash, so a synced
    file has a new URL by construction. Never pass `--allow-partial`: it
    would replace the glyph bundle with whatever subset the tol0 checkout
-   happens to hold. The bundle itself is held since 2026-09-20 (tol0 holds
-   regenerated `tnr8` sets whose baselines sit a pixel lower on some lines;
-   the shipped read and the pixel view's exactness were made with this
-   one): until tol0's gate is re-run over it, copy the engine files by hand
+   happens to hold. Before a bundle sync, back up `glyphs.bin` and A/B-read
+   the golden PDFs under both bundles. The last bundle sync, 2026-11-05, went
+   from 77 to 86 sets (DejaVu Sans Mono 1024, Times 833, the Nimbus Roman
+   942/849/768 sets; the 77 payloads byte-identical; 39 of 40 recorded golden
+   pages read the same, `vector` p2 still ±10). Engine files were copied by
+   hand before that
    (2026-10-10: `blindocr.js`, `ocr-engine.js`, `set-fonts.js` —
    recto-eval's full tier 12 better, 0 worse, 249 more certified segments;
    the last, 2026-10-11: `ocr-engine.js` — a tall glyph glued to a bar
