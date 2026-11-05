@@ -22,11 +22,14 @@ character counts of the `ocr` and `embedded` layers and shows exactly one:
 The choice just flips the existing body classes (`hide-ocr-text` /
 `hide-embedded-text`) **and** both toolbar toggle buttons' active state, so
 manual toggling afterwards starts from a state that matches the screen; the
-verdict is appended to the status line. Opening a new document mid-run
-cancels the old run — already on `document:opening`, before the new
-document's first page shows (the page in flight is abandoned at its next
-band) — and the new auto read starts on `document:loaded`. Manual runs never
-flip layers.
+verdict is appended to the status line. Every document starts with both
+layers shown (`document:opening`): what the last document's choice hid is not
+hidden on this one, so a read stopped before its choice leaves the new
+document's text visible. Opening a new document mid-run cancels the old run —
+already on `document:opening`, before the new document's first page shows,
+and the page in flight ends with the reader's worker at once (`ocrStopWorker`;
+the next read starts a new one) — and the new auto read starts on
+`document:loaded`. Manual runs never flip layers.
 
 This matters for scanned/eDiscovery documents: their pages are images, so the
 embedded-text extractor has nothing to read. The blind reader recovers the
@@ -177,8 +180,12 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
   changes and editing stay live while a read runs. The main thread loads the
   glyph sets only for the pixel view, or to read inline in a browser without
   Workers (the fallback, same results). **Stop** cancels between bands: the
-  page in progress is abandoned (no boxes for it), earlier pages keep theirs;
-  loading another document does the same before its own auto read starts.
+  page in progress is abandoned (no boxes for it), earlier pages keep theirs.
+  A page still being prepared when Stop is pressed never goes to the worker
+  (the worker takes a `cancel` only for the read in flight); a page that does
+  not reach its next band within `OCR_CANCEL_GRACE_MS` (3 s — a dark page
+  yields only every sixth band) ends with its worker. Loading another document
+  ends the worker at once before its own auto read starts.
 - Input pixels are `Doc.pageImageURL(n)` — the core document service's
   lossless page rasters, the very images the viewer displays,
   so OCR coordinates line up with the page by construction. The URL is asked

@@ -37,7 +37,7 @@ popover (`tool-column-more`), and keeps working there.
 
 | Label / tooltip | id | Template (owner) | Wired in |
 |---|---|---|---|
-| Toggle Embedded Text | `toggle-embedded-text` | `embedded_text_viewer/toolbar_button.html` | `text_tool/toolbar.js` (guarded `?.`) — toggles body class `hide-embedded-text`. embedded_text_viewer contributes no bar; this toggle is its only UI |
+| Toggle Embedded Text | `toggle-embedded-text` | `embedded_text_viewer/toolbar_button.html` | `embedded_text_viewer/etv-fetch.js` (guarded `?.`) — toggles body class `hide-embedded-text` (the CSS rule keys on it in `text_tool/styles.css`). embedded_text_viewer contributes no bar; this toggle is its only UI |
 | Toggle WebGL Mask | `toggle-webgl` | `webgl_mask/toolbar_button.html` | `webgl_mask/webgl-mask.js` — Reveal on/off, opens `#webgl-options-bar` |
 | Artistic Text Tool (click to type; drag sets the size; corners scale) | `tt-art-text-btn` | `text_tool/toolbar_button.html` | `text_tool/artistic-tool.js` — stays armed; a click on a line of the page takes its face, size, baseline and space, and a tab stop where it goes on after a tab (a list label's: type the label, Tab, the text); a press on a story box edits it (`drag-resize.js`); a press on the ruler's marker or a nudge's slider is theirs, not the page's |
 | Frame Text Tool (drag a frame; arrows while dragging: a grid of frames) | `tt-frame-text-btn` | `text_tool/toolbar_button.html` | `text_tool/frame-tool.js` — stays armed; a press on a story box edits it (`drag-resize.js`); a press on the ruler's marker or a nudge's slider is theirs, not the page's |

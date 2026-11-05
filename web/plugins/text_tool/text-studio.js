@@ -480,6 +480,7 @@
       nudge.dataset.t0 = why || 'Nudge characters: press one, then move it (a pair\'s manual kerning)';
     }
   }
+  let defaultSwChanges = 0;
   $('fabric-default-sw')?.addEventListener('change', async e => {
     const t = target();
     if (!t) return;
@@ -488,10 +489,13 @@
       else sync();                                           // the field holds the face's space; moving it sets another
       return;
     }
+    const mine = ++defaultSwChanges;
     if (e.target.checked) await window.utbPlainChar?.setSpaceWidth(t.box, null);
     else {
       const w = await window.getNaturalSpaceWidth?.(t.box);
-      if (w > 0) await window.utbPlainChar?.setSpaceWidth(t.box, w);
+      // ticked again while the face's space was being measured: that tick
+      // stands (it landed first, and this width would have overwritten it)
+      if (w > 0 && mine === defaultSwChanges) await window.utbPlainChar?.setSpaceWidth(t.box, w);
     }
     sync();
   });

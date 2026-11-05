@@ -41,10 +41,10 @@ const pixelView = {
   on: false,
   diff: false,
   loading: false,     // glyph sets being fetched (the cache-hit path never loads them)
-  pages: new Map(),   // `${docHash}|${page}` -> { page: whitened {w,h,gray}, mask, rawMask, quant } | null
+  pages: new Map(),   // `${docHash}|${page}` -> { page: whitened {w,h,gray}, mask, rawMask, quant } | null — the last PV_PAGES_KEPT pages
   results: new Map(), // box.id -> { set, ink, count, within, masked, outside, unexplained, glyphs, phy, tol }
   windows: new Map(), // box.id -> { page, r } — the last render window of every drawn box
-  cache: new Map(),   // render key -> { href, x, y, w, h, advanceW, ink, count, … }
+  cache: new Map(),   // render key (the page in it: a diff is that page's) -> { href, x, y, w, h, advanceW, ink, count, … }
   notes: new Map(),   // box.id -> why it fell back to SVG
   dirty: new Set(),   // pages whose residuals must be recomputed
   lastNote: null,
@@ -430,9 +430,15 @@ function pvLayerHidden(box) {
 // through the same PageEngine buffer + colour whitening the reader used, plus
 // the reader's object mask (with box halos for the glyph diff, without them
 // for the residual — the reader counts residue inside a halo too).
+const PV_PAGES_KEPT = 6;
 function pvPageInfo(pageNum) {
   const key = `${state.docHash}|${pageNum}`;
-  if (pixelView.pages.has(key)) return pixelView.pages.get(key);
+  if (pixelView.pages.has(key)) {                          // the newest again (the cap below drops the oldest)
+    const kept = pixelView.pages.get(key);
+    pixelView.pages.delete(key);
+    pixelView.pages.set(key, kept);
+    return kept;
+  }
   const img = document.getElementById(`page${pageNum}`);
   if (!img) return null;
   if (!img.complete || !img.naturalWidth) {
@@ -458,6 +464,12 @@ function pvPageInfo(pageNum) {
     info.mask = OCRRender.objectMask(det, page.w, page.h);
   } catch (e) { console.warn('pixel view: detectObjects', e); }
   pixelView.pages.set(key, info);
+  // ~2.6 MB a page: the last few pages visited are kept, an older one is
+  // worked out again when it is shown again (every visited page was kept)
+  for (const k of pixelView.pages.keys()) {
+    if (pixelView.pages.size <= PV_PAGES_KEPT) break;
+    pixelView.pages.delete(k);
+  }
   return info;
 }
 function pvQuant(info) {
@@ -607,8 +619,10 @@ function utbPixelRender(box, xs, baseline) {
   // the line to, the per-pixel tolerance of the rung it was read on, its
   // palette map — typed text takes its page's (pvTerms)
   const { phy, tol, quant } = pvTerms(box);
+  // (the page is part of it: the diff is against that page's pixels — the same
+  // line on another page reused the first page's verdict)
   const key = [setInfo.label, box.text, glyphs.map(g => Math.round(g.pen * 4)).join(','), yb, phy, tol,
-    pixelView.diff ? 'd' : 'p', info ? 'pg' : 'nopg', tint.join('.'), quant ? 'q' : '',
+    pixelView.diff ? 'd' : 'p', info ? `pg${box.page}` : 'nopg', tint.join('.'), quant ? 'q' : '',
     rects.map(q => `${q.x0},${q.y0},${q.w},${q.h},${q.cov[0]},${q.cov[q.cov.length - 1]}`).join(';')].join('|');
   let out = pixelView.cache.get(key);
   if (!out) {

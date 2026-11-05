@@ -5,7 +5,7 @@ The `embedded_text_viewer` is a fully self-contained, removable plugin (`web/plu
 ## Features
 
 - **Integrated Overlay:** Renders natively inside the main viewer — no separate page or window required.
-- **Toggle Button:** A toolbar icon (`#toggle-embedded-text`, shipped as the plugin's `toolbar_button.html`) shows/hides the overlay without leaving the current view. The click flips the body class `hide-embedded-text`; the wiring and the CSS rule that keys on it live with the renderer, in `text_tool`.
+- **Toggle Button:** A toolbar icon (`#toggle-embedded-text`, shipped as the plugin's `toolbar_button.html`) shows/hides the overlay without leaving the current view. The click flips the body class `hide-embedded-text` (wired in `etv-fetch.js`, beside the button); the CSS rule that keys on it lives with the renderer, in `text_tool/styles.css`.
 - **SVG-Based Rendering:** Text is rendered as SVG `<text>` elements via `web/plugins/text_tool/svg-renderer.js`, not DOM spans.
 - **No requests:** Spans are computed from the core's raw primitive, `Doc.structuredText(n)` — nothing is fetched, and the document never leaves the browser.
 - **Fully Removable:** Deleting the `web/plugins/embedded_text_viewer/` folder removes the button, the extractor, and all span logic in one step.

@@ -79,14 +79,20 @@
   }
 
   // A manual space width (px), or null: the face's own
+  // the newest call per box: a width that waits for the face's measurement
+  // gives way to any call made meanwhile (a "Font's" ticked again)
+  const spaceCalls = new WeakMap();
   async function setSpaceWidth(box, px, key = null) {
     if (!box) return;
+    const call = (spaceCalls.get(box) || 0) + 1;
+    spaceCalls.set(box, call);
     const step = window.utbUndo?.capture([box]);
     if (px == null) {
       box.defaultSpaceWidth = true;
       box.spaceWidth = null;
     } else {
       if (box.nativeSpaceWidth == null || box.nativeSpaceKey !== nativeSpaceKey(box)) await measureNativeSpace(box);
+      if (spaceCalls.get(box) !== call) return;
       box.defaultSpaceWidth = false;
       box.spaceWidth = Math.max(0, +px);
     }
@@ -155,12 +161,7 @@
   window.syncToolbarToBox = box => window.TextPanel?.sync(box);
   window.syncToolbarToSelection = () => window.TextPanel?.sync();
 
-  // Toggle-embedded-text button (show/hide embedded text in SVG globally)
-  el('toggle-embedded-text')?.classList.add('active');
-  el('toggle-embedded-text')?.addEventListener('click', () => {
-    const btn = el('toggle-embedded-text');
-    const active = btn.classList.toggle('active');
-    document.body.classList.toggle('hide-embedded-text', !active);
-  });
+  // (The embedded-text layer's toggle is wired by its own plugin,
+  // embedded_text_viewer; styles.css hides those boxes under its class.)
 
 })();

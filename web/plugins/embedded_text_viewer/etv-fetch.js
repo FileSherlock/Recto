@@ -250,6 +250,7 @@ async function etvFetchFull(pageNum) {
 // path and after an OCR pass.
 
 function utbConnectRedactionsToLines() {
+  if (typeof utbState === 'undefined') return;
   // OCR-read lines are text lines too — a redaction connects to whichever
   // kind sits on its row (scanned pages only ever have 'ocr' lines)
   const embeddedBoxes = utbState.boxes.filter(b => b.type === 'embedded' || b.type === 'ocr');
@@ -437,11 +438,20 @@ if (window.PDFHooks) {
   });
 }
 
-// Clear stale overlays the moment the user picks a new file, before analysis returns.
+// Clear stale overlays the moment the user picks a new file, before analysis
+// returns. (text_tool's globals, guarded: without it this threw on every file.)
 document.getElementById('pdf-file')?.addEventListener('change', () => {
   _utbFetchState.fetched = false;
-  utbState.reset();
-  clearAllSVGLayers?.();
+  if (typeof utbState !== 'undefined') utbState.reset();
+  if (typeof clearAllSVGLayers === 'function') clearAllSVGLayers();
+});
+
+// The embedded-text layer's own toggle (this plugin's button): shows or hides
+// every embedded line (body.hide-embedded-text).
+document.getElementById('toggle-embedded-text')?.classList.add('active');
+document.getElementById('toggle-embedded-text')?.addEventListener('click', e => {
+  const active = e.currentTarget.classList.toggle('active');
+  document.body.classList.toggle('hide-embedded-text', !active);
 });
 
 

@@ -22,6 +22,8 @@ const ocrToolState = {
   setUrls: null,    // glyph bundle urls from index.json (what both threads load)
   worker: null,     // the reader's Worker (ocr-worker.js), once ready
   workerReady: null,  // promise of that worker; rejected = no Worker, read inline
+  workerHandle: null, // that Worker from its creation on (ocrStopWorker ends it, ready or not)
+  workerAbort: null,  // rejects workerReady while the worker still starts (ocrStopWorker)
   workerJob: null,  // the page read in flight: { id, resolve, reject, progress }
   workerSeq: 0,
   readVia: null,    // 'worker' | 'inline' — where the last page read ran (the smoke test asserts 'worker')
@@ -96,6 +98,8 @@ function ocrWorker() {
     if (scripts.length < 4) return reject(new Error('engine scripts not found on the page'));
     let w;
     try { w = new Worker(OCR_WORKER_URL); } catch (e) { return reject(e); }
+    ocrToolState.workerHandle = w;
+    ocrToolState.workerAbort = () => reject(Object.assign(new Error('OCR worker stopped'), { stopped: true }));
     const fail = (err) => {
       reject(err);
       const job = ocrToolState.workerJob;
@@ -104,7 +108,7 @@ function ocrWorker() {
     w.onerror = (e) => fail(e.error || new Error(e.message || 'OCR worker error'));
     w.onmessage = (e) => {
       const m = e.data;
-      if (m.type === 'ready') { ocrToolState.worker = w; resolve(w); return; }
+      if (m.type === 'ready') { ocrToolState.worker = w; ocrToolState.workerAbort = null; resolve(w); return; }
       if (m.type === 'error' && m.id === null) { fail(new Error(m.message)); return; }
       const job = ocrToolState.workerJob;
       if (!job || m.id !== job.id) return;             // a reply to a job nobody waits for
@@ -129,6 +133,10 @@ function ocrWorker() {
 // where the same engine on the whole page leaves 114 (an e-mail's blue
 // links: 47 on one page, 0 with the band).
 function ocrWorkerRead(w, page, opts) {
+  // Stopped while the page was being prepared: it never goes out. (The worker
+  // takes a 'cancel' only for the read in flight — the next read starts
+  // afresh — so a page posted after a Stop was read through to its end.)
+  if (ocrToolState.cancel) return Promise.resolve(null);
   return new Promise((resolve, reject) => {
     const id = ++ocrToolState.workerSeq;
     ocrToolState.workerJob = { id, resolve, reject, progress: opts.progress };
@@ -140,10 +148,29 @@ function ocrWorkerRead(w, page, opts) {
 }
 
 // stop the current run: no further page starts, and the page in flight is
-// abandoned at its next band (the worker replies 'cancelled', no boxes)
-function ocrCancel() {
+// abandoned at its next band (the worker replies 'cancelled', no boxes). A
+// page that does not reach its next band soon — a dark page yields only every
+// sixth band, for minutes — ends with its worker; `now`: at once (another
+// document is opening, the read is the old one's).
+const OCR_CANCEL_GRACE_MS = 3000;
+function ocrCancel({ now = false } = {}) {
   ocrToolState.cancel = true;
+  const job = ocrToolState.workerJob;
   ocrToolState.worker?.postMessage({ type: 'cancel' });
+  if (now) ocrStopWorker();
+  else if (job) setTimeout(() => { if (ocrToolState.workerJob === job) ocrStopWorker(); }, OCR_CANCEL_GRACE_MS);
+}
+
+// The reader's worker ends, started or still starting: the read in flight
+// resolves as cancelled, a start in progress rejects as stopped, and the next
+// read starts a new worker (its glyph sets load again).
+function ocrStopWorker() {
+  const w = ocrToolState.workerHandle, abort = ocrToolState.workerAbort, job = ocrToolState.workerJob;
+  ocrToolState.worker = ocrToolState.workerReady = ocrToolState.workerHandle = ocrToolState.workerAbort = null;
+  ocrToolState.workerJob = null;
+  w?.terminate();
+  abort?.();
+  job?.resolve(null);
 }
 
 // page raster (a blob: URL from the document service) -> loaded <img>
@@ -453,9 +480,11 @@ async function ocrReadOnePage(pageNum, label, carry) {
   const page = BlindOCR.whitenColored(ocrToolState.engine._pageFor(img), rgba);
   const progress = (p, d, t) => setOcrStatus(`${label}${BlindOCR.passLabel(p)}: ${d}/${t} bands…`);
   const w = await ocrWorker().catch(e => {
+    if (e?.stopped) return undefined;                   // stopped while it started: this page is cancelled
     console.warn('OCR: no worker, reading on the main thread —', e?.message || e);
     return null;
   });
+  if (w === undefined || ocrToolState.cancel) return null;
   let out;
   ocrToolState.readVia = w ? 'worker' : 'inline';
   if (w) {
@@ -465,8 +494,16 @@ async function ocrReadOnePage(pageNum, label, carry) {
       passHint: ocrToolState.passHint, carry: mode, progress });
     if (!out) return null;                              // cancelled mid-page
   } else {
+    // inline, a Stop is seen between bands as in the worker
+    const stop = new Error('cancelled');
     const sets = await ocrLoadSets();
-    out = await BlindOCR.readPageAuto(page, sets, { passHint: ocrToolState.passHint, carry, progress });
+    try {
+      out = await BlindOCR.readPageAuto(page, sets, { passHint: ocrToolState.passHint, carry,
+        progress: (p, d, t) => { if (ocrToolState.cancel) throw stop; progress(p, d, t); } });
+    } catch (e) {
+      if (e === stop) return null;
+      throw e;
+    }
   }
   ocrToolState.passHint = out.pass;
   const dropped = ocrKeepRedactionBoxes(page, pageNum, out.res);
@@ -593,7 +630,17 @@ function ocrShowOcrLayer(showOcr) {
   document.getElementById('toggle-embedded-text')?.classList.toggle('active', !showOcr);
 }
 
+// Both layers shown, as a document starts: what the last document's choice
+// hid is not hidden on this one (a read stopped before its choice left a
+// document's embedded text hidden).
+function ocrShowBothLayers() {
+  document.body.classList.remove('hide-ocr-text', 'hide-embedded-text');
+  document.getElementById('ocr-toggle-text')?.classList.add('active');
+  document.getElementById('toggle-embedded-text')?.classList.add('active');
+}
+
 function ocrChooseLayer() {
+  if (typeof utbState === 'undefined') return;   // no text tool: no boxes to choose between
   const ocr = ocrTextAmount('ocr'), emb = ocrTextAmount('embedded');
   if (!ocr) return;                       // nothing read — leave the display alone
   const ratio = emb ? Math.min(ocr, emb) / Math.max(ocr, emb) : 1;
@@ -673,8 +720,9 @@ async function ocrAutoRead() {
 // stale autoDone would read as "this document is done".)
 PDFHooks.on('document:opening', () => {
   ocrToolState.autoSeq++;                 // an auto read still waiting for the old document gives up
-  if (ocrToolState.running) ocrCancel();
+  if (ocrToolState.running) ocrCancel({ now: true });   // its page is the old document's: the worker ends
   ocrToolState.autoDone = false;
+  ocrShowBothLayers();
   ocrProducer.clear();
   ocrDropped.clear();
 });

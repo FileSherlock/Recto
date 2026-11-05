@@ -292,7 +292,6 @@ changes (`char:sizePt:<id>`, …) — and with nothing selected the font and siz
 | `change` | `#tolerance`, `#tt-name-case` | the selected redaction box's `tolerance` / `uppercase`; guarded calls into a matching plugin |
 | `change` | `#toggle-space-labels` | `setShowSpaceWidthLabels(checked)` |
 | `click` | `#tt-studio-btn`, `#tt-studio-close` | show / hide the panel |
-| `click` | `#toggle-embedded-text` | Toggle `hide-embedded-text` on `<body>` — shows / hides every `embedded` box |
 | `click` | `#utb-delete-box` | `utbDeleteBox(utbState.selectedId)` |
 
 `window.TextPanel` = `{ open, close, sync, newText, setNewText }`; `window.openTextStudio(tab)`
