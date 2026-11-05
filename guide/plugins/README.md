@@ -60,27 +60,25 @@ the plugin is installed.
 
 ## Base64 attachment decoder
 
-Finds base64 blocks (the wrapped-line body of an email attachment) in the document's
-text, decodes them in the browser, sniffs each file's type from its bytes (about 40 types:
-documents, images, audio, video, archives, markup, text) and lists them in the
-**Attachments** side panel as cards — the name the MIME headers declare, size, pages, a
-preview for an image, View (a new tab, as the type allows: markup only ever as plain text,
-archives and Office files not at all) and Download. It reads exactly one unified-text-box
-layer — whichever of OCR / embedded is visible on screen — so duplicate layers never
-interleave and corrupt a block. After a document loads it waits for the text layer to
-settle (the `ocr_tool` state read through a guarded global, else a stability poll), scans,
-counts what it found on its tool's badge, and shows its panel when no other side panel is
-showing.
+Finds base64 bodies (the wrapped-line body of an email attachment, a form's attached file)
+in the document's OCR read, decodes them in the browser, sniffs each file's type from its
+bytes (about 40 types: documents, images, audio, video, archives, markup, text) and lists
+them in the **Attachments** side panel as cards — the name the MIME headers declare, size,
+pages, how far the file can be trusted (exact, incomplete, unproven, damaged), a preview for
+an image, View (a new tab, as the type allows: markup only ever as plain text, archives and
+Office files not at all) and Download. It reads the `ocr` boxes and nothing else: the embedded
+layer is another OCR's text, nothing certifies its characters, and it is never decoded. After
+a document loads it waits for the read to settle (the `ocr_tool` state read through a guarded
+global), scans, counts what it found on its tool's badge, and shows its panel when no other
+side panel is showing.
 
 | Plugin | Docs | What it does | Data it keeps |
 |---|---|---|---|
-| `base64_tool` | [base64-tool/](base64-tool/) | Base64 block detection → decode → typed cards to view or download, in a docked side panel (`b64-core.js` the DOM-free core, `base64-tool.js` the panel) | Whether the panel was shown, in `localStorage` (`recto.attachments.open`) |
+| `base64_tool` | [base64-tool/](base64-tool/) | Base64 bodies in the OCR read → decode → typed, judged cards to view or download, in a docked side panel (`b64-core.js` the DOM-free core, `base64-tool.js` the panel) | Whether the panel was shown, in `localStorage` (`recto.attachments.open`) |
 
 - **Requires `text_tool`** (reads `utbState.boxes`; all access guarded so removal
-  never throws). Needs a text source to be useful: an `ocr_tool` read or an
-  `embedded_text_viewer` layer. Pages the user has not visited are read from
-  `embedded_text_viewer`'s lean span cache (`window.etvSpanCache`, guarded), so detection
-  sees the whole document, not just the pages on screen.
+  never throws) **and an `ocr_tool` read**, its only text source: without one it lists
+  nothing and says why.
 - **Shares the right side** with the other side panels, one at a time, through the
   `sidepanel:shown` convention.
 

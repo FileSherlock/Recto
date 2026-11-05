@@ -115,6 +115,13 @@
 }
 .b64-page:hover { text-decoration: underline; }
 .b64-warn { color: #fdd663; font-size: 11px; line-height: 1.4; }
+.b64-verdict { margin-top: 2px; font-size: 11px; line-height: 1.4; }
+.b64-verdict-exact { color: #81c995; }
+.b64-verdict-incomplete, .b64-verdict-unproven { color: #fdd663; }
+.b64-verdict-damaged { color: #f28b82; }
+.b64-others { color: #9aa0a6; font-size: 11px; line-height: 1.6; }
+.b64-others summary { cursor: pointer; }
+.b64-other { padding-left: 12px; }
 .b64-thumb {
   display: block;
   max-width: 100%;

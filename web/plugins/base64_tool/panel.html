@@ -1,7 +1,7 @@
 <!-- base64_tool's Attachments panel: one card per base64 attachment found in
-     the document's text — its type (sniffed from the decoded bytes), the name
-     its MIME headers declare, its size and pages, a preview for an image, and
-     View / Download. base64-tool.js fills #b64-cards and #b64-status.
+     the document's OCR read — its type (sniffed from the decoded bytes), the
+     name its MIME headers declare, its size and pages, how far it can be
+     trusted, a preview for an image, and View / Download. base64-tool.js fills #b64-cards and #b64-status.
      data-side-panel: it shares the right side with the other side panels, one
      at a time ('sidepanel:shown' on the bus). The edge (.b64-resize) is
      dragged to make it wider — at the foot of a phone's screen, taller. -->
@@ -9,7 +9,7 @@
   <div class="b64-resize" title="Drag to resize · double-click for the default size"></div>
   <header class="b64-head">
     <h2 class="b64-title"><span class="material-symbols-outlined" aria-hidden="true">attach_file</span>Attachments</h2>
-    <button id="b64-scan" class="icon-button b64-mini" title="Scan the text again">
+    <button id="b64-scan" class="icon-button b64-mini" title="Scan the OCR read again">
       <span class="material-symbols-outlined">refresh</span>
     </button>
     <button id="b64-close" class="icon-button b64-mini" title="Hide the panel">
