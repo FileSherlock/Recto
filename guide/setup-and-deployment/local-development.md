@@ -54,7 +54,8 @@ of the site; nothing under `web/` refers to them.
 ### A plugin developed in a repository of its own
 
 `--plugin <folder>` (repeatable) puts a plugin folder from elsewhere in place of
-`web/plugins/<folder name>/`: the build reads its manifest, fragments and file hashes from
+`web/plugins/<name>/`, `<name>` being the one in its `plugin.json` (so `--plugin .` and a
+checkout folder named otherwise work too): the build reads its manifest, fragments and file hashes from
 that folder (`build({ overlay: { name: folder } })`), and the server serves the folder at
 `plugins/<name>/`. Everything else is this site, so the page is exactly the one the plugin
 will run in once its folder is synced in. Nothing is written into `web/` — `index.html` and

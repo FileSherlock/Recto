@@ -351,13 +351,15 @@
       if (fits()) { menu.classList.add('hidden'); return; }
       more.classList.remove('hidden');
       const groups = groupsInReadingOrder();
+      // the last group leaves first, and each goes in at the top of the menu:
+      // the menu keeps the row's reading order
       while (!fits() && groups.length) {
         const { g, bar } = groups.pop();
         const prev = g.previousElementSibling;
         const divider = prev && prev.classList.contains('options-divider') ? prev : null;
         moved.push({ group: g, divider, parent: bar });
-        if (divider) menu.appendChild(divider);
-        menu.appendChild(g);
+        menu.prepend(g);
+        if (divider) menu.prepend(divider);
       }
       if (!moved.length) { more.classList.add('hidden'); menu.classList.add('hidden'); }
     } finally { busy = false; }
@@ -400,6 +402,10 @@ function closePanels() {
   };
   shown();
   if (sections) new MutationObserver(shown).observe(sections, { childList: true });
+  // the button is lit while the panel is open, whoever opens or closes it
+  // (another panel's closePanels() among them)
+  new MutationObserver(() => btn.classList.toggle('active', !panel.classList.contains('hidden')))
+    .observe(panel, { attributes: true, attributeFilter: ['class'] });
   btn.addEventListener('click', () => {
     const open = panel.classList.contains('hidden');
     closePanels();

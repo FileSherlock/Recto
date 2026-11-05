@@ -205,7 +205,7 @@ page rectangle is the placement) and for an image document.
 |------|---------|-------------|
 | `Doc.bytes()` | `Promise<ArrayBuffer>` | The open document's bytes, for a plugin that runs its own worker over the file. Rejects when no document is open |
 | `Doc.heapMB()` | `Promise<number \| null>` | Size of the worker's WebAssembly heap in MB; `null` when no worker is running |
-| `Doc.close()` | — | Revokes every URL of the document, rejects whatever is still queued (`the document was closed`) and **terminates the worker**. A WebAssembly heap never shrinks; ending the worker is what returns the memory. The next `open()` starts a new one (about 50 ms) |
+| `Doc.close()` | — | Revokes every URL of the document, rejects whatever is still queued (`the document was closed`) and **terminates the worker**. A WebAssembly heap never shrinks; ending the worker is what returns the memory. The next `open()` starts a new one (about 50 ms). A worker that dies on its own (fails to load, crashes) is ended the same way: everything queued, and every request after it, rejects at once with `document worker: <reason>` — the viewer shows that in the page's place — until the next `open()` |
 | `Doc.info` | object \| `null` | The last `open()`'s result |
 | `Doc.timings` | object \| `null` | Where that open's time went (ms) |
 

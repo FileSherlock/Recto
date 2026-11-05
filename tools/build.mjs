@@ -194,9 +194,12 @@ function render(template, plugins, assets) {
   for (const slot of Object.keys(blocks))
     if (!seen.has(slot)) throw new Error(`index.template.html: marker @plugins:${slot} is missing`);
 
-  // The asset map, for assetURL() in core/hooks.js.
+  // The asset map, for assetURL() in core/hooks.js — inserted by a function, so
+  // a `$` in a file name stays a `$`, and with `<` escaped, so no file name can
+  // end the script element.
   if (!html.includes('<!-- @assets -->')) throw new Error('index.template.html: marker @assets is missing');
-  html = html.replace('<!-- @assets -->', `<script>window.RECTO_ASSETS = ${JSON.stringify(assets)};</script>`);
+  const assetJSON = JSON.stringify(assets).replace(/</g, '\\u003c');
+  html = html.replace('<!-- @assets -->', () => `<script>window.RECTO_ASSETS = ${assetJSON};</script>`);
 
   // Content-hash every remaining local src/href (the template's own core files).
   html = html.replace(/\b(src|href)="([^"?#]+)"/g, (m, attr, value) => {

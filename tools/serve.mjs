@@ -22,7 +22,8 @@
 //
 // A plugin developed in a repository of its own runs here before it is synced
 // in: --plugin <folder> builds the page with that folder in place of
-// web/plugins/<folder name>/ and serves it at plugins/<name>/. The page is the
+// web/plugins/<name>/ — the name in its plugin.json — and serves it at
+// plugins/<name>/. The page is the
 // site's own, so it looks exactly as it will once the plugin is synced; nothing
 // is written into web/ (index.html and generated/* come from memory).
 //
@@ -48,7 +49,12 @@ for (let i = 0; i < args.length; i++) {
   if (args[i] !== '--plugin') continue;
   if (!args[i + 1]) { console.error('--plugin needs a plugin folder'); process.exit(2); }
   const folder = path.resolve(args[++i]);
-  overlay[path.basename(folder)] = folder;
+  // the plugin's own name (its plugin.json), so `--plugin .` or a checkout
+  // folder named otherwise still stands in for web/plugins/<name>/
+  let name = path.basename(folder);
+  try { name = JSON.parse(fs.readFileSync(path.join(folder, 'plugin.json'), 'utf8')).name || name; }
+  catch { /* no readable manifest: the build says so */ }
+  overlay[name] = folder;
 }
 const overlaid = Object.keys(overlay).length > 0;
 const MOUNTS = { ...DEV_MOUNTS, ...Object.fromEntries(Object.entries(overlay).map(([name, folder]) => [`/plugins/${name}/`, folder])) };

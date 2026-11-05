@@ -348,16 +348,24 @@ export function openPdf(mupdf, Module, bytes) {
 
   // The embedded image's pixmap the way extract_image writes it to a PNG:
   // its own samples for gray and RGB (no colour management), anything else
-  // (CMYK, Lab, …) converted to DeviceRGB.
+  // (CMYK, Lab, …) converted to DeviceRGB. A conversion that fails takes the
+  // decoded pixmap with it; the colour space wrapper is let go either way.
   function imagePixmap(image) {
     let pix = image.toPixmap();
     const cs = pix.getColorSpace();
-    if (cs && !cs.isGray() && !cs.isRGB()) {
-      const rgb = pix.convertToColorSpace(mupdf.ColorSpace.DeviceRGB, true);
+    try {
+      if (cs && !cs.isGray() && !cs.isRGB()) {
+        const rgb = pix.convertToColorSpace(mupdf.ColorSpace.DeviceRGB, true);
+        pix.destroy();
+        pix = rgb;
+      }
+      return pix;
+    } catch (e) {
       pix.destroy();
-      pix = rgb;
+      throw e;
+    } finally {
+      cs?.destroy();
     }
-    return pix;
   }
 
   // Transparency composited over white paper — what the page shows, so every

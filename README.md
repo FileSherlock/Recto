@@ -55,7 +55,8 @@ into or taken out of `web/plugins/` shows on reload. It serves `.wasm` as `appli
 and sends COOP/COEP headers (cross-origin isolation, which exposes memory measurement in the
 browser). It listens on `127.0.0.1` only and is meant for development. `--plugin <folder>` is
 for a plugin developed in a repository of its own: the page is built and served with that
-folder in place of `web/plugins/<folder name>/`, and nothing is written into `web/`.
+folder in place of `web/plugins/<name>/` (the `name` in its `plugin.json`, whatever the folder
+is called), and nothing is written into `web/`.
 
 The PDF directly in `web/assets/pdfs/` is the startup document; without one the app starts
 empty.

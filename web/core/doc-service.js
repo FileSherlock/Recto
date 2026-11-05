@@ -60,6 +60,7 @@
   };
 
   let worker = null, ready = null;
+  let failed = null;                     // what the worker died of: the document it held went with it
   let nextId = 1, inflight = null;
   const queue = [];                      // { id, message, transfer, priority, resolve, reject }
   let generation = 0;                    // bumps on open/close: answers for an older document are dropped
@@ -78,6 +79,7 @@
   }
 
   function request(message, { transfer, priority } = {}) {
+    if (failed) return Promise.reject(failed);
     return new Promise((resolve, reject) => {
       queue.push({ id: nextId++, message, transfer, priority: priority ?? PRIORITY[message.type] ?? 2, resolve, reject });
       pump();
@@ -86,6 +88,7 @@
 
   function startWorker() {
     if (ready) return ready;
+    failed = null;
     worker = new Worker(assetURL('core/pdf-worker.js'), { type: 'module' });
     worker.onmessage = e => {
       const job = inflight;
@@ -94,8 +97,17 @@
       if (e.data.ok) job.resolve(e.data); else job.reject(new Error(e.data.error));
       pump();
     };
+    // The worker answers every request it can, even with an error; an error
+    // event means it failed to load or died. The document it held is gone:
+    // the worker is ended, and every request from here on fails at once with
+    // the reason instead of waiting for an answer that never comes. The next
+    // Doc.open() starts a new worker.
     worker.onerror = e => {
       const err = new Error(`document worker: ${e.message || 'failed to load'}`);
+      failed = err;
+      worker?.terminate();
+      worker = null;
+      ready = null;
       if (inflight) { inflight.reject(err); inflight = null; }
       while (queue.length) queue.shift().reject(err);
     };
@@ -195,13 +207,15 @@
     let timings = {};
 
     if (kind.isImage) {
+      // only the image's size is wanted here: the decoded bitmap goes at once
       const bitmap = await createImageBitmap(blob);
+      const { width, height } = bitmap;
+      bitmap.close();
       // an image document is taken as 8.5 in wide: its px per pt is its width over 612 pt
-      doc.info = { sha256: await hashing, numPages: 1, pageWidth: bitmap.width, pageHeight: bitmap.height,
-                   pxPerPt: bitmap.width / GEO.PAGE_WIDTH_PT,
+      doc.info = { sha256: await hashing, numPages: 1, pageWidth: width, pageHeight: height,
+                   pxPerPt: width / GEO.PAGE_WIDTH_PT,
                    pdfFonts: [], suggestedScale: Math.round(100 * GEO.PT_TO_PX), suggestedSize: 12.0,
                    pageImageType: kind.mime };
-      bitmap.close();
       superseded();
       current = doc;
     } else {
