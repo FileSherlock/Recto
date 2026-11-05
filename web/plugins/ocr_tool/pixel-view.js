@@ -453,6 +453,12 @@ function pvPageInfo(pageNum) {
     return null;
   }
   if (typeof PageEngine === 'undefined' || typeof BlindOCR === 'undefined') return null;
+  // a page that is no paper and ink (ocr-tool.js ocrPageKind: a photograph)
+  // is not worked out — the colour step froze the page on one
+  if (typeof ocrPageKind === 'function' && !ocrPageKind(img).document) {
+    pixelView.pages.set(key, null);
+    return null;
+  }
   ocrToolState.engine ??= new PageEngine();
   const raw = ocrToolState.engine._pageFor(img);
   const page = BlindOCR.whitenColored(raw, ocrToolState.engine.pageRGBA(img));

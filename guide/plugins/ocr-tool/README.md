@@ -163,6 +163,24 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
 
 ## How it reads
 
+- **Paper and ink only.** The reader is made for pages of paper and ink; a
+  photograph sent the colour step (on the main thread) and every pass of the
+  reader through the whole page — a phone photo of a letter (5032 × 3355)
+  froze the page for 152 s and read nothing. Before anything else a page is
+  judged (`page-kind.js`, `OCRPageKind`, DOM-free and tested): on a
+  nearest-neighbour copy of at most 600 px, the pixels as the reader would see
+  them, the share near the page's own paper level and the share of dark ink.
+  A page is read when its paper is at least 0.3 of it and paper and ink at
+  least 0.78. Measured on 345 pages of the project's documents (scans and
+  renders, text and redaction bars): paper 0.365–1.00 — 0.365 on a page
+  two-thirds black with bars — and paper + ink 0.823–1.00, every one read;
+  on two photographs and six wallpapers paper + ink was at most 0.75 or the
+  paper at most 0.26, none read. The automatic read and *Read all pages*
+  pass such a page over (kept in the stored read as a page with nothing on
+  it) and the status line says so, with its shares; *Read this page* reads
+  it anyway. The pixel view leaves it alone too. (Every page of the
+  project's own documents is 816 px wide, but a 300-dpi scan from elsewhere
+  is 2550: the shares are what decides, not the width.)
 - **Off the main thread.** The engine is synchronous JavaScript that yields
   only between bands, and a page in a face the sets do not carry runs the
   whole tolerance ladder — tens of seconds with the full bundle. The adapter

@@ -22,6 +22,7 @@
     "ocr-result.js",
     "box-rules.js",
     "line-boxes.js",
+    "page-kind.js",
     "ocr-tool.js",
     "pixel-view.js",
     "hypothesis-view.js"

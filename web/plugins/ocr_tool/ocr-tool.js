@@ -479,14 +479,46 @@ function ocrKeepRedactionBoxes(page, pageNum, res) {
   return dropped.length;
 }
 
+// ── Pages that are no document ──────────────────────────────
+// The reader is made for paper and ink. A photograph (a phone photo of a
+// letter, 5032 × 3355) or an image whose transparent background it takes for
+// black sent the colour step and the reader through the whole page — minutes,
+// the colour step alone freezing the page for 152 s — for nothing it can
+// certify. OCRPageKind (page-kind.js) judges a nearest-neighbour copy of at
+// most 600 px, the pixels as the reader would see them: every page of the
+// project's documents is paper and ink, no photograph is. The automatic read
+// and Read all pages pass such a page over; Read this page reads it anyway.
+const ocrPageKinds = new WeakMap();   // page image → OCRPageKind verdict
+function ocrPageKind(img) {
+  if (ocrPageKinds.has(img)) return ocrPageKinds.get(img);
+  let kind = { document: true };      // nothing to judge with: read, as before
+  try {
+    const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+    const k = Math.min(1, 600 / Math.max(w, h));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w * k));
+    c.height = Math.max(1, Math.round(h * k));
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.imageSmoothingEnabled = false;  // a sample of the page's own pixels, not a blur that turns text grey
+    g.drawImage(img, 0, 0, c.width, c.height);
+    if (typeof OCRPageKind !== 'undefined') kind = OCRPageKind.judge(g.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+  } catch { /* a page the canvas cannot read: read it */ }
+  ocrPageKinds.set(img, kind);
+  return kind;
+}
+const ocrPercent = x => `${Math.round(100 * x)} %`;
+
 // one page: { img, res, pass } — res slim when it came through the worker
 // (ocrAddBoxes reads the same fields either way) — or null when the page has
 // no raster or the read was cancelled. carry: null for a single page, the
 // run's { fresh } marker for Read-all-pages (cross-page baseline hints live
 // in the worker, per run; inline they live on this object).
-async function ocrReadOnePage(pageNum, label, carry) {
+async function ocrReadOnePage(pageNum, label, carry, { force = false } = {}) {
   const [img, size] = await Promise.all([ocrLoadPageImage(pageNum), Doc.pageSize(pageNum).catch(() => null)]);
   if (!img) return null;
+  // no paper and ink, no read: before the colour step, the costly part
+  const kind = ocrPageKind(img);
+  if (!kind.document && !force) return { img, size, skipped: kind };
   ocrToolState.engine ??= new PageEngine();
   const rgba = ocrToolState.engine.pageRGBA(img);
   const page = BlindOCR.whitenColored(ocrToolState.engine._pageFor(img), rgba);
@@ -556,13 +588,23 @@ async function ocrRun(allPages) {
     const runHash = state.docHash;
     const collected = (allPages && runHash) ? [] : null;
     let lastPass = null, fonts = new Set();
+    const skipped = [];                  // pages that are no document, not read
     for (const p of nums) {
       if (ocrToolState.cancel || runHash !== state.docHash) break;
       const label = allPages ? `OCR ${p}/${state.numPages}` : `OCR p${p}`;
-      const out = await ocrReadOnePage(p, label, carry);
+      // Read this page reads whatever the page is: the user asked for it
+      const out = await ocrReadOnePage(p, label, carry, { force: !allPages });
       if (runHash !== state.docHash || ocrToolState.cancel) break;
       if (!out) continue;
       ocrClearPage(p);
+      if (out.skipped) {
+        skipped.push({ page: p, ...out.skipped });
+        // kept in the stored read as a page with nothing on it, so the document
+        // is not read again for it
+        collected?.push({ page: p, w: out.img.naturalWidth, h: out.img.naturalHeight, skipped: true,
+          pass: ocrSlimPass(null), res: ocrSlimResult({ lines: [], objects: [] }) });
+        continue;
+      }
       const t = ocrAddBoxes(p, out.img, out.res, out.pass, out.size);
       totals.lines += t.lines; totals.clean += t.clean;
       totals.unread += t.unread; totals.boxes += t.boxes; totals.dropped += out.dropped || 0;
@@ -579,6 +621,10 @@ async function ocrRun(allPages) {
     if (runHash !== state.docHash) return;
     if (typeof calculateAllWidths === 'function') calculateAllWidths();
     ocrEmitTypography();
+    const notRead = !skipped.length ? ''
+      : skipped.length === 1
+        ? ` · page ${skipped[0].page} not read: it looks like a photograph (${ocrPercent(skipped[0].near)} paper, ${ocrPercent(skipped[0].dark)} ink) — Read this page reads it anyway`
+        : ` · ${skipped.length} pages not read: they look like photographs — Read this page reads the one shown anyway`;
     if (lastPass) {
       const cert = lastPass.tol ? `clean@±${lastPass.tol}` : 'byte-clean';
       // a union pool's set name is 'a+b+…' — too noisy for the status line;
@@ -589,10 +635,10 @@ async function ocrRun(allPages) {
         (totals.boxes ? ` · ${totals.boxes} redaction boxes` : '') +
         (totals.dropped ? ` · ${totals.dropped} dark region(s) not redactions` : '') +
         ` · ${shownFonts.join(' ') || '—'}` +
-        (lastPass.quant ? ' · palette producer' : '') +
+        (lastPass.quant ? ' · palette producer' : '') + notRead +
         (ocrToolState.cancel ? ' · cancelled' : ''));
     } else {
-      setOcrStatus('OCR: no readable page rasters');
+      setOcrStatus(skipped.length ? `OCR:${notRead.slice(2)}` : 'OCR: no readable page rasters');
     }
   } catch (e) {
     console.warn('OCR:', e);
