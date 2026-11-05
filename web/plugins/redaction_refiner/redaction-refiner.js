@@ -768,7 +768,12 @@
   // The verdict is recorded on box.refineInfo for inspection.
   async function refineRedaction(box, opts = {}) {
     if (!box || box.type !== 'redaction') return false;
+    // a bar that left the model during an await (another document opened, or
+    // it was deleted) is neither written nor drawn — the old document's bar
+    // was drawn onto the next document's page 1
+    const gone = () => typeof utbState !== 'undefined' && utbState.getBox?.(box.id) !== box;
     await loadDictionary();
+    if (gone()) return false;
 
     const nb = neighboursFor(box);
     if (!nb.left && !nb.right) {
@@ -795,6 +800,7 @@
       nb.left ? await resolveEdge(box, nb.left, 'left', nb.spans) : null,
       nb.right ? await resolveEdge(box, nb.right, 'right', nb.spans) : null);
     const { left, right } = bounds;
+    if (gone()) return false;
 
     let newX0 = left ? left.edge : box.x;
     let newX1 = right ? right.edge : box.x + box.w;

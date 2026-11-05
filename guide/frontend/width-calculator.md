@@ -35,6 +35,7 @@ Calculates pixel widths for a list of text strings.
 | `ligatures` | bool | `true` | Let HarfBuzz form standard ligatures (`liga`, `clig`); `false` gives the plain advances, as a page set without ligatures was laid. Calibri's `ff` / `tt` differ by half a pixel |
 | `force_uppercase` | bool | `false` | Convert text to uppercase before measuring |
 | `space_width` | number \| `null` | `null` | Substitute this advance (image px) for every space glyph |
+| `report` | bool | `false` | Also say what measured: each result's `missing` and the response's `face` (below) |
 
 **Response:**
 
@@ -46,6 +47,8 @@ Calculates pixel widths for a list of text strings.
 ```
 
 `width` is in image pixels. `chars` has one entry per shaped **glyph** — `c` is the first character of the glyph's cluster (clusters count code points), `x` the pen position before the glyph — so a caller can place characters as well as measure them. An empty string answers `{ text, width: 0 }`. When no face can be resolved or loaded, every result is `{ text, width: 0, error }`; the call itself does not throw.
+
+**With `report: true`** each result also has `missing` — the characters the face has no glyph for, which measured as its `.notdef` (`['王', '小', '明']` in Times) — and the response has `face: { file, family, style, substitute }`: the face that measured, and whether it stands in for the one asked for (no family of that name installed — `Garamond` measures in Times New Roman — or no such style: `Nimbus Mono PS` has no bold). A caller that compares widths against the page needs both; the recorded requests never ask, and their answers are byte for byte what they were.
 
 **Justified mode.** With `mode: 'justified'` and `block_w` the call answers a different question — which space advance makes the line exactly `block_w` pixels wide:
 

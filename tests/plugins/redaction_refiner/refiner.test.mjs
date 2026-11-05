@@ -953,6 +953,25 @@ test('the text column is where lines agree, not where a stamp in the margin reac
 });
 
 
+test('a bar that left the model while its edges were measured is neither moved nor drawn', async () => {
+  // another document opened during the pass (the core reset the boxes): the
+  // old document's bar was moved and drawn onto the new document's page 1
+  reset();
+  const left = span({ text: 'Dr', x: 100, w: widthPx('Dr', 12), baseCharPositions: charsFor('Dr'), lineId: 'L' });
+  const x0 = 100 + widthPx('Dr', 12) + 1;
+  const right = span({ text: 'said', x: x0 + 80 + SPACE, w: widthPx('said', 12), baseCharPositions: charsFor('said'), lineId: 'L' });
+  const box = redaction(x0, x0 + 80); box.lineId = 'L';
+  utbState.boxes.push(left, right, box);
+  const before = { x: box.x, w: box.w };
+  rendered.length = 0;
+  const pass = R.refineRedaction(box);
+  utbState.boxes = [];                   // the next document
+  assert.equal(await pass, false);
+  assert.deepEqual({ x: box.x, w: box.w }, before);
+  assert.deepEqual(rendered, []);
+  assert.equal(box.refineInfo, undefined);
+});
+
 for (const t of tests) {
   try {
     await t.fn();

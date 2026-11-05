@@ -61,6 +61,21 @@ test('a face resolves through its family\'s styles, then the fallback family', (
   assert.equal(shaper.resolve('No Such Face', false, false), 'times.ttf');
 });
 
+test('widths with report: the face that measured, whether it stands in for another, the glyphs it lacks', async () => {
+  const ask = (family, bold, strings = ['Ada']) => shaper.widths({ strings, family, bold, size: 12, scale: 100 * 96 / 72, report: true });
+  const own = await ask('Times New Roman', true);
+  assert.deepEqual(own.face, { file: 'timesbd.ttf', family: 'Times New Roman', style: 'bold', substitute: false });
+  assert.deepEqual(own.results[0].missing, []);
+  assert.deepEqual((await ask('Garamond', false)).face, { file: 'times.ttf', family: 'Times New Roman', style: 'regular', substitute: true });
+  assert.equal((await ask('Nimbus Mono PS', true)).face.substitute, true, 'no bold file: the regular stands in');
+  const cjk = await ask('Times New Roman', false, ['王小明', 'Ann']);
+  assert.deepEqual(cjk.results.map(r => r.missing), [['王', '小', '明'], []]);
+  // without report the answer is the recorded one, key for key
+  const plain = await shaper.widths({ strings: ['Ada'], family: 'Times New Roman', size: 12, scale: 133 });
+  assert.deepEqual(Object.keys(plain), ['results']);
+  assert.deepEqual(Object.keys(plain.results[0]).sort(), ['chars', 'text', 'width']);
+});
+
 for (const name of readJSON(path.join(GOLDEN, 'widths', 'index.json'))) {
   test(`/widths ${name}`, async () => {
     const { request, response } = readGz(path.join(GOLDEN, 'widths', `${name}.json.gz`));

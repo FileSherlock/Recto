@@ -5,6 +5,11 @@
 //   await Shaping.widths({ strings, family, bold, italic, size, scale, kerning,
 //                          ligatures, force_uppercase, space_width })
 //       → { results: [{ text, width, chars: [{ c, x }] }] }
+//   await Shaping.widths({ …, report: true })
+//       → the same, plus each result's `missing` (the characters the face has
+//         no glyph for — they measured as its .notdef) and `face`: { file,
+//         family, style, substitute } — the face that measured, and whether it
+//         is another than the one asked for (no such family, or no such style)
 //   await Shaping.widths({ strings: [text], …, mode: 'justified', block_w })
 //       → { space_width }
 //   await Shaping.fontMetrics({ family, bold, italic, size_px })
@@ -143,6 +148,20 @@
       return fam.family !== FALLBACK_FAMILY ? resolve(FALLBACK_FAMILY, bold, italic) : null;
     }
 
+    // The family and style a face file is, and whether it is the one a request
+    // asked for: another family (none of that name is installed) or another
+    // style (a family without the bold) is a substitute.
+    function faceOf(file, request) {
+      for (const fam of families.values())
+        for (const [style, f] of Object.entries(fam.files || {}))
+          if (f === file) {
+            const asked = request.family ? String(request.family).trim().toLowerCase() : null;
+            const substitute = asked != null && (fam.family.toLowerCase() !== asked || style !== styleKey(!!request.bold, !!request.italic));
+            return { file, family: fam.family, style, substitute };
+          }
+      return { file, family: null, style: null, substitute: !!request.family };
+    }
+
     // fonts.resolve_file(): the legacy `font: 'times.ttf'` form.
     function resolveFile(name) {
       if (!name) return null;
@@ -222,20 +241,23 @@
         return { space_width: spaces ? Math.max(0.0, (blockW - other) / spaces) : null };
       }
 
+      const report = !!request.report;
       const results = strings.map(text => {
-        if (!text) return { text, width: 0 };
+        if (!text) return report ? { text, width: 0, missing: [] } : { text, width: 0 };
         const { glyphs, codePoints } = shape(rec, upper ? text.toUpperCase() : text, { kern, ligatures });
         let total = 0;
-        const chars = [];
+        const chars = [], missing = [];
         for (const g of glyphs) {
-          chars.push({ c: g.cluster < codePoints.length ? String.fromCodePoint(codePoints[g.cluster]) : '', x: total });
+          const c = g.cluster < codePoints.length ? String.fromCodePoint(codePoints[g.cluster]) : '';
+          chars.push({ c, x: total });
+          if (report && g.gid === 0 && !missing.includes(c)) missing.push(c);
           total += (spaceWidth !== null && spaceGid !== null && g.gid === spaceGid)
             ? spaceWidth
             : (g.advance / rec.upem) * size * scaleFactor;
         }
-        return { text, width: total, chars };
+        return report ? { text, width: total, chars, missing } : { text, width: total, chars };
       });
-      return { results };
+      return report ? { results, face: faceOf(file, request) } : { results };
     }
 
     // GET /font-metrics: the face's own advances and every kern pair at one
