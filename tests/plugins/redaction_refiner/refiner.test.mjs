@@ -745,6 +745,27 @@ test('a lone capital letter touching the bar is a sliver of the name: the bar gr
   assert.equal(box2.refineInfo.left.token, 'A');
 });
 
+test('a sliver showing past the ink moves the ink bound with it (EFTA00018586 item 2)', async () => {
+  reset();
+  // The reader's pens on the page: "including" ends at 228.5, the S of SARAH
+  // shows at 232.5 (a space on), the bar's black ink runs 235–357, "and" at 357.
+  const inc = 'EPSTEIN, including';
+  const incChars = charsFor(inc);
+  const incW = incChars[incChars.length - 1].x + incChars[incChars.length - 1].w;
+  const left = span({ type: 'ocr', text: inc, x: 228.5 - incW, w: incW, baseCharPositions: incChars, lineId: 'L', ocr: { trusted: true } });
+  const s = span({ type: 'ocr', text: 'S', x: 232.5, w: 8.9, baseCharPositions: [{ c: 'S', x: 0, w: 8.9 }], lineId: 'L', ocr: { trusted: true } });
+  const right = span({ type: 'ocr', text: 'and GHISLAINE', x: 357, w: widthPx('and GHISLAINE', 12), baseCharPositions: charsFor('and GHISLAINE'), lineId: 'L', ocr: { trusted: true } });
+  const box = redaction(235, 357); box.lineId = 'L'; box.ink = { x0: 235, x1: 357 };
+  utbState.boxes.push(left, s, right, box);
+  await R.refineRedaction(box);
+  assert.deepEqual(box.refineInfo.remnants, [{ text: 'S', side: 'left' }]);
+  assert.equal(box.refineInfo.left.kind, 'word', 'the S, not the ink, says where the name starts');
+  near(box.x, 232.5, 0.01, 'left edge = including + space = the S');
+  near(box.x + box.w, 353, 0.01, 'right edge = and − space');
+  assert.equal(box.refineInfo.exact, true, 'both edges from reader pens');
+  near(box.w, NAME_W, 0.5, 'SARAH KELLEN fits');
+});
+
 test('a capitalised token touching the bar is a proper noun, not a fragment', async () => {
   reset();
   const left = span({ text: 'including', x: 100, w: widthPx('including', 12), baseCharPositions: charsFor('including'), lineId: 'L' });

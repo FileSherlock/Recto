@@ -498,6 +498,9 @@
     const words = rowWords(spans);
     const centre = box.x + box.w / 2;
     const remnants = [];
+    // How far the remnants reach past the bar: the hidden text shows there,
+    // so the ink no longer bounds it on that side (inkBounds).
+    const reach = { left: null, right: null };
 
     // How far out each side may look before it runs into another bar.
     const tol = TOUCH_TOL_MIN_PX;
@@ -520,7 +523,12 @@
       // a pixel into ("[A], [B]") still stands between the bars, and is B's
       // neighbour as much as A's.
       if (side === 'left' ? wCentre <= leftLimit : wCentre >= rightLimit) continue;
-      if (isRemnant(w, box, side)) { remnants.push({ text: w.text, side }); continue; }
+      if (isRemnant(w, box, side)) {
+        remnants.push({ text: w.text, side });
+        if (side === 'left') reach.left = Math.min(reach.left ?? Infinity, w.x0);
+        else reach.right = Math.max(reach.right ?? -Infinity, w.x1);
+        continue;
+      }
       const width = w.x1 - w.x0;
       const under = Math.min(w.x1, box.x + box.w) - Math.max(w.x0, box.x);
       // Text lying mostly under the bar is the redacted text itself. A
@@ -537,7 +545,7 @@
         right = w;
       }
     }
-    return { left, right, remnants, blocked, source, spans };
+    return { left, right, remnants, reach, blocked, source, spans };
   }
 
   function median(nums) {
@@ -751,8 +759,15 @@
   // bar 62 px left and let a 24-letter name fit a 95 px box. A side with no
   // neighbour whose ink reaches the text column's edge runs to the margin —
   // the name may end anywhere before it — and refineInfo.margin says so.
-  function inkBounds(box, left, right) {
-    const ink = box.ink;
+  // A remnant is the hidden text showing past the ink (the S of SARAH left of
+  // the bar on EFTA00018586 item 2, 2.5 px out): the ink bounds the text only
+  // beyond it (`reach`, from neighboursFor) — held to the ink, the bar lost
+  // those 2.5 px and SARAH KELLEN no longer fit.
+  function inkBounds(box, left, right, reach = null) {
+    const ink = box.ink && {
+      x0: Math.min(box.ink.x0, reach?.left ?? Infinity),
+      x1: Math.max(box.ink.x1, reach?.right ?? -Infinity),
+    };
     const out = { left, right, margin: { left: false, right: false } };
     if (!ink) return out;
     const asInk = (side, edge, gap) => ({ edge, wordEdge: edge, inkEdge: side.inkEdge, kind: 'ink', reason: 'gap',
@@ -782,7 +797,7 @@
       // is another bar — the other half of a name.
       box.refineInfo = {
         source: nb.source, left: null, right: null, remnants: nb.remnants, blocked: nb.blocked,
-        margin: inkBounds(box, null, null).margin,
+        margin: inkBounds(box, null, null, nb.reach).margin,
         x: box.x, w: box.w, exact: false,
       };
       return false;
@@ -798,7 +813,7 @@
 
     const bounds = inkBounds(box,
       nb.left ? await resolveEdge(box, nb.left, 'left', nb.spans) : null,
-      nb.right ? await resolveEdge(box, nb.right, 'right', nb.spans) : null);
+      nb.right ? await resolveEdge(box, nb.right, 'right', nb.spans) : null, nb.reach);
     const { left, right } = bounds;
     if (gone()) return false;
 

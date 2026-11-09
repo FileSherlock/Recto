@@ -44,7 +44,11 @@ than the ink (past a 2 px rim) is not the name's neighbour: nothing was written
 between the two, and the edge stays the ink's, recorded as `kind: 'ink'`,
 `reason: 'gap'` with the gap. On EFTA00173953 "From:" sits a tab stop before its
 box; the word rule had pulled the bar 62 px left and let a 24-letter name fit a
-95 px box. An ink edge is never `exact` and gets the detector's slack in the
+95 px box. A remnant (above) is the hidden text showing **past** the ink, so
+the ink bounds the name only beyond it: on EFTA00018586 item 2 the S of SARAH
+shows 2.5 px left of the black, and held to the ink the bar came out 118 px
+where SARAH KELLEN needs 120.5 — the item-3 bar of the same name measured
+120.5. An ink edge is never `exact` and gets the detector's slack in the
 matcher. A side with no neighbour whose ink reaches the text column's edge
 (`columnEdges`: where the page's lines start and end, else one-inch margins)
 runs **to the margin** — the name may end anywhere before it — and
