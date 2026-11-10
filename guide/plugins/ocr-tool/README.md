@@ -325,7 +325,20 @@ file is added to `scripts_after_app` in `plugin.json`, in load order.
   line's bar or a block of lines); a box narrower than 40 px and taller than
   1.6 lines is a border or two bars' junction, never a name's bar. A page
   with fewer rows keeps every black box but one shorter than 0.6 of its
-  lines' median band (a thick rule under a heading and a few lines). Measured 2026-09-22: every real bar
+  lines' median band (a thick rule under a heading and a few lines). Between
+  the two, the box's **shape** (2026-11-10): with the engine loaded,
+  `filter` asks `OCREngine.barShapes` (guarded) what each box is, and a
+  black box whose shape is no bar's goes with the engine's reason —
+  `sliver` (under 5 px wide), `page edge` (a band along the page's border,
+  half its length or more), `dark shape` (its solid core reaches past every
+  box, closes round letter-shaped holes or slides one way: a logo, a plate
+  of white lettering, a bullet, a photograph) or `lone rule` (≤ 8 rows with
+  no ink cut at its edges and none on its rows within 60 px: a form's thick
+  rule, a footer line). A box the text shows at — ink cut at its top or
+  bottom row, or on its rows beside it (`peek` or `beside` ≥ 3) — is a bar
+  over small text however short, and the **shorter than a line** test
+  passes it: EFTA01987274's 39 × 7 bar over an 8-pt name, on a page whose
+  lines are 14 rows. Measured 2026-09-22: every real bar
   on the corpus and on EFTA00173953 overlaps a line by 0.47–0.84 of its
   height or lies 0–11 px from one and is 0.78–1.27 lines tall, so the rules
   drop nothing real there. `OCRTool.dropped(page)` lists what went (`why`,

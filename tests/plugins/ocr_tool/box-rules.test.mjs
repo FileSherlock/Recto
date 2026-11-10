@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FILE = path.join(HERE, '..', '..', '..', 'web', 'plugins', 'ocr_tool', 'box-rules.js');
@@ -161,4 +162,29 @@ test('a bar in slices — glyphs touching its sides — is one box again', { ski
   // a double underline is rules only: left as it is
   const dbl = [{ type: 'rule', x0: 100, y0: 172, x1: 300, y1: 173 }, { type: 'rule', x0: 100, y0: 174, x1: 300, y1: 175 }];
   assert.deepEqual(R.restack(dbl, R.grid(rows(12, 60, 18))), dbl);
+});
+
+// With the engine loaded beside it (the page loads engine/ocr-engine.js before
+// this file), filter() asks OCREngine.barShapes what each box's SHAPE is:
+// a logo's piece, a plate of white lettering, a lone thick rule go whatever
+// the grid says, and a thin bar the text shows at stays however short.
+const ENGINE = path.join(HERE, '..', '..', '..', 'web', 'plugins', 'ocr_tool', 'engine', 'ocr-engine.js');
+const E = fs.existsSync(ENGINE) ? createRequire(import.meta.url)(ENGINE) : null;
+const noShapes = skip || (!E?.barShapes && 'engine without barShapes');
+test('filter with the engine: shapes that are no bars go, a thin bar at its text stays', { skip: noShapes }, () => {
+  const rects = [
+    { x0: 100, y0: 47, x1: 300, y1: 66 },              // a bar on the first row
+    { x0: 40, y0: 120, x1: 500, y1: 126 },             // a 6-row rule with nothing at it, between two rows
+    { x0: 160, y0: 230, x1: 199, y1: 237 },            // a 39 × 7 bar over small text…
+    { x0: 120, y0: 231, x1: 150, y1: 236 },            // …its label 10 px to the left (strokes)
+  ];
+  const p = page(600, 500, rects);
+  for (let x = 121; x < 150; x += 3) for (let y = 231; y < 236; y++) p.gray[y * 600 + x] = 255;   // the label is strokes, not a block
+  const objects = [box(100, 47, 300, 66), box(40, 120, 500, 126), box(160, 230, 199, 237)];
+  globalThis.OCREngine = E;
+  try {
+    const { kept, dropped } = R.filter(p, rows(12), objects);
+    assert.deepEqual(kept.map(o => o.x0), [100, 160]);
+    assert.deepEqual(dropped.map(d => d.why), ['lone rule']);
+  } finally { delete globalThis.OCREngine; }
 });

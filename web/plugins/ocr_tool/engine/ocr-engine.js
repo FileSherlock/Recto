@@ -191,7 +191,11 @@
           }
           const dark = x < w && v < 160;
           if (dark) { if (dS < 0) dS = x; dGap = 0; }
-          else if (dS >= 0 && ++dGap > 1) {
+          // the sentinel column closes a run however short its gap: a run
+          // that reaches the page's right edge has one blank (the sentinel)
+          // after it, never two, and was silently dropped — a full-width
+          // separator (EFTA01987274 y218) was no rule at all
+          else if (dS >= 0 && (++dGap > 1 || x === w)) {
             if (x - dGap + 1 - dS >= 40) rows.push({ y, x0: dS, x1: x - dGap + 1, dark: true });
             dS = -1; dGap = 0;
           }
@@ -216,7 +220,7 @@
           if (v < 255) colAct[x >> 5] |= 1 << (x & 31);   // may open a run: track for fast path
           const vdark = rowLive && v < 160;
           if (vdark) { if (vdS[x] < 0) vdS[x] = y; vdGap[x] = 0; }
-          else if (vdS[x] >= 0 && ++vdGap[x] > 1) {
+          else if (vdS[x] >= 0 && (++vdGap[x] > 1 || !rowLive)) {   // the sentinel row closes it (as the column above)
             if (y - vdGap[x] + 1 - vdS[x] >= 40) vcols.push({ x, y0: vdS[x], y1: y - vdGap[x] + 1 });
             vdS[x] = -1; vdGap[x] = 0;
           }
@@ -269,13 +273,28 @@
     // fake it — a strictly contiguous 9-px-plus run holding to ±3 for 8
     // rows is a solid blob, and no glyph is one.
     const stacks = [];
+    const flatRun = r => {                                 // one byte along the run (±12): a drawn edge, not a glyph
+      let mn = 255, mx = 0;
+      for (let x = r.x0, o = r.y * w; x < r.x1; x++) { const v = gray[o + x]; if (v < mn) mn = v; if (v > mx) mx = v; }
+      return mx - mn <= 24;
+    };
     for (const r of shortRuns) {
       const g = stacks.find(g => g.y1 === r.y && (r.wide
-        ? r.x0 <= g.x0 + 1 && r.x1 >= g.x1 - 1
+        ? r.x0 <= g.x0 + 1 && r.x1 >= g.x1 - 1 &&
+          (g.flat || Math.abs(r.x0 - g.x0) <= 1 || Math.abs(r.x1 - g.x1) <= 1)
         : Math.abs(g.x0 - r.x0) <= 3 && Math.abs(g.x1 - r.x1) <= 3));
-      if (g) { g.y1 = r.y + 1; if (!r.wide) g.exts.push([r.x0, r.x1]); }
-      else if (!r.wide) stacks.push({ y0: r.y, y1: r.y + 1, x0: r.x0, x1: r.x1, exts: [[r.x0, r.x1]] });
+      if (g) { g.y1 = r.y + 1; if (!r.wide) { g.exts.push([r.x0, r.x1]); g.flat &&= flatRun(r); } }
+      else if (!r.wide) stacks.push({ y0: r.y, y1: r.y + 1, x0: r.x0, x1: r.x1, exts: [[r.x0, r.x1]], flat: flatRun(r) });
     }
+    // A wide row continues a stack as a glyph fused to ONE of its sides does
+    // — it keeps the stack's other edge — or when the stack's own rows are a
+    // drawn rectangle's, one byte along each (a bar drawn a row above the
+    // bars it overlaps: its top row, then their fused rows; EFTA00783084 p5
+    // y184, EFTA00162435 p1 y75 — that box masks the dark top row the `(`
+    // above sits on). A glyph's top peeking out of a bar is neither: its row
+    // runs 158, 62, 82, 96, 46 …, and the bar's rows passing it on both
+    // sides carried that 9-px "box" 8 rows down (EFTA01987274 y250,
+    // `To: █████`; a consumer then cut the bar in three around it).
     const modeOf = (exts, k) => {
       const n = new Map();
       for (const e of exts) n.set(e[k], (n.get(e[k]) ?? 0) + 1);
@@ -285,14 +304,56 @@
     };
     // `sb` marks a small box as STACK-born: its extent is evidence from
     // shortRuns, not from `rows`, which the box-extent pass below relies on.
-    for (const g of stacks)
-      if (g.y1 - g.y0 >= 8) objects.push({ sb: true, y0: g.y0, y1: g.y1, x0: modeOf(g.exts, 0), x1: modeOf(g.exts, 1) });
+    // The 8-row floor is for runs a glyph could almost make. A bar over 8-pt
+    // text is shorter — EFTA01987274 y115, `From: ███`, 39 × 7: under the
+    // 40-px run rule and under the floor, it had no object at all — so a
+    // stack of 5–7 rows is a box when it is DRAWN: 12 px or wider, every row
+    // on the same extent (±1, not the ±3 a touching glyph needs), and both
+    // sides straight — the column beside each holds one byte down the stack
+    // (paper, or the rectangle's soft edge: 135 left, 165 right there),
+    // one row spared — and paper past one of its long sides, two rows of it
+    // (the text it covers shows on the other; a white letter's arm is one
+    // row or two, then the plate again). That keeps out what such a stack
+    // mostly is: a piece of dark plate between white letters, a stroke of a
+    // big letter, bold scanned text fused solid, a patch of photograph —
+    // their sides follow whatever shape is beside them, and they sit in
+    // more of it.
+    const paperRow = (y, x0, x1) => {                     // the row is paper over 60 % of the run
+      if (y < 0 || y >= h) return true;
+      let n = 0;
+      for (let x = x0; x < x1; x++) if (gray[y * w + x] > 160) n++;
+      return n >= 0.6 * (x1 - x0);
+    };
+    const straightSide = (x, y0, y1) => {
+      if (x < 0 || x >= w) return true;
+      const n = new Map();
+      for (let y = y0; y < y1; y++) { const v = gray[y * w + x] >> 3; n.set(v, (n.get(v) ?? 0) + 1); }
+      let best = 0;
+      for (const [v, c] of n) best = Math.max(best, c + (n.get(v - 1) ?? 0) + (n.get(v + 1) ?? 0));
+      return best >= y1 - y0 - 1;
+    };
+    for (const g of stacks) {
+      const n = g.y1 - g.y0, x0 = modeOf(g.exts, 0), x1 = modeOf(g.exts, 1);
+      if (n < 8 && !(n >= 5 && x1 - x0 >= 12 &&
+          g.exts.every(e => Math.abs(e[0] - x0) <= 1 && Math.abs(e[1] - x1) <= 1) &&
+          straightSide(x0 - 1, g.y0, g.y1) && straightSide(x1, g.y0, g.y1) &&
+          ((paperRow(g.y0 - 3, x0, x1) && paperRow(g.y0 - 2, x0, x1)) ||
+           (paperRow(g.y1 + 1, x0, x1) && paperRow(g.y1 + 2, x0, x1))))) continue;
+      objects.push({ sb: true, y0: g.y0, y1: g.y1, x0, x1 });
+    }
     // vertical rules (table/quote borders): long solid runs down a column —
     // collected in the fused pass above; the sort restores column-major order
     vcols.sort((a, b) => a.x - b.x || a.y0 - b.y0);
+    // The columns of one rule run the same rows: a run joins its neighbour
+    // when they share 80 % of the LONGER one. Measured on the shorter, the
+    // 185-row columns of a page-wide black block joined a 987-row frame
+    // border beside them, column after column — one "rule" 754 px wide and
+    // the frame's height, masking 87 % of the page (EFTA00403318 p1); the
+    // block's own columns, merged among themselves, are dropped below as
+    // living inside a box.
     for (const c of vcols) {
       const o = objects.find(o => o.vr && o.x1 === c.x &&
-        Math.min(o.y1, c.y1) - Math.max(o.y0, c.y0) > 0.8 * Math.min(o.y1 - o.y0, c.y1 - c.y0));
+        Math.min(o.y1, c.y1) - Math.max(o.y0, c.y0) > 0.8 * Math.max(o.y1 - o.y0, c.y1 - c.y0));
       if (o) { o.x1 = c.x + 1; o.y0 = Math.min(o.y0, c.y0); o.y1 = Math.max(o.y1, c.y1); }
       else objects.push({ vr: true, x0: c.x, x1: c.x + 1, y0: c.y0, y1: c.y1 });
     }
@@ -466,6 +527,25 @@
           (mode(b, 0) === mode(a, 0) && mode(b, 1) > mode(a, 1) + 4);
         if (overhang &&
             Math.abs(mode(a, 0) - mode(c, 0)) <= 2 && Math.abs(mode(a, 1) - mode(c, 1)) <= 2) {
+          // …unless what overhangs is a BAR: a bar touching a taller one on
+          // its line (a one-line name beside a two-line block) fuses with it
+          // on its rows and is exactly such a superset — absorbed, it had no
+          // object at all, neither masked nor a redaction (EFTA00360919 p1
+          // y75, x 288–377). Glyphs kerned against a box leave stems, never
+          // 9 columns side by side dark on every row of the burst (its two
+          // soft edge rows spared). Each such run is a bar: two bars that
+          // abut leave a lighter seam between them (EFTA00691942 p1 x421).
+          // A bar is a line tall, 8 rows and more (those were 17–29); a
+          // thinner burst is a plate's or a big letter's.
+          if (b.y1 - b.y0 >= 8) {
+            const x0 = mode(a, 1), x1 = mode(b, 1), need = b.y1 - b.y0 - 2;
+            for (let x = x0, s = -1; x <= x1; x++) {
+              let n = 0;
+              if (x < x1) for (let y = b.y0; y < b.y1; y++) if (gray[y * w + x] < 160) n++;
+              if (x < x1 && n >= need) { if (s < 0) s = x; }
+              else if (s >= 0) { if (x - s >= 9) segmented.push({ y0: b.y0, y1: b.y1, x0: s, x1: x }); s = -1; }
+            }
+          }
           a.y1 = c.y1; a.exts.push(...c.exts); a.last = c.last;
           segs.splice(m, 2);
           m = Math.max(1, m - 1);
@@ -478,15 +558,21 @@
     objects.push(...segmented);
     // a glyph descender touching a box top merges with the box's own dark column
     // into one long vertical run — drop vrule candidates that live inside boxes
-    // (summing coverage over box segments: a stacked pair covers a rule jointly)
+    // (the rows its boxes cover together: a stacked pair covers a rule
+    // jointly — each row once: two boxes over the same rows of a table's
+    // shaded header counted twice, and the column line through the whole
+    // table went as "inside a box", its □ in every row below (EFTA00173953
+    // p25: 96 of 155 rows, covered in truth 56))
     const boxes = objects.filter(o => !o.vr && o.y1 - o.y0 > 4);
     for (let i = objects.length - 1; i >= 0; i--) {
       const o = objects[i];
       if (!o.vr) continue;
-      let cov = 0;
+      const covered = new Uint8Array(o.y1 - o.y0);
       for (const b of boxes)
         if (o.x0 >= b.x0 - 2 && o.x1 <= b.x1 + 2)
-          cov += Math.max(0, Math.min(o.y1, b.y1) - Math.max(o.y0, b.y0));
+          covered.fill(1, Math.max(0, b.y0 - o.y0), Math.max(0, Math.min(o.y1, b.y1) - o.y0));
+      let cov = 0;
+      for (const c of covered) cov += c;
       if (cov > 0.6 * (o.y1 - o.y0)) objects.splice(i, 1);
     }
     // SHORT UNDERLINES (2026-10-11). An underline under one short word —
@@ -899,6 +985,253 @@
     mask._edge = edge;
     mask._edgeV = edgeV;
     return { mask, objects };
+  }
+
+  // ---- which boxes are redaction bars ----
+  // detectObjects types by height alone (≤ 4 rows a rule, taller a box), so
+  // anything dark and wide arrives as a 'box': the reader only needs it
+  // masked. A consumer asking where the redactions are needs more, and the
+  // shape answers most of it from the pixels alone, before any line is read:
+  // a redaction is a filled rectangle laid over text, on paper — bounded by
+  // paper, by the text it did not cover, or by another bar. What arrives as
+  // a box and is none:
+  //   'sliver'      under 5 px wide: a piece the box passes cut off a bar's
+  //                 end or a frame's side; no name fits it.
+  //   'page edge'   a band along an edge of the page, half its length or
+  //                 more: a scan's border, a page-wide banner.
+  //   'dark shape'  a piece of something solid that is no rectangle, judged
+  //                 on the page's solid CORE — dark (≤ CORE_DARK) with its
+  //                 whole 5 × 5 neighbourhood, so glyph strokes (1–4 px) and
+  //                 a bar's soft rim fall away — taking the core component
+  //                 the box is part of, within SHAPE_WIN px. It reaches past
+  //                 the box where no other object is, by a 9 × 9 block's
+  //                 worth (OUTSIDE_MIN: a big letter's stem, the rest of a
+  //                 logo; a bold scanned glyph or a marker bar's round end
+  //                 is a few pixels); or it closes round HOLES_MIN
+  //                 paper-light pixels or more in letter-shaped holes (white
+  //                 letters on a black plate: a banner, a button, a table's
+  //                 header, a reversed-out logo — letters closer than the
+  //                 erosion are one hole, so it is their light that counts);
+  //                 or a side of its outline slides one way, 5 px or more at
+  //                 a pixel every 4 rows or faster (a bullet's round caps, a
+  //                 letter's diagonal, a photograph). Stacked bars stay
+  //                 rectangles: their outline steps where one bar meets the
+  //                 next, and a separator between two bars of a line is a
+  //                 slot. The boxes whose cores join are one shape and share
+  //                 its verdict.
+  //   'lone rule'   thin (≤ THIN_ROWS rows) and no text at it: nothing
+  //                 peeking past its long edges and no ink on its rows
+  //                 within BESIDE_PX of its ends — a form's thick rule, a
+  //                 table's border, a footer line (5–8 rows). A bar that
+  //                 thin is laid over small text and the text shows: the
+  //                 39 × 7 bar over `Nadia` in EFTA01987274's header leaves
+  //                 the descenders below it, and `From:` stands 19 px to its
+  //                 left (a label's tab stop can be 35: `bill    ████`).
+  //                 Peeking ink touches the bar — the row on its edge, where
+  //                 a cut glyph goes on; a table keeps a blank row between
+  //                 its text and its rules — and is a row of strokes, not of
+  //                 fill (≤ 70 % of the width): fill there that no object
+  //                 owns makes the box the slice of a dark plate ('dark
+  //                 shape'). A thin box within 3 rows of a taller box is a
+  //                 slice of that stack, judged with it. A bar of 9 rows and
+  //                 more passes: a line of small text redacted alone on its
+  //                 line (a signature under `Kind regards,`) is that tall.
+  // Ink includes colour the page lost: on a colour page, text whose tint no
+  // pen explains is whitened (colourInk), and is the text all the same.
+  // Returns one verdict per object, null for the objects that are not boxes:
+  // { bar, why, outside, holes, drift, peek, beside } — why names what
+  // failed (null for a bar); the rest is the evidence, peek and beside the
+  // text at the box (glyph pixels on its edge rows, ink beside its ends),
+  // which a consumer may weigh against a line's height. Pure in the page
+  // pixels and the object list; the reader never calls it.
+  const CORE_DARK = 128, SHAPE_WIN = 40, OUTSIDE_MIN = 25, HOLES_MIN = 40, THIN_ROWS = 8, BESIDE_PX = 60;
+  function barShapes(page, objects) {
+    const { w, h, gray } = page;
+    if (!objects.some(o => o.type === 'box')) return objects.map(() => null);
+    // the solid core, separably: 5 dark in a row, then 5 such in a column —
+    // and its counterpart in paper, 5 × 5 light (> 160), which no white
+    // letter's 1–4 px strokes hold
+    const erode5 = test => {
+      const hr = new Uint8Array(w * h), out = new Uint8Array(w * h), vrun = new Uint8Array(w);
+      for (let y = 0; y < h; y++) {
+        let run = 0;
+        for (let x = 0, i = y * w; x < w; x++, i++) {
+          run = test(gray[i]) ? run + 1 : 0;
+          if (run >= 5) hr[i - 2] = 1;
+        }
+      }
+      for (let y = 0; y < h; y++)
+        for (let x = 0, i = y * w; x < w; x++, i++) {
+          vrun[x] = hr[i] ? Math.min(5, vrun[x] + 1) : 0;
+          if (vrun[x] >= 5) out[i - 2 * w] = 1;
+        }
+      return out;
+    };
+    const core = erode5(v => v <= CORE_DARK), paper = erode5(v => v > 160);
+    // every object's cells, one pixel wider for its soft rim
+    const owned = new Uint8Array(w * h);
+    for (const b of objects)
+      for (let y = Math.max(0, b.y0 - 1); y < Math.min(h, b.y1 + 1); y++)
+        owned.fill(1, y * w + Math.max(0, b.x0 - 1), y * w + Math.min(w, b.x1 + 1));
+    const links = objects.map(() => []);                  // boxes whose core joins this one's
+    const verdicts = objects.map((o, i) => {
+      if (o.type !== 'box') return null;
+      const bw = o.x1 - o.x0, bh = o.y1 - o.y0;
+      const v = { bar: true, why: null, outside: 0, holes: 0, drift: false, peek: null, beside: null };
+      if (bw < 5) return { ...v, bar: false, why: 'sliver' };
+      if (((o.y0 <= 0 || o.y1 >= h) && 2 * bw >= w) || ((o.x0 <= 0 || o.x1 >= w) && 2 * bh >= h))
+        return { ...v, bar: false, why: 'page edge' };
+      // the core component of the box, within SHAPE_WIN px of it
+      const wx0 = Math.max(0, o.x0 - SHAPE_WIN), wx1 = Math.min(w, o.x1 + SHAPE_WIN);
+      const wy0 = Math.max(0, o.y0 - SHAPE_WIN), wy1 = Math.min(h, o.y1 + SHAPE_WIN);
+      const ww = wx1 - wx0, wh = wy1 - wy0, cc = new Uint8Array(ww * wh), todo = [];
+      for (let y = o.y0; y < o.y1; y++)
+        for (let x = o.x0; x < o.x1; x++)
+          if (core[y * w + x]) { const k = (y - wy0) * ww + x - wx0; cc[k] = 1; todo.push(k); }
+      while (todo.length) {
+        const k = todo.pop(), x = k % ww, y = (k - x) / ww;
+        for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+          if (nx < 0 || ny < 0 || nx >= ww || ny >= wh) continue;
+          const k2 = ny * ww + nx;
+          if (!cc[k2] && core[(ny + wy0) * w + nx + wx0]) { cc[k2] = 1; todo.push(k2); }
+        }
+      }
+      // the boxes this core reaches into, past this box's own rows and
+      // columns (a box that merely contains another — a frame's bbox round a
+      // bar — reaches nothing of it)
+      objects.forEach((b, j) => {
+        if (j === i || b.type !== 'box') return;
+        const x0 = Math.max(b.x0, wx0), x1 = Math.min(b.x1, wx1), y0 = Math.max(b.y0, wy0), y1 = Math.min(b.y1, wy1);
+        for (let y = y0; y < y1; y++)
+          for (let x = x0; x < x1; x++)
+            if (cc[(y - wy0) * ww + x - wx0] && !(x >= o.x0 && x < o.x1 && y >= o.y0 && y < o.y1)) { links[i].push(j); links[j].push(i); return; }
+      });
+      // reach: core past the box where no object is
+      const colTop = new Int32Array(ww).fill(-1), colBot = new Int32Array(ww).fill(-1);
+      for (let y = 0; y < wh; y++)
+        for (let x = 0; x < ww; x++) {
+          if (!cc[y * ww + x]) continue;
+          if (colTop[x] < 0) colTop[x] = y;
+          colBot[x] = y;
+          if (!owned[(y + wy0) * w + x + wx0]) v.outside++;
+        }
+      if (v.outside >= OUTSIDE_MIN) return { ...v, bar: false, why: 'dark shape' };
+      // holes: a gap between two runs of a row with core above AND below it
+      // in its columns; gaps on consecutive rows that overlap are one hole.
+      // Only a hole the shape of a letter counts, and what counts is its
+      // light pixels. Not the slot a separator leaves between two bars of a
+      // line, closed by the bars of the lines above and below (`<███>,
+      // "███` in a block of header bars): its sides keep their columns, and
+      // slots that line up on three lines step twice (EFTA00334125 p2, bars
+      // a `/` separates) where a letter's outline steps row after row. Not
+      // the seam where one line's bars meet the next's: a row or two of
+      // soft edge that the erosion widens to a 6-row hole, light (> 160) on
+      // 1–2 of them (EFTA00393954 p1 y859) — a letter is light on 4 rows or
+      // more. Not the slivers a `/` leaves (under 20 light pixels). And not
+      // open paper: 5 × 5 light, which no white letter's strokes hold.
+      let open = [];
+      const found = [];
+      const L = [], R = [];                                // outline, per row of the component
+      for (let y = 0; y < wh; y++) {
+        const runs = [];
+        for (let x = 0; x < ww; x++) {
+          if (!cc[y * ww + x]) continue;
+          let e = x;
+          while (e < ww && cc[y * ww + e]) e++;
+          runs.push([x, e]); x = e;
+        }
+        if (runs.length) { L.push(runs[0][0]); R.push(runs[runs.length - 1][1]); }
+        const gaps = [];
+        for (let m = 1; m < runs.length; m++) {
+          const g0 = runs[m - 1][1], g1 = runs[m][0];
+          let up = false, dn = false;
+          for (let x = g0; x < g1 && !(up && dn); x++) {
+            if (colTop[x] >= 0 && colTop[x] < y) up = true;
+            if (colBot[x] > y) dn = true;
+          }
+          if (up && dn) gaps.push([g0, g1]);
+        }
+        const next = [];
+        for (const [g0, g1] of gaps) {
+          let hole = open.find(p => p.g0 < g1 && p.g1 > g0)?.hole;
+          if (!hole) found.push(hole = { rows: 0, px: 0, steps: 0 });
+          if (hole.y === y - 1 && (g0 !== hole.g0 || g1 !== hole.g1)) hole.steps++;
+          hole.y = y; hole.g0 = g0; hole.g1 = g1;
+          let light = 0;                                   // paper-light pixels of the gap
+          for (let x = g0, off = (y + wy0) * w + wx0; x < g1; x++) {
+            if (gray[off + x] > 160) light++;
+            if (paper[off + x]) hole.paper = true;
+          }
+          if (light && hole.at !== y) { hole.rows++; hole.at = y; }
+          hole.px += light;
+          next.push({ g0, g1, hole });
+        }
+        open = next;
+      }
+      for (const hl of found)
+        if (hl.steps > 2 && hl.rows >= 4 && hl.px >= 20 && !hl.paper) v.holes += hl.px;
+      if (v.holes >= HOLES_MIN) return { ...v, bar: false, why: 'dark shape' };
+      // drift: a side that slides one way through small steps (≤ 2 px a
+      // row), 5 px or more and at least a pixel every 4 rows — a curve, a
+      // diagonal. Where one bar meets the next the side jumps, a bar's soft
+      // edge jitters by a pixel and back, a skewed scan's moves a pixel in
+      // dozens of rows: none of them slides.
+      for (const side of [L, R]) {
+        let s = 0, dir = 0;
+        for (let m = 1; m <= side.length; m++) {
+          const d = m < side.length ? side[m] - side[m - 1] : 99;
+          if (Math.abs(d) <= 2 && (d === 0 || dir === 0 || Math.sign(d) === dir)) { if (d) dir = Math.sign(d); continue; }
+          const net = Math.abs(side[m - 1] - side[s]), rows = m - 1 - s;
+          if (net >= 5 && rows <= 4 * net) v.drift = true;
+          // a turn starts the next slide where this one ended
+          if (Math.abs(d) <= 2) { s = m - 1; dir = Math.sign(d); } else { s = m; dir = 0; }
+        }
+      }
+      if (v.drift) return { ...v, bar: false, why: 'dark shape' };
+      // ink, or colour the page lost (`John C <████> wrote:` in warm dark
+      // gray, whitened, EFTA01193766)
+      const lost = page.whitened;
+      const ink = (x, y) => !owned[y * w + x] && (gray[y * w + x] < CORE_DARK || (lost && lost[y * w + x]));
+      // the text at it: strokes on the rows touching its long edges, ink on
+      // its own rows near its ends — evidence for every box, a condition
+      // for a thin one
+      let peek = 0, fill = false;
+      for (const y of [o.y0 - 1, o.y1]) {
+        if (y < 0 || y >= h) continue;
+        let n = 0;
+        for (let x = o.x0; x < o.x1; x++) if (ink(x, y)) n++;
+        if (n <= 0.7 * bw) peek = Math.max(peek, n);
+        else fill = true;
+      }
+      let beside = 0;
+      for (let y = o.y0; y < o.y1; y++) {
+        for (let x = Math.max(0, o.x0 - BESIDE_PX); x < o.x0; x++) if (ink(x, y)) beside++;
+        for (let x = o.x1; x < Math.min(w, o.x1 + BESIDE_PX); x++) if (ink(x, y)) beside++;
+      }
+      v.peek = peek; v.beside = beside;
+      if (bh > THIN_ROWS) return v;
+      // a thin box: a slice of a stack is its stack's business
+      if (objects.some(b => b !== o && b.type === 'box' && b.y1 - b.y0 > THIN_ROWS &&
+          b.x0 < o.x1 && b.x1 > o.x0 && b.y0 <= o.y1 + 3 && b.y1 >= o.y0 - 3))
+        return v;
+      if (fill) return { ...v, bar: false, why: 'dark shape' };
+      if (peek < 3 && beside < 3) return { ...v, bar: false, why: 'lone rule' };
+      return v;
+    });
+    // One shape, one verdict: the pieces of a plate whose core joins up are
+    // all the plate's, also the slice whose own window never reached the
+    // lettering (`Manage Your Booking`, the band right of the words).
+    const seen = new Uint8Array(objects.length);
+    verdicts.forEach((v, i) => {
+      if (!v || seen[i]) return;
+      const group = [i];
+      seen[i] = 1;
+      for (let k = 0; k < group.length; k++)
+        for (const j of links[group[k]]) if (!seen[j]) { seen[j] = 1; group.push(j); }
+      if (group.some(j => verdicts[j]?.why === 'dark shape'))
+        for (const j of group) if (verdicts[j]?.bar) verdicts[j] = { ...verdicts[j], bar: false, why: 'dark shape' };
+    });
+    return verdicts;
   }
 
   // ---- ink bands ----
@@ -2937,7 +3270,7 @@
     return boxes.some(bx => bx[0] + 2 >= prev.pen && bx[0] + 2 < next.pen && bx[1] > prev.pen + prev.adv);
   }
 
-  const api = { unionSets, quantMap, detectObjects, findBands, anchorGroups, boxBetween,
+  const api = { unionSets, quantMap, detectObjects, barShapes, findBands, anchorGroups, boxBetween,
     CHAIN_PROBES, scanLine, probeBaseline, spaceCalib, readPage, colourInk, snapConverted };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.OCREngine = api;

@@ -103,10 +103,20 @@
   // one box: { keep, why, black, onLine, gap, hPitch } — why names what
   // failed ('not black', 'narrow and taller than a line', 'shorter than a
   // line', 'away from the text'), null when the box stays
-  function verdict(page, lines, ob, g = grid(lines)) {
+  // shape: the engine's barShapes verdict for this box ({ bar, why, peek,
+  // beside }), when the engine has one. A box whose shape is no bar's — a
+  // sliver, a band along the page's edge, a piece of a logo or of a plate of
+  // white lettering, a thick rule with no text at it — goes, whatever the
+  // grid says. A thin bar the text shows at (glyphs cut at its edge, words
+  // on its rows) is a bar over small text, however short against the
+  // page's lines: EFTA01987274's 39 × 7 bar over an 8-pt name, on a page
+  // whose lines are 14 rows.
+  function verdict(page, lines, ob, g = grid(lines), shape = null) {
     const black = blackness(page, ob);
     const out = { keep: true, why: null, black: +black.toFixed(3), onLine: null, gap: null, hPitch: null };
     if (black < BLACK_FRACTION) return { ...out, keep: false, why: 'not black' };
+    if (shape && !shape.bar) return { ...out, keep: false, why: shape.why };
+    const atText = !!shape && (shape.peek >= 3 || shape.beside >= 3);
     if (!g) {
       // no grid to judge by (fewer than MIN_ROWS rows): the lines' own bands
       // stand in for the pitch in the one test a size decides — a bar covers
@@ -115,7 +125,7 @@
       // no longer counted inside it)
       const bands = (lines || []).map(L => L.bot - L.top).filter(h => h > 0).sort((p, q) => p - q);
       const band = bands.length ? bands[bands.length >> 1] : 0;
-      if (band && ob.y1 - ob.y0 < GRID_MIN_H * band) return { ...out, keep: false, why: 'shorter than a line' };
+      if (band && ob.y1 - ob.y0 < GRID_MIN_H * band && !atText) return { ...out, keep: false, why: 'shorter than a line' };
       return out;
     }
     const h = ob.y1 - ob.y0, w = ob.x1 - ob.x0;
@@ -125,7 +135,7 @@
     // a bar is never shorter than GRID_MIN_H of a line: a thick rule (5–8
     // rows, past the engine's 4-row rule limit) is, and would still touch
     // the next line's band by half its own height
-    if (h < GRID_MIN_H * g.pitch) return { ...out, keep: false, why: 'shorter than a line' };
+    if (h < GRID_MIN_H * g.pitch && !atText) return { ...out, keep: false, why: 'shorter than a line' };
     if (a.onLine >= ON_LINE || a.gap <= GRID_GAP * g.pitch) return out;
     return { ...out, keep: false, why: 'away from the text' };
   }
@@ -211,9 +221,12 @@
   function filter(page, lines, objects) {
     const g = grid(lines);
     const kept = [], dropped = [];
-    for (const o of deoverlap(restack(objects, g))) {
+    const objs = deoverlap(restack(objects, g));
+    const E = typeof OCREngine !== 'undefined' ? OCREngine : null;   // the engine, when it is loaded beside this file
+    const shapes = E && typeof E.barShapes === 'function' ? E.barShapes(page, objs) : null;
+    for (const [i, o] of objs.entries()) {
       if (o.type !== 'box') { kept.push(o); continue; }
-      const v = verdict(page, lines, o, g);
+      const v = verdict(page, lines, o, g, shapes?.[i] ?? null);
       if (v.keep) kept.push(o);
       else dropped.push({ x0: o.x0, y0: o.y0, x1: o.x1, y1: o.y1, black: v.black, onLine: v.onLine, gap: v.gap, hPitch: v.hPitch, why: v.why });
     }
