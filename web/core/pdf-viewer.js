@@ -170,6 +170,9 @@ async function goToPage(pageNum) {
   let src, size;
   try { [src, size] = await Promise.all([Doc.pageImageURL(pageNum), Doc.pageSize(pageNum)]); }
   catch (e) {
+    // its document was closed while it loaded (another was opened): no error,
+    // the open that closed it owns the screen and reports its own outcome
+    if (e.closed) return;
     console.error(`Page ${pageNum}:`, e.message);
     if (turn === goToPage.turn && hash === state.docHash) showPageError(pageNum, e.message);
     return;

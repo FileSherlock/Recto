@@ -119,8 +119,10 @@
     return ready;
   }
 
+  // A request cut off here failed because its document went away, not because
+  // anything was wrong with it: `closed` lets a caller tell the two apart.
   function stopWorker() {
-    const err = new Error('the document was closed');
+    const err = Object.assign(new Error('the document was closed'), { closed: true });
     if (inflight) { inflight.reject(err); inflight = null; }
     while (queue.length) queue.shift().reject(err);
     worker?.terminate();
